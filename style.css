@@ -196,20 +196,6 @@ button, input, select, textarea {
 .chapter-btn:hover { background: var(--surface-alt); }
 .chapter-btn.active { background: var(--accent-soft); color: var(--accent); font-weight: 700; }
 
-.chapter-del {
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  padding: 4px 6px;
-  border-radius: 6px;
-  font-size: 0.85rem;
-  opacity: 0;
-  transition: opacity .15s ease;
-}
-.chapter-item:hover .chapter-del { opacity: 1; }
-.chapter-del:hover { color: var(--danger); background: var(--surface-alt); }
-
 .overlay {
   display: none;
   position: fixed;
@@ -295,6 +281,29 @@ button, input, select, textarea {
   color: var(--text-muted);
   text-align: center;
   padding: 40px 0;
+}
+
+.chapter-footer {
+  margin-top: 32px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.btn-delete-chapter {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  padding: 8px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+.btn-delete-chapter:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+  background: var(--surface-alt);
 }
 
 /* ---------- Modal ---------- */

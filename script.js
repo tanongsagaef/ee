@@ -315,25 +315,6 @@ function renderSidebar() {
       overlay.classList.remove("open");
     });
     li.appendChild(btn);
-
-    const del = document.createElement("button");
-    del.className = "chapter-del";
-    del.title = "ลบบทนี้";
-    del.textContent = "✕";
-    del.addEventListener("click", async (e) => {
-      e.stopPropagation();
-      if (confirm(`ลบบท "${ch.title}" ทั้งหมดหรือไม่?`)) {
-        chapters = chapters.filter(c => c.id !== ch.id);
-        if (activeChapterId === ch.id) {
-          activeChapterId = chapters[0]?.id;
-        }
-        await saveData();
-        renderSidebar();
-        renderContent();
-      }
-    });
-    li.appendChild(del);
-
     list.appendChild(li);
   });
 }
@@ -383,6 +364,10 @@ function renderContent() {
     html += `</article>`;
   });
 
+  html += `<div class="chapter-footer">
+    <button id="deleteChapterBtn" class="btn-delete-chapter">ลบบทนี้ทั้งหมด</button>
+  </div>`;
+
   content.innerHTML = html;
 
   content.querySelectorAll(".del-sec").forEach(btn => {
@@ -404,6 +389,16 @@ function renderContent() {
       const sec = chapter.sections.find(s => s.id === secId);
       startEditSection(card, chapter, sec);
     });
+  });
+
+  document.getElementById("deleteChapterBtn").addEventListener("click", async () => {
+    if (confirm(`ลบบท "${chapter.title}" ทั้งหมดหรือไม่? การลบนี้ไม่สามารถย้อนกลับได้`)) {
+      chapters = chapters.filter(c => c.id !== chapter.id);
+      activeChapterId = chapters[0]?.id;
+      await saveData();
+      renderSidebar();
+      renderContent();
+    }
   });
 }
 
