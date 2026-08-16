@@ -28,7 +28,13 @@
 <div class="layout">
   <nav id="sidebar" class="sidebar">
     <ul id="chapterList" class="chapter-list"></ul>
-    <button id="resetBtn" class="link-btn">รีเซ็ตเนื้อหาเริ่มต้น</button>
+    <div class="sidebar-footer">
+      <button id="exportBtn" class="link-btn">ส่งออกข้อมูล (สำรอง/ย้ายเครื่อง)</button>
+      <button id="importBtn" class="link-btn">นำเข้าข้อมูลจากไฟล์สำรอง</button>
+      <input type="file" id="importInput" accept="application/json" hidden>
+      <p class="sidebar-hint">นำเข้าจะเพิ่มเป็นบทใหม่ต่อท้าย ไม่ทับเนื้อหาเดิม</p>
+      <button id="resetBtn" class="link-btn">รีเซ็ตเนื้อหาเริ่มต้น</button>
+    </div>
   </nav>
   <div id="overlay" class="overlay"></div>
 

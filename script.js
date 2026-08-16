@@ -510,6 +510,105 @@ document.getElementById("resetBtn").addEventListener("click", async () => {
   }
 });
 
+/* ---------- Export / Import (backup, move between devices) ----------
+   IndexedDB is per-browser/per-device only, so this gives users a way to
+   carry their own added content (images/PDFs included) between devices. */
+
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function base64ToBlob(dataUrl) {
+  const res = await fetch(dataUrl);
+  return res.blob();
+}
+
+function triggerDownload(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+const exportBtn = document.getElementById("exportBtn");
+const importBtn = document.getElementById("importBtn");
+const importInput = document.getElementById("importInput");
+
+exportBtn.addEventListener("click", async () => {
+  exportBtn.disabled = true;
+  const originalLabel = exportBtn.textContent;
+  exportBtn.textContent = "กำลังเตรียมไฟล์...";
+  try {
+    const exportChapters = [];
+    for (const ch of chapters) {
+      const sections = [];
+      for (const sec of ch.sections) {
+        const copy = { ...sec };
+        if (sec.pdf) copy.pdf = await blobToBase64(sec.pdf);
+        sections.push(copy);
+      }
+      exportChapters.push({ title: ch.title, desc: ch.desc, sections });
+    }
+    const payload = { version: 1, exportedAt: new Date().toISOString(), chapters: exportChapters };
+    const blob = new Blob([JSON.stringify(payload)], { type: "application/json" });
+    const stamp = new Date().toISOString().slice(0, 10);
+    triggerDownload(blob, `elliott-wave-review-backup-${stamp}.json`);
+  } catch (err) {
+    console.error(err);
+    alert("ส่งออกข้อมูลไม่สำเร็จ");
+  } finally {
+    exportBtn.disabled = false;
+    exportBtn.textContent = originalLabel;
+  }
+});
+
+importBtn.addEventListener("click", () => importInput.click());
+importInput.addEventListener("change", async () => {
+  const file = importInput.files[0];
+  importInput.value = "";
+  if (!file) return;
+
+  try {
+    const parsed = JSON.parse(await file.text());
+    if (!parsed || !Array.isArray(parsed.chapters)) {
+      alert("รูปแบบไฟล์ไม่ถูกต้อง");
+      return;
+    }
+
+    const importedChapters = [];
+    for (const ch of parsed.chapters) {
+      const sections = [];
+      for (const sec of (ch.sections || [])) {
+        const newSec = { ...sec, id: uid() };
+        if (typeof newSec.pdf === "string" && newSec.pdf.startsWith("data:")) {
+          newSec.pdf = await base64ToBlob(newSec.pdf);
+        }
+        sections.push(newSec);
+      }
+      importedChapters.push({ id: uid(), title: ch.title || "บทที่นำเข้า", desc: ch.desc || "", sections });
+    }
+
+    chapters = chapters.concat(importedChapters);
+    await saveData();
+    activeChapterId = importedChapters[0]?.id || activeChapterId;
+    renderSidebar();
+    renderContent();
+    alert(`นำเข้าเนื้อหาเรียบร้อย ${importedChapters.length} บท`);
+  } catch (err) {
+    console.error(err);
+    alert("นำเข้าข้อมูลไม่สำเร็จ ไฟล์อาจเสียหายหรือไม่ใช่ไฟล์สำรองที่ถูกต้อง");
+  }
+});
+
 /* ---------- Modal: add content ---------- */
 
 const modal = document.getElementById("modal");

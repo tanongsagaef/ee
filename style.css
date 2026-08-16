@@ -123,10 +123,27 @@ button, input, select, textarea {
   font-size: 0.85rem;
   cursor: pointer;
   text-decoration: underline;
-  padding: 10px 6px;
+  padding: 8px 6px;
   align-self: flex-start;
 }
-.link-btn:hover { color: var(--danger); }
+.link-btn:hover { color: var(--accent); }
+
+.sidebar-footer {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--border);
+  margin-top: 8px;
+  padding-top: 6px;
+}
+.sidebar-footer #resetBtn:hover { color: var(--danger); }
+
+.sidebar-hint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin: 0 0 4px;
+  padding: 0 6px;
+  line-height: 1.4;
+}
 
 /* ---------- Layout ---------- */
 .layout {
