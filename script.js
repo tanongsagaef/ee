@@ -248,6 +248,7 @@ async function saveData() {
 
 let chapters = [];
 let activeChapterId = null;
+let activeView = "home"; // "home" | "chapter"
 
 function uid() {
   return Math.random().toString(36).slice(2, 9);
@@ -295,9 +296,21 @@ overlay.addEventListener("click", () => {
   overlay.classList.remove("open");
 });
 
+document.getElementById("homeBtn").addEventListener("click", () => {
+  activeView = "home";
+  activeChapterId = null;
+  renderSidebar();
+  renderContent();
+  sidebar.classList.remove("open");
+  overlay.classList.remove("open");
+});
+
 /* ---------- Render ---------- */
 
 function renderSidebar() {
+  const homeBtn = document.getElementById("homeBtn");
+  homeBtn.classList.toggle("active", activeView === "home");
+
   const list = document.getElementById("chapterList");
   list.innerHTML = "";
   chapters.forEach(ch => {
@@ -305,9 +318,10 @@ function renderSidebar() {
     li.className = "chapter-item";
 
     const btn = document.createElement("button");
-    btn.className = "chapter-btn" + (ch.id === activeChapterId ? " active" : "");
+    btn.className = "chapter-btn" + (activeView === "chapter" && ch.id === activeChapterId ? " active" : "");
     btn.textContent = ch.title;
     btn.addEventListener("click", () => {
+      activeView = "chapter";
       activeChapterId = ch.id;
       renderSidebar();
       renderContent();
@@ -325,6 +339,47 @@ function renderContent() {
   sectionObjectUrls.forEach(u => URL.revokeObjectURL(u));
   sectionObjectUrls = [];
 
+  if (activeView === "home") {
+    renderHomeContent();
+    return;
+  }
+  renderChapterContent();
+}
+
+function renderHomeContent() {
+  const content = document.getElementById("content");
+
+  if (!chapters.length) {
+    content.innerHTML = `<h1>ทบทวน Elliott Wave</h1><p class="empty-chapter">ยังไม่มีบทเนื้อหา กด "+ เพิ่มเนื้อหา" เพื่อเริ่มต้น</p>`;
+    return;
+  }
+
+  let html = `<h1>ทบทวน Elliott Wave</h1><p class="chapter-desc">สรุปเนื้อหาทั้งหมด — เลือกบทที่ต้องการอ่านต่อ</p>`;
+  html += `<div class="home-grid">`;
+  chapters.forEach(ch => {
+    const subCount = ch.sections.reduce((n, s) => n + (s.subsections ? s.subsections.length : 0), 0);
+    let meta = `${ch.sections.length} หัวข้อหลัก`;
+    if (subCount) meta += ` · ${subCount} หัวข้อย่อย`;
+    html += `<button class="home-card" data-chapter-id="${ch.id}">
+      <div class="home-card-title">${escapeHtml(ch.title)}</div>
+      <div class="home-card-desc">${escapeHtml(ch.desc || "")}</div>
+      <div class="home-card-meta">${meta}</div>
+    </button>`;
+  });
+  html += `</div>`;
+  content.innerHTML = html;
+
+  content.querySelectorAll(".home-card").forEach(btn => {
+    btn.addEventListener("click", () => {
+      activeView = "chapter";
+      activeChapterId = btn.dataset.chapterId;
+      renderSidebar();
+      renderContent();
+    });
+  });
+}
+
+function renderChapterContent() {
   const content = document.getElementById("content");
   const chapter = chapters.find(c => c.id === activeChapterId);
   if (!chapter) {
@@ -340,6 +395,7 @@ function renderContent() {
   }
 
   chapter.sections.forEach(sec => {
+    if (!sec.subsections) sec.subsections = [];
     html += `<article class="section-card" data-section-id="${sec.id}">`;
     if (sec.title) html += `<h3>${escapeHtml(sec.title)}</h3>`;
     if (sec.html) html += sec.html;
@@ -355,12 +411,28 @@ function renderContent() {
           <a href="${url}" download="${escapeAttr(sec.pdfName || "document.pdf")}">ดาวน์โหลด</a>
         </div>`;
     }
-    if (!sec.html) {
-      html += `<div class="section-actions">
-        <button class="edit-sec">แก้ไข</button>
-        <button class="danger del-sec">ลบ</button>
-      </div>`;
+
+    if (sec.subsections.length) {
+      html += `<div class="subsection-list">`;
+      sec.subsections.forEach(sub => {
+        html += `<div class="subsection-card" data-subsection-id="${sub.id}">
+          <h4>${escapeHtml(sub.title)}</h4>
+          ${sub.text ? `<div class="section-text">${escapeHtml(sub.text)}</div>` : ""}
+          <div class="section-actions">
+            <button class="edit-subsec">แก้ไข</button>
+            <button class="danger del-subsec">ลบ</button>
+          </div>
+        </div>`;
+      });
+      html += `</div>`;
     }
+
+    html += `<div class="section-actions">`;
+    if (!sec.html) {
+      html += `<button class="edit-sec">แก้ไข</button><button class="danger del-sec">ลบ</button>`;
+    }
+    html += `<button class="add-subsec">+ เพิ่มหัวข้อย่อย</button>`;
+    html += `</div>`;
     html += `</article>`;
   });
 
@@ -391,15 +463,105 @@ function renderContent() {
     });
   });
 
+  content.querySelectorAll(".add-subsec").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const card = btn.closest(".section-card");
+      const secId = card.dataset.sectionId;
+      const sec = chapter.sections.find(s => s.id === secId);
+      startAddSubsection(card, sec);
+    });
+  });
+
+  content.querySelectorAll(".edit-subsec").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const subCard = btn.closest(".subsection-card");
+      const card = btn.closest(".section-card");
+      const sec = chapter.sections.find(s => s.id === card.dataset.sectionId);
+      const sub = sec.subsections.find(s => s.id === subCard.dataset.subsectionId);
+      startEditSubsection(subCard, sub);
+    });
+  });
+
+  content.querySelectorAll(".del-subsec").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const subCard = btn.closest(".subsection-card");
+      const card = btn.closest(".section-card");
+      const sec = chapter.sections.find(s => s.id === card.dataset.sectionId);
+      const subId = subCard.dataset.subsectionId;
+      if (confirm("ลบหัวข้อย่อยนี้หรือไม่?")) {
+        sec.subsections = sec.subsections.filter(s => s.id !== subId);
+        await saveData();
+        renderContent();
+      }
+    });
+  });
+
   document.getElementById("deleteChapterBtn").addEventListener("click", async () => {
     if (confirm(`ลบบท "${chapter.title}" ทั้งหมดหรือไม่? การลบนี้ไม่สามารถย้อนกลับได้`)) {
       chapters = chapters.filter(c => c.id !== chapter.id);
-      activeChapterId = chapters[0]?.id;
+      if (chapters.length) {
+        activeChapterId = chapters[0].id;
+        activeView = "chapter";
+      } else {
+        activeChapterId = null;
+        activeView = "home";
+      }
       await saveData();
       renderSidebar();
       renderContent();
     }
   });
+}
+
+function startAddSubsection(card, sec) {
+  let list = card.querySelector(".subsection-list");
+  if (!list) {
+    list = document.createElement("div");
+    list.className = "subsection-list";
+    const actions = card.querySelector(".section-actions");
+    card.insertBefore(list, actions);
+  }
+
+  const form = document.createElement("div");
+  form.className = "subsection-card subsection-form";
+  form.innerHTML = `
+    <input type="text" class="edit-subsec-title" placeholder="หัวข้อย่อย">
+    <textarea class="edit-subsec-text" rows="4" placeholder="เนื้อหา"></textarea>
+    <div class="section-actions">
+      <button class="save-subsec">บันทึก</button>
+      <button class="cancel-subsec">ยกเลิก</button>
+    </div>
+  `;
+  list.appendChild(form);
+  form.querySelector(".edit-subsec-title").focus();
+
+  form.querySelector(".save-subsec").addEventListener("click", async () => {
+    const title = form.querySelector(".edit-subsec-title").value.trim();
+    const text = form.querySelector(".edit-subsec-text").value.trim();
+    if (!title && !text) { form.remove(); return; }
+    sec.subsections.push({ id: uid(), title: title || "หัวข้อย่อยใหม่", text });
+    await saveData();
+    renderContent();
+  });
+  form.querySelector(".cancel-subsec").addEventListener("click", () => form.remove());
+}
+
+function startEditSubsection(subCard, sub) {
+  subCard.innerHTML = `
+    <input type="text" class="edit-subsec-title" value="${escapeAttr(sub.title || "")}" placeholder="หัวข้อย่อย">
+    <textarea class="edit-subsec-text" rows="4">${sub.text || ""}</textarea>
+    <div class="section-actions">
+      <button class="save-subsec">บันทึก</button>
+      <button class="cancel-subsec">ยกเลิก</button>
+    </div>
+  `;
+  subCard.querySelector(".save-subsec").addEventListener("click", async () => {
+    sub.title = subCard.querySelector(".edit-subsec-title").value.trim() || sub.title;
+    sub.text = subCard.querySelector(".edit-subsec-text").value.trim();
+    await saveData();
+    renderContent();
+  });
+  subCard.querySelector(".cancel-subsec").addEventListener("click", renderContent);
 }
 
 function startEditSection(card, chapter, sec) {
@@ -500,6 +662,7 @@ document.getElementById("resetBtn").addEventListener("click", async () => {
     chapters = JSON.parse(JSON.stringify(DEFAULT_CHAPTERS));
     await saveData();
     activeChapterId = chapters[0]?.id;
+    activeView = "chapter";
     renderSidebar();
     renderContent();
   }
@@ -595,6 +758,7 @@ importInput.addEventListener("change", async () => {
     chapters = chapters.concat(importedChapters);
     await saveData();
     activeChapterId = importedChapters[0]?.id || activeChapterId;
+    activeView = "chapter";
     renderSidebar();
     renderContent();
     alert(`นำเข้าเนื้อหาเรียบร้อย ${importedChapters.length} บท`);
@@ -1002,6 +1166,7 @@ document.getElementById("saveContentBtn").addEventListener("click", async () => 
   }
 
   activeChapterId = targetChapter.id;
+  activeView = "chapter";
   await saveData();
   renderSidebar();
   renderContent();
@@ -1011,7 +1176,8 @@ document.getElementById("saveContentBtn").addEventListener("click", async () => 
 /* ---------- Init ---------- */
 (async function init() {
   chapters = await loadData();
-  activeChapterId = chapters[0]?.id;
+  activeView = "home";
+  activeChapterId = null;
   renderSidebar();
   renderContent();
 })();

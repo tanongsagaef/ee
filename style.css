@@ -197,6 +197,14 @@ button, input, select, textarea {
 .chapter-btn:hover { background: var(--surface-alt); }
 .chapter-btn.active { background: var(--accent-soft); color: var(--accent); font-weight: 700; }
 
+.home-nav-btn {
+  font-weight: 700;
+  border-bottom: 1px solid var(--border);
+  border-radius: 10px 10px 0 0;
+  margin-bottom: 8px;
+  padding-bottom: 14px;
+}
+
 .overlay {
   display: none;
   position: fixed;
@@ -282,6 +290,65 @@ button, input, select, textarea {
   color: var(--text-muted);
   text-align: center;
   padding: 40px 0;
+}
+
+/* ---------- Subsections (nested inside a section card) ---------- */
+.subsection-list {
+  margin-top: 16px;
+  padding-left: 16px;
+  border-left: 2px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.subsection-card h4 {
+  margin: 0 0 8px;
+  font-size: 0.98rem;
+}
+
+.subsection-form input,
+.subsection-form textarea {
+  margin-bottom: 8px;
+}
+
+/* ---------- Home page ---------- */
+.home-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+  margin-top: 8px;
+}
+
+.home-card {
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  transition: transform .1s ease, border-color .15s ease;
+}
+.home-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+
+.home-card-title {
+  font-weight: 700;
+  font-size: 1.05rem;
+  margin-bottom: 6px;
+}
+
+.home-card-desc {
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  line-height: 1.5;
+  margin-bottom: 10px;
+  min-height: 1.2em;
+}
+
+.home-card-meta {
+  font-size: 0.78rem;
+  color: var(--text-muted);
 }
 
 .chapter-footer {
