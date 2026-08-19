@@ -189,7 +189,7 @@ function renderChapterContent() {
     html += `<article class="section-card" data-section-id="${sec.id}">`;
     if (sec.title) html += `<h3>${escapeHtml(sec.title)}</h3>`;
     if (sec.html) html += sec.html;
-    if (sec.text) html += `<div class="section-text">${escapeHtml(sec.text)}</div>`;
+    if (sec.text) html += `<div class="section-text">${renderBodyText(sec.text)}</div>`;
     if (sec.image) html += `<img class="section-image" src="${sec.image}" alt="${escapeHtml(sec.title || "")}">`;
     if (sec.pdf) {
       const url = URL.createObjectURL(sec.pdf);
@@ -207,7 +207,7 @@ function renderChapterContent() {
       sec.subsections.forEach(sub => {
         html += `<div class="subsection-card" data-subsection-id="${sub.id}">
           <h4>${escapeHtml(sub.title)}</h4>
-          ${sub.text ? `<div class="section-text">${escapeHtml(sub.text)}</div>` : ""}
+          ${sub.text ? `<div class="section-text">${renderBodyText(sub.text)}</div>` : ""}
           ${sub.image ? `<img class="section-image" src="${sub.image}" alt="${escapeHtml(sub.title || "")}">` : ""}
           <div class="section-actions">
             <button class="edit-subsec">แก้ไข</button>
@@ -475,14 +475,37 @@ function escapeHtml(str) {
 }
 function escapeAttr(str) { return escapeHtml(str); }
 
+function renderBodyText(str) {
+  return escapeHtml(str).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+}
+
 /* ---------- Paste formatted content (e.g. from a webpage/Word/Docs) into a
    plain textarea while keeping the source's paragraph/line breaks — a
    browser's default plain-text paste often collapses those since HTML
    spaces paragraphs with margins, not literal newlines. ---------- */
 
+function isBoldElement(el) {
+  if (el.tagName === "B" || el.tagName === "STRONG") return true;
+  const fw = el.style && el.style.fontWeight;
+  if (!fw) return false;
+  if (fw === "bold" || fw === "bolder") return true;
+  const n = parseInt(fw, 10);
+  return !Number.isNaN(n) && n >= 600;
+}
+
 function htmlToPlainTextPreservingParagraphs(html) {
   const container = document.createElement("div");
   container.innerHTML = html;
+
+  // mark bold runs with **markdown-style** markers so the plain-text field
+  // can still carry them; processed top-down so nested bold-in-bold isn't
+  // double-wrapped (the inner element gets detached once the parent's
+  // textContent is replaced).
+  container.querySelectorAll("*").forEach(el => {
+    if (isBoldElement(el) && container.contains(el) && el.textContent.trim()) {
+      el.textContent = "**" + el.textContent + "**";
+    }
+  });
 
   container.querySelectorAll("br").forEach(br => br.replaceWith("\n"));
   container.querySelectorAll("li").forEach(li => li.prepend("- "));
