@@ -1,8 +1,10 @@
 :root {
+  color-scheme: light;
   --bg: #f6f7fb;
   --surface: #ffffff;
   --surface-alt: #eef0f7;
   --text: #1c1e2b;
+  --text-heading: #10121c;
   --text-muted: #5a5f75;
   --border: #e1e3ee;
   --accent: #5b5fef;
@@ -16,10 +18,12 @@
 }
 
 :root[data-theme="dark"] {
+  color-scheme: dark;
   --bg: #14151f;
   --surface: #1c1e2b;
   --surface-alt: #242639;
   --text: #eceefb;
+  --text-heading: #ffffff;
   --text-muted: #9a9db3;
   --border: #2e3049;
   --accent: #8386ff;
@@ -164,6 +168,7 @@ button, input, select, textarea {
 .content h1 {
   font-size: 1.6rem;
   margin: 0 0 6px;
+  color: var(--text-heading);
 }
 
 .content .chapter-desc {
@@ -184,6 +189,7 @@ button, input, select, textarea {
 .section-card h3 {
   margin: 0 0 10px;
   font-size: 1.08rem;
+  color: var(--text-heading);
 }
 
 .section-card .section-text {
@@ -245,6 +251,7 @@ button, input, select, textarea {
 .subsection-card h4 {
   margin: 0 0 8px;
   font-size: 0.98rem;
+  color: var(--text-heading);
 }
 
 .subsection-form input,
@@ -276,6 +283,7 @@ button, input, select, textarea {
   font-weight: 700;
   font-size: 1.05rem;
   margin-bottom: 6px;
+  color: var(--text-heading);
 }
 
 .home-card-desc {
