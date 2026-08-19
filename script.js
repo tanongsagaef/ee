@@ -282,56 +282,17 @@ document.getElementById("themeToggle").addEventListener("click", () => {
   applyTheme(current === "dark" ? "light" : "dark");
 });
 
-/* ---------- Sidebar / mobile menu ---------- */
+/* ---------- Home navigation ---------- */
 
-const sidebar = document.getElementById("sidebar");
-const overlay = document.getElementById("overlay");
-
-document.getElementById("menuToggle").addEventListener("click", () => {
-  sidebar.classList.toggle("open");
-  overlay.classList.toggle("open");
-});
-overlay.addEventListener("click", () => {
-  sidebar.classList.remove("open");
-  overlay.classList.remove("open");
-});
-
-document.getElementById("homeBtn").addEventListener("click", () => {
+function goHome() {
   activeView = "home";
   activeChapterId = null;
-  renderSidebar();
   renderContent();
-  sidebar.classList.remove("open");
-  overlay.classList.remove("open");
-});
+}
+
+document.getElementById("brandHome").addEventListener("click", goHome);
 
 /* ---------- Render ---------- */
-
-function renderSidebar() {
-  const homeBtn = document.getElementById("homeBtn");
-  homeBtn.classList.toggle("active", activeView === "home");
-
-  const list = document.getElementById("chapterList");
-  list.innerHTML = "";
-  chapters.forEach(ch => {
-    const li = document.createElement("li");
-    li.className = "chapter-item";
-
-    const btn = document.createElement("button");
-    btn.className = "chapter-btn" + (activeView === "chapter" && ch.id === activeChapterId ? " active" : "");
-    btn.textContent = ch.title;
-    btn.addEventListener("click", () => {
-      activeView = "chapter";
-      activeChapterId = ch.id;
-      renderSidebar();
-      renderContent();
-      sidebar.classList.remove("open");
-      overlay.classList.remove("open");
-    });
-    li.appendChild(btn);
-    list.appendChild(li);
-  });
-}
 
 let sectionObjectUrls = [];
 
@@ -348,9 +309,11 @@ function renderContent() {
 
 function renderHomeContent() {
   const content = document.getElementById("content");
+  const footer = `<div class="chapter-footer"><button id="resetBtn" class="link-btn">รีเซ็ตเนื้อหาเริ่มต้น</button></div>`;
 
   if (!chapters.length) {
-    content.innerHTML = `<h1>ทบทวน Elliott Wave</h1><p class="empty-chapter">ยังไม่มีบทเนื้อหา กด "+ เพิ่มเนื้อหา" เพื่อเริ่มต้น</p>`;
+    content.innerHTML = `<h1>ทบทวน Elliott Wave</h1><p class="empty-chapter">ยังไม่มีบทเนื้อหา กด "+ เพิ่มเนื้อหา" เพื่อเริ่มต้น</p>${footer}`;
+    wireResetBtn();
     return;
   }
 
@@ -367,15 +330,29 @@ function renderHomeContent() {
     </button>`;
   });
   html += `</div>`;
+  html += footer;
   content.innerHTML = html;
 
   content.querySelectorAll(".home-card").forEach(btn => {
     btn.addEventListener("click", () => {
       activeView = "chapter";
       activeChapterId = btn.dataset.chapterId;
-      renderSidebar();
       renderContent();
     });
+  });
+
+  wireResetBtn();
+}
+
+function wireResetBtn() {
+  document.getElementById("resetBtn").addEventListener("click", async () => {
+    if (confirm("รีเซ็ตกลับเป็นเนื้อหาเริ่มต้นทั้งหมด? เนื้อหาที่คุณเพิ่มเองจะถูกลบถาวร")) {
+      chapters = JSON.parse(JSON.stringify(DEFAULT_CHAPTERS));
+      await saveData();
+      activeChapterId = null;
+      activeView = "home";
+      renderContent();
+    }
   });
 }
 
@@ -387,7 +364,8 @@ function renderChapterContent() {
     return;
   }
 
-  let html = `<h1>${escapeHtml(chapter.title)}</h1>`;
+  let html = `<button class="back-home-link" id="backHomeLink">← หน้าหลัก</button>`;
+  html += `<h1>${escapeHtml(chapter.title)}</h1>`;
   if (chapter.desc) html += `<p class="chapter-desc">${escapeHtml(chapter.desc)}</p>`;
 
   if (!chapter.sections.length) {
@@ -441,6 +419,8 @@ function renderChapterContent() {
   </div>`;
 
   content.innerHTML = html;
+
+  content.querySelector("#backHomeLink").addEventListener("click", goHome);
 
   content.querySelectorAll(".del-sec").forEach(btn => {
     btn.addEventListener("click", async () => {
@@ -499,15 +479,9 @@ function renderChapterContent() {
   document.getElementById("deleteChapterBtn").addEventListener("click", async () => {
     if (confirm(`ลบบท "${chapter.title}" ทั้งหมดหรือไม่? การลบนี้ไม่สามารถย้อนกลับได้`)) {
       chapters = chapters.filter(c => c.id !== chapter.id);
-      if (chapters.length) {
-        activeChapterId = chapters[0].id;
-        activeView = "chapter";
-      } else {
-        activeChapterId = null;
-        activeView = "home";
-      }
+      activeChapterId = null;
+      activeView = "home";
       await saveData();
-      renderSidebar();
       renderContent();
     }
   });
@@ -657,17 +631,6 @@ function escapeHtml(str) {
 }
 function escapeAttr(str) { return escapeHtml(str); }
 
-document.getElementById("resetBtn").addEventListener("click", async () => {
-  if (confirm("รีเซ็ตกลับเป็นเนื้อหาเริ่มต้นทั้งหมด? เนื้อหาที่คุณเพิ่มเองจะถูกลบถาวร")) {
-    chapters = JSON.parse(JSON.stringify(DEFAULT_CHAPTERS));
-    await saveData();
-    activeChapterId = chapters[0]?.id;
-    activeView = "chapter";
-    renderSidebar();
-    renderContent();
-  }
-});
-
 /* ---------- Export / Import (backup, move between devices) ----------
    IndexedDB is per-browser/per-device only, so this gives users a way to
    carry their own added content (images/PDFs included) between devices. */
@@ -757,9 +720,8 @@ importInput.addEventListener("change", async () => {
 
     chapters = chapters.concat(importedChapters);
     await saveData();
-    activeChapterId = importedChapters[0]?.id || activeChapterId;
-    activeView = "chapter";
-    renderSidebar();
+    activeChapterId = null;
+    activeView = "home";
     renderContent();
     alert(`นำเข้าเนื้อหาเรียบร้อย ${importedChapters.length} บท`);
   } catch (err) {
@@ -1168,7 +1130,6 @@ document.getElementById("saveContentBtn").addEventListener("click", async () => 
   activeChapterId = targetChapter.id;
   activeView = "chapter";
   await saveData();
-  renderSidebar();
   renderContent();
   closeModal();
 });
@@ -1178,6 +1139,5 @@ document.getElementById("saveContentBtn").addEventListener("click", async () => 
   chapters = await loadData();
   activeView = "home";
   activeChapterId = null;
-  renderSidebar();
   renderContent();
 })();

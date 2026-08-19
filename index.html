@@ -9,13 +9,10 @@
 <body>
 
 <header class="topbar">
-  <button id="menuToggle" class="icon-btn" aria-label="เปิด/ปิดเมนู">
-    <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M3 6h18v2H3V6zm0 5h18v2H3v-2zm0 5h18v2H3v-2z"/></svg>
-  </button>
-  <div class="brand">
+  <button id="brandHome" class="brand">
     <span class="brand-wave">〜</span>
     <span>ทบทวน Elliott Wave</span>
-  </div>
+  </button>
   <div class="topbar-actions">
     <a href="stock-decision-terminal.html" class="btn btn-secondary" style="text-decoration:none;">STOCK/DECIDE</a>
     <button id="exportBtn" class="btn btn-secondary" title="ส่งออกข้อมูล (สำรอง/ย้ายเครื่อง)">ส่งออกข้อมูล</button>
@@ -29,18 +26,7 @@
   </div>
 </header>
 
-<div class="layout">
-  <nav id="sidebar" class="sidebar">
-    <button id="homeBtn" class="chapter-btn home-nav-btn">🏠 หน้าหลัก</button>
-    <ul id="chapterList" class="chapter-list"></ul>
-    <div class="sidebar-footer">
-      <button id="resetBtn" class="link-btn">รีเซ็ตเนื้อหาเริ่มต้น</button>
-    </div>
-  </nav>
-  <div id="overlay" class="overlay"></div>
-
-  <main id="content" class="content"></main>
-</div>
+<main id="content" class="content"></main>
 
 <!-- Modal: เพิ่มเนื้อหา -->
 <div id="modal" class="modal-backdrop">
