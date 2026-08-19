@@ -18,6 +18,9 @@
   </div>
   <div class="topbar-actions">
     <a href="stock-decision-terminal.html" class="btn btn-secondary" style="text-decoration:none;">STOCK/DECIDE</a>
+    <button id="exportBtn" class="btn btn-secondary" title="ส่งออกข้อมูล (สำรอง/ย้ายเครื่อง)">ส่งออกข้อมูล</button>
+    <button id="importBtn" class="btn btn-secondary" title="นำเข้าข้อมูลจากไฟล์สำรอง — จะเพิ่มเป็นบทใหม่ต่อท้าย ไม่ทับเนื้อหาเดิม">นำเข้าข้อมูล</button>
+    <input type="file" id="importInput" accept="application/json" hidden>
     <button id="addContentBtn" class="btn btn-primary">+ เพิ่มเนื้อหา</button>
     <button id="themeToggle" class="icon-btn" aria-label="สลับโหมดสี" title="สลับโหมดสว่าง/มืด">
       <svg id="iconSun" viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12 4.5a1 1 0 0 1-1-1V2a1 1 0 1 1 2 0v1.5a1 1 0 0 1-1 1zm0 15a1 1 0 0 1 1 1V22a1 1 0 1 1-2 0v-1.5a1 1 0 0 1 1-1zm7.5-7.5a1 1 0 0 1 1-1H22a1 1 0 1 1 0 2h-1.5a1 1 0 0 1-1-1zm-15 0a1 1 0 0 1-1 1H2a1 1 0 1 1 0-2h1.5a1 1 0 0 1 1 1zm12.02-5.52a1 1 0 0 1 0-1.42l1.06-1.06a1 1 0 1 1 1.42 1.42l-1.06 1.06a1 1 0 0 1-1.42 0zm-11.04 11.04a1 1 0 0 1 0-1.42l1.06-1.06a1 1 0 1 1 1.42 1.42L6.9 17.52a1 1 0 0 1-1.42 0zm11.04 0a1 1 0 0 1 1.42 0l1.06 1.06a1 1 0 1 1-1.42 1.42l-1.06-1.06a1 1 0 0 1 0-1.42zM5.48 5.48a1 1 0 0 1 1.42 0l1.06 1.06A1 1 0 1 1 6.54 7.96L5.48 6.9a1 1 0 0 1 0-1.42zM12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10z"/></svg>
@@ -31,10 +34,6 @@
     <button id="homeBtn" class="chapter-btn home-nav-btn">🏠 หน้าหลัก</button>
     <ul id="chapterList" class="chapter-list"></ul>
     <div class="sidebar-footer">
-      <button id="exportBtn" class="link-btn">ส่งออกข้อมูล (สำรอง/ย้ายเครื่อง)</button>
-      <button id="importBtn" class="link-btn">นำเข้าข้อมูลจากไฟล์สำรอง</button>
-      <input type="file" id="importInput" accept="application/json" hidden>
-      <p class="sidebar-hint">นำเข้าจะเพิ่มเป็นบทใหม่ต่อท้าย ไม่ทับเนื้อหาเดิม</p>
       <button id="resetBtn" class="link-btn">รีเซ็ตเนื้อหาเริ่มต้น</button>
     </div>
   </nav>
