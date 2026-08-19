@@ -1,190 +1,3 @@
-/* ---------- Wave diagrams (inline SVG, theme-aware via CSS vars) ---------- */
-
-function impulseDiagram() {
-  return `
-  <div class="diagram-wrap">
-    <svg viewBox="0 0 420 200" width="100%" height="200" style="max-width:420px">
-      <polyline points="10,150 70,50 110,110 220,20 260,90 400,10"
-        fill="none" style="stroke:var(--wave-line)" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
-      <g style="fill:var(--text)" font-size="14" font-weight="600" text-anchor="middle">
-        <text x="10" y="168">0</text>
-        <text x="70" y="40">1</text>
-        <text x="110" y="128">2</text>
-        <text x="220" y="12">3</text>
-        <text x="260" y="108">4</text>
-        <text x="400" y="0" dy="14">5</text>
-      </g>
-      <g style="stroke:var(--border)" stroke-dasharray="3 3">
-        <line x1="10" y1="150" x2="400" y2="150"/>
-      </g>
-    </svg>
-  </div>`;
-}
-
-function correctiveDiagram() {
-  return `
-  <div class="diagram-wrap">
-    <svg viewBox="0 0 300 180" width="100%" height="180" style="max-width:300px">
-      <polyline points="10,20 90,120 140,70 260,160"
-        fill="none" style="stroke:var(--wave-corrective)" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
-      <g style="fill:var(--text)" font-size="14" font-weight="600" text-anchor="middle">
-        <text x="10" y="14">5</text>
-        <text x="90" y="140">A</text>
-        <text x="140" y="58">B</text>
-        <text x="260" y="178">C</text>
-      </g>
-    </svg>
-  </div>`;
-}
-
-function cycleDiagram() {
-  return `
-  <div class="diagram-wrap">
-    <svg viewBox="0 0 460 200" width="100%" height="200" style="max-width:460px">
-      <polyline points="10,150 60,60 95,110 190,20 225,85 300,50"
-        fill="none" style="stroke:var(--wave-line)" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
-      <polyline points="300,50 350,130 385,95 450,160"
-        fill="none" style="stroke:var(--wave-corrective)" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
-      <g style="fill:var(--text)" font-size="13" font-weight="600" text-anchor="middle">
-        <text x="60" y="50">1</text><text x="95" y="128">2</text>
-        <text x="190" y="12">3</text><text x="225" y="103">4</text>
-        <text x="300" y="40">5</text>
-        <text x="350" y="148">A</text><text x="385" y="85">B</text><text x="450" y="178">C</text>
-      </g>
-    </svg>
-  </div>`;
-}
-
-/* ---------- Default content ---------- */
-
-const DEFAULT_CHAPTERS = [
-  {
-    id: "intro",
-    title: "อีเลียตเวฟคืออะไร",
-    desc: "ความรู้พื้นฐานก่อนเริ่มนับคลื่น",
-    sections: [
-      {
-        id: "s1",
-        title: "แนวคิดพื้นฐาน",
-        text: "Elliott Wave Theory คิดค้นโดย Ralph Nelson Elliott ในช่วงทศวรรษ 1930 มีแนวคิดว่าราคาสินทรัพย์ในตลาดการเงินเคลื่อนไหวเป็นรูปแบบคลื่นที่ซ้ำกันไปเรื่อย ๆ ซึ่งสะท้อนจิตวิทยาหมู่ (mass psychology) ของผู้เข้าร่วมตลาดระหว่างช่วงมองบวก (optimism) และมองลบ (pessimism)\n\nคลื่นราคาแบ่งออกเป็น 2 ประเภทหลัก คือ คลื่นแรงขับ (Impulse Wave) ที่เคลื่อนไปตามทิศทางเทรนด์หลัก และ คลื่นปรับฐาน (Corrective Wave) ที่เคลื่อนสวนทางเทรนด์หลักเพื่อพักตัว",
-        image: null
-      }
-    ]
-  },
-  {
-    id: "structure",
-    title: "โครงสร้างคลื่นหลัก",
-    desc: "รูปแบบ 5 คลื่นแรงขับ + 3 คลื่นปรับฐาน และธรรมชาติแบบเฟรกทัล",
-    sections: [
-      {
-        id: "s1",
-        title: "วงจรคลื่นสมบูรณ์ (1 รอบ)",
-        text: "คลื่นหนึ่งรอบสมบูรณ์ประกอบด้วย 8 คลื่นย่อย แบ่งเป็นคลื่นแรงขับ 5 คลื่น (1-2-3-4-5) ตามด้วยคลื่นปรับฐาน 3 คลื่น (A-B-C)\n\nจุดสำคัญคือ Elliott Wave มีลักษณะแบบเฟรกทัล (fractal) กล่าวคือแต่ละคลื่นย่อยจะประกอบด้วยคลื่นที่เล็กลงไปอีกในรูปแบบเดียวกัน และสามารถขยายรวมกันเป็นคลื่นที่ใหญ่ขึ้นได้เช่นกัน ทำให้หลักการนี้ใช้ได้กับทุกกรอบเวลา (timeframe) ตั้งแต่กราฟรายนาทีไปจนถึงกราฟรายปี",
-        image: null
-      },
-      {
-        id: "s2",
-        title: "แผนภาพโครงสร้างคลื่น",
-        text: "",
-        html: cycleDiagram(),
-        image: null
-      }
-    ]
-  },
-  {
-    id: "impulse",
-    title: "คลื่นแรงขับ (Impulse Wave)",
-    desc: "คลื่น 1-2-3-4-5 ที่เคลื่อนไหวตามทิศทางเทรนด์หลัก",
-    sections: [
-      {
-        id: "s1",
-        title: "แผนภาพคลื่นแรงขับ",
-        text: "",
-        html: impulseDiagram(),
-        image: null
-      },
-      {
-        id: "s2",
-        title: "ลักษณะของแต่ละคลื่นย่อย",
-        text: "คลื่น 1: จุดเริ่มต้นของเทรนด์ใหม่ มักเกิดขึ้นเงียบ ๆ ยังไม่มีใครเชื่อว่าเทรนด์เปลี่ยน\nคลื่น 2: ปรับฐานสวนทาง แต่ต้องไม่ย้อนกลับไปต่ำกว่าจุดเริ่มต้นของคลื่น 1\nคลื่น 3: มักเป็นคลื่นที่แรงและยาวที่สุด เกิดจากนักลงทุนส่วนใหญ่เริ่มมั่นใจในเทรนด์ ห้ามเป็นคลื่นที่สั้นที่สุดเมื่อเทียบกับคลื่น 1 และ 5\nคลื่น 4: ปรับฐานอีกครั้ง มักเคลื่อนไหวแบบไซด์เวย์ ต้องไม่ทับซ้อนกับพื้นที่ราคาของคลื่น 1\nคลื่น 5: คลื่นสุดท้ายของเทรนด์ อาจมีแรงส่งน้อยกว่าคลื่น 3 (สังเกตได้จาก divergence ของ indicator เช่น RSI/MACD)",
-        image: null
-      }
-    ]
-  },
-  {
-    id: "corrective",
-    title: "คลื่นปรับฐาน (Corrective Wave)",
-    desc: "คลื่น A-B-C และรูปแบบย่อยที่พบบ่อย",
-    sections: [
-      {
-        id: "s1",
-        title: "แผนภาพคลื่นปรับฐาน",
-        text: "",
-        html: correctiveDiagram(),
-        image: null
-      },
-      {
-        id: "s2",
-        title: "รูปแบบคลื่นปรับฐานที่พบบ่อย",
-        text: "Zigzag (5-3-5): ปรับฐานแบบชันและรวดเร็ว คลื่น A และ C มีโครงสร้างแบบคลื่นแรงขับย่อย (5 คลื่น) ส่วนคลื่น B เป็นคลื่นเล็ก (3 คลื่น)\n\nFlat (3-3-5): ราคาเคลื่อนไหวแบบไซด์เวย์ คลื่น B มักยาวเกือบเท่าคลื่น A\n\nTriangle (3-3-3-3-3): คลื่นย่อย 5 เส้น (A-B-C-D-E) บีบตัวแคบลงเรื่อย ๆ มักเกิดก่อนคลื่นสุดท้ายของเทรนด์ใหญ่",
-        image: null
-      }
-    ]
-  },
-  {
-    id: "rules",
-    title: "กฎเหล็ก 3 ข้อ (Three Rules)",
-    desc: "กฎที่ห้ามละเมิด หากละเมิดแปลว่านับคลื่นผิด",
-    sections: [
-      {
-        id: "s1",
-        title: "กฎที่ต้องเป็นจริงเสมอ",
-        text: "1) คลื่น 2 ห้ามย้อนกลับเกิน 100% ของคลื่น 1 (ห้ามต่ำกว่าจุดเริ่มต้นของคลื่น 1)\n\n2) คลื่น 3 ห้ามเป็นคลื่นที่สั้นที่สุด เมื่อเทียบกับคลื่น 1 และคลื่น 5\n\n3) คลื่น 4 ห้ามเคลื่อนที่ทับซ้อนกับพื้นที่ราคาของคลื่น 1 (ยกเว้นกรณีพิเศษ เช่น diagonal triangle)\n\nหากการนับคลื่นใดละเมิดกฎข้อใดข้อหนึ่งข้างต้น แสดงว่าการนับคลื่นนั้นผิดพลาด ต้องนับใหม่",
-        image: null
-      }
-    ]
-  },
-  {
-    id: "guidelines",
-    title: "แนวทางเสริม (Guidelines)",
-    desc: "ไม่ใช่กฎตายตัว แต่ช่วยให้นับคลื่นแม่นยำขึ้น",
-    sections: [
-      {
-        id: "s1",
-        title: "แนวทางที่ควรรู้",
-        text: "Alternation (ความสลับรูปแบบ): คลื่น 2 และคลื่น 4 มักมีรูปแบบที่ต่างกัน เช่น ถ้าคลื่น 2 เป็น zigzag คลื่น 4 มักเป็น flat หรือ triangle\n\nEquality (ความเท่ากัน): หากคลื่น 3 extend (ยืดยาวผิดปกติ) คลื่น 5 มักมีความยาวใกล้เคียงกับคลื่น 1\n\nChanneling: การลากเส้นแนวโน้มขนานคลุมคลื่น 2 และ 4 ช่วยประเมินแนวรับแนวต้านของคลื่น 5\n\nWave Personality: แต่ละคลื่นมีบุคลิกลักษณะเฉพาะของตัวเอง เช่น คลื่น 3 มักมีปริมาณการซื้อขาย (volume) สูงและข่าวสนับสนุนชัดเจน",
-        image: null
-      }
-    ]
-  },
-  {
-    id: "fibonacci",
-    title: "อัตราส่วนฟีโบนักชี",
-    desc: "ตัวเลขที่ใช้ประเมินเป้าหมายและแนวรับแนวต้านของแต่ละคลื่น",
-    sections: [
-      {
-        id: "s1",
-        title: "อัตราส่วนที่ใช้บ่อย",
-        text: "Retracement (คลื่นปรับฐาน 2 และ 4): 0.382, 0.5, 0.618, 0.786\n\nExtension (คลื่นแรงขับ 3 และ 5): 1.0, 1.272, 1.618, 2.618\n\nตัวเลขเหล่านี้มาจากอนุกรมฟีโบนักชี (Fibonacci sequence) ซึ่ง Elliott สังเกตว่าความยาวและสัดส่วนของคลื่นราคามักมีความสัมพันธ์กับอัตราส่วนเหล่านี้ นักวิเคราะห์จึงใช้ร่วมกับการนับคลื่นเพื่อประเมินเป้าหมายราคาและจุดกลับตัวที่เป็นไปได้",
-        image: null
-      }
-    ]
-  },
-  {
-    id: "apply",
-    title: "การประยุกต์ใช้ในการเทรด",
-    desc: "ข้อควรระวังและแนวทางนำไปใช้จริง",
-    sections: [
-      {
-        id: "s1",
-        title: "แนวทางปฏิบัติ",
-        text: "1. เริ่มนับคลื่นจากกรอบเวลาใหญ่ก่อน (เช่น รายวัน/รายสัปดาห์) แล้วค่อยลงไปดูกรอบเวลาเล็กลง เพื่อให้เห็นภาพรวมของเทรนด์\n\n2. ใช้ร่วมกับเครื่องมือยืนยันอื่น เช่น Fibonacci, แนวรับแนวต้าน, indicator อย่าง RSI/MACD เพื่อลดความเป็นอัตวิสัย (subjectivity) ในการนับคลื่น\n\n3. การนับคลื่นอาจผิดพลาดหรือถูกนับใหม่ได้เสมอเมื่อมีข้อมูลราคาล่าสุดเข้ามา จึงควรใช้เพื่อประเมินโอกาสและอัตราส่วนความเสี่ยงต่อผลตอบแทน (risk/reward) มากกว่าใช้ทำนายราคาที่แน่นอน\n\nหมายเหตุ: เนื้อหาทั้งหมดจัดทำขึ้นเพื่อการศึกษาทบทวนเท่านั้น ไม่ถือเป็นคำแนะนำการลงทุน",
-        image: null
-      }
-    ]
-  }
-];
-
 /* ---------- Storage (IndexedDB — PDFs/images are too large for localStorage) ---------- */
 
 const OLD_STORAGE_KEY = "ewReviewData_v1";
@@ -235,9 +48,8 @@ async function loadData() {
     }
   } catch (e) { /* ignore corrupt data */ }
 
-  const defaults = JSON.parse(JSON.stringify(DEFAULT_CHAPTERS));
-  await dbSetChapters(defaults);
-  return defaults;
+  await dbSetChapters([]);
+  return [];
 }
 
 async function saveData() {
@@ -309,13 +121,13 @@ function renderContent() {
 
 function renderHomeContent() {
   const content = document.getElementById("content");
-  const footer = `<div class="chapter-footer"><button id="resetBtn" class="link-btn">รีเซ็ตเนื้อหาเริ่มต้น</button></div>`;
 
   if (!chapters.length) {
-    content.innerHTML = `<h1>ทบทวน Elliott Wave</h1><p class="empty-chapter">ยังไม่มีบทเนื้อหา กด "+ เพิ่มเนื้อหา" เพื่อเริ่มต้น</p>${footer}`;
-    wireResetBtn();
+    content.innerHTML = `<h1>ทบทวน Elliott Wave</h1><p class="empty-chapter">ยังไม่มีบทเนื้อหา กด "+ เพิ่มเนื้อหา" เพื่อเริ่มต้น</p>`;
     return;
   }
+
+  const footer = `<div class="chapter-footer"><button id="resetBtn" class="link-btn">ลบเนื้อหาทั้งหมด</button></div>`;
 
   let html = `<h1>ทบทวน Elliott Wave</h1><p class="chapter-desc">สรุปเนื้อหาทั้งหมด — เลือกบทที่ต้องการอ่านต่อ</p>`;
   html += `<div class="home-grid">`;
@@ -346,8 +158,8 @@ function renderHomeContent() {
 
 function wireResetBtn() {
   document.getElementById("resetBtn").addEventListener("click", async () => {
-    if (confirm("รีเซ็ตกลับเป็นเนื้อหาเริ่มต้นทั้งหมด? เนื้อหาที่คุณเพิ่มเองจะถูกลบถาวร")) {
-      chapters = JSON.parse(JSON.stringify(DEFAULT_CHAPTERS));
+    if (confirm("ลบเนื้อหาทั้งหมดหรือไม่? การลบนี้ไม่สามารถย้อนกลับได้")) {
+      chapters = [];
       await saveData();
       activeChapterId = null;
       activeView = "home";
