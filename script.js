@@ -396,6 +396,7 @@ function renderChapterContent() {
         html += `<div class="subsection-card" data-subsection-id="${sub.id}">
           <h4>${escapeHtml(sub.title)}</h4>
           ${sub.text ? `<div class="section-text">${escapeHtml(sub.text)}</div>` : ""}
+          ${sub.image ? `<img class="section-image" src="${sub.image}" alt="${escapeHtml(sub.title || "")}">` : ""}
           <div class="section-actions">
             <button class="edit-subsec">แก้ไข</button>
             <button class="danger del-subsec">ลบ</button>
@@ -487,6 +488,39 @@ function renderChapterContent() {
   });
 }
 
+function renderSubsecImageEditor(root, getImage, setImage) {
+  const wrap = root.querySelector(".edit-media-wrap");
+  const labelText = root.querySelector(".edit-image-label-text");
+  labelText.textContent = getImage() ? "เปลี่ยนรูป" : "เพิ่มรูปตัวอย่าง";
+  wrap.innerHTML = getImage()
+    ? `<div class="edit-media-item"><img class="edit-media-preview" src="${getImage()}"><button type="button" class="edit-remove-image">ลบรูปนี้</button></div>`
+    : "";
+  const removeBtn = wrap.querySelector(".edit-remove-image");
+  if (removeBtn) removeBtn.addEventListener("click", () => { setImage(null); renderSubsecImageEditor(root, getImage, setImage); });
+  root.querySelector(".edit-subsec-image-input").addEventListener("change", async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setImage(await resizeImageToDataUrl(file, 1000));
+    renderSubsecImageEditor(root, getImage, setImage);
+  });
+}
+
+function subsecEditorHtml(title, text) {
+  return `
+    <input type="text" class="edit-subsec-title" value="${escapeAttr(title || "")}" placeholder="หัวข้อย่อย">
+    <textarea class="edit-subsec-text" rows="4" placeholder="เนื้อหา">${text || ""}</textarea>
+    <div class="edit-media-wrap"></div>
+    <label class="btn btn-secondary">
+      <span class="edit-image-label-text"></span>
+      <input type="file" accept="image/*" class="edit-subsec-image-input" hidden>
+    </label>
+    <div class="section-actions">
+      <button class="save-subsec">บันทึก</button>
+      <button class="cancel-subsec">ยกเลิก</button>
+    </div>
+  `;
+}
+
 function startAddSubsection(card, sec) {
   let list = card.querySelector(".subsection-list");
   if (!list) {
@@ -498,22 +532,18 @@ function startAddSubsection(card, sec) {
 
   const form = document.createElement("div");
   form.className = "subsection-card subsection-form";
-  form.innerHTML = `
-    <input type="text" class="edit-subsec-title" placeholder="หัวข้อย่อย">
-    <textarea class="edit-subsec-text" rows="4" placeholder="เนื้อหา"></textarea>
-    <div class="section-actions">
-      <button class="save-subsec">บันทึก</button>
-      <button class="cancel-subsec">ยกเลิก</button>
-    </div>
-  `;
+  form.innerHTML = subsecEditorHtml("", "");
   list.appendChild(form);
   form.querySelector(".edit-subsec-title").focus();
+
+  let newImage = null;
+  renderSubsecImageEditor(form, () => newImage, (img) => { newImage = img; });
 
   form.querySelector(".save-subsec").addEventListener("click", async () => {
     const title = form.querySelector(".edit-subsec-title").value.trim();
     const text = form.querySelector(".edit-subsec-text").value.trim();
-    if (!title && !text) { form.remove(); return; }
-    sec.subsections.push({ id: uid(), title: title || "หัวข้อย่อยใหม่", text });
+    if (!title && !text && !newImage) { form.remove(); return; }
+    sec.subsections.push({ id: uid(), title: title || "หัวข้อย่อยใหม่", text, image: newImage });
     await saveData();
     renderContent();
   });
@@ -521,17 +551,15 @@ function startAddSubsection(card, sec) {
 }
 
 function startEditSubsection(subCard, sub) {
-  subCard.innerHTML = `
-    <input type="text" class="edit-subsec-title" value="${escapeAttr(sub.title || "")}" placeholder="หัวข้อย่อย">
-    <textarea class="edit-subsec-text" rows="4">${sub.text || ""}</textarea>
-    <div class="section-actions">
-      <button class="save-subsec">บันทึก</button>
-      <button class="cancel-subsec">ยกเลิก</button>
-    </div>
-  `;
+  subCard.innerHTML = subsecEditorHtml(sub.title, sub.text);
+
+  let editImage = sub.image || null;
+  renderSubsecImageEditor(subCard, () => editImage, (img) => { editImage = img; });
+
   subCard.querySelector(".save-subsec").addEventListener("click", async () => {
     sub.title = subCard.querySelector(".edit-subsec-title").value.trim() || sub.title;
     sub.text = subCard.querySelector(".edit-subsec-text").value.trim();
+    sub.image = editImage;
     await saveData();
     renderContent();
   });
@@ -773,6 +801,68 @@ chapterSelect.addEventListener("change", () => {
   newChapterRow.hidden = chapterSelect.value !== "__new__";
 });
 
+/* Subsections added directly from the "add content" modal */
+let modalSubsections = []; // { id, title, text, image }
+const modalSubsectionsList = document.getElementById("modalSubsectionsList");
+
+document.getElementById("addModalSubsecBtn").addEventListener("click", () => {
+  modalSubsections.push({ id: uid(), title: "", text: "", image: null });
+  renderModalSubsections();
+});
+
+function renderModalSubsections() {
+  modalSubsectionsList.innerHTML = "";
+  modalSubsections.forEach((item, idx) => {
+    const div = document.createElement("div");
+    div.className = "image-item";
+    div.innerHTML = `
+      <div class="image-item-head">
+        <span class="image-item-name">หัวข้อย่อยที่ ${idx + 1}</span>
+        <button type="button" class="image-item-remove" title="เอาออก">✕</button>
+      </div>
+      <input type="text" class="modal-subsec-title" placeholder="ชื่อหัวข้อย่อย" value="${escapeAttr(item.title)}" style="margin-bottom:8px;">
+      <textarea class="modal-subsec-text image-item-text" rows="3" placeholder="เนื้อหา (ถ้ามี)">${item.text}</textarea>
+      <div class="edit-media-wrap"></div>
+      <label class="btn btn-secondary" style="margin-top:8px;">
+        <span class="edit-image-label-text"></span>
+        <input type="file" accept="image/*" class="modal-subsec-image-input" hidden>
+      </label>
+    `;
+    div.querySelector(".image-item-remove").addEventListener("click", () => {
+      modalSubsections = modalSubsections.filter(s => s.id !== item.id);
+      renderModalSubsections();
+    });
+    div.querySelector(".modal-subsec-title").addEventListener("input", (e) => { item.title = e.target.value; });
+    div.querySelector(".modal-subsec-text").addEventListener("input", (e) => { item.text = e.target.value; });
+
+    const mediaWrap = div.querySelector(".edit-media-wrap");
+    const labelText = div.querySelector(".edit-image-label-text");
+    function renderMedia() {
+      labelText.textContent = item.image ? "เปลี่ยนรูปตัวอย่าง" : "+ เพิ่มรูปตัวอย่าง";
+      mediaWrap.innerHTML = item.image
+        ? `<div class="edit-media-item"><img class="edit-media-preview" src="${item.image}"><button type="button" class="edit-remove-image">ลบรูปนี้</button></div>`
+        : "";
+      const removeBtn = mediaWrap.querySelector(".edit-remove-image");
+      if (removeBtn) removeBtn.addEventListener("click", () => { item.image = null; renderMedia(); });
+    }
+    renderMedia();
+    div.querySelector(".modal-subsec-image-input").addEventListener("change", async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      item.image = await resizeImageToDataUrl(file, 1000);
+      renderMedia();
+    });
+
+    modalSubsectionsList.appendChild(div);
+  });
+}
+
+function collectModalSubsections() {
+  return modalSubsections
+    .filter(s => s.title.trim() || s.text.trim() || s.image)
+    .map(s => ({ id: uid(), title: s.title.trim() || "หัวข้อย่อยใหม่", text: s.text.trim(), image: s.image || null }));
+}
+
 function resetModalFields() {
   document.getElementById("imageInput").value = "";
   pendingImages = [];
@@ -782,6 +872,9 @@ function resetModalFields() {
   sectionTitle.value = "";
   newChapterName.value = "";
   newChapterRow.hidden = true;
+
+  modalSubsections = [];
+  renderModalSubsections();
 
   pdfInput.value = "";
   if (modalPdfObjectUrl) { URL.revokeObjectURL(modalPdfObjectUrl); modalPdfObjectUrl = null; }
@@ -1104,7 +1197,8 @@ document.getElementById("saveContentBtn").addEventListener("click", async () => 
         text: item.text.trim(),
         image: item.dataUrl || null,
         pdf: null,
-        pdfName: null
+        pdfName: null,
+        subsections: collectModalSubsections()
       });
     });
   } else if (activeTab === "manual") {
@@ -1114,7 +1208,8 @@ document.getElementById("saveContentBtn").addEventListener("click", async () => 
       text: document.getElementById("manualText").value.trim(),
       image: null,
       pdf: null,
-      pdfName: null
+      pdfName: null,
+      subsections: collectModalSubsections()
     });
   } else if (activeTab === "pdf") {
     targetChapter.sections.push({
@@ -1123,7 +1218,8 @@ document.getElementById("saveContentBtn").addEventListener("click", async () => 
       text: "",
       image: null,
       pdf: currentPdfFile,
-      pdfName: currentPdfFile.name
+      pdfName: currentPdfFile.name,
+      subsections: collectModalSubsections()
     });
   }
 
