@@ -347,6 +347,7 @@ function startAddSubsection(card, sec) {
   form.innerHTML = subsecEditorHtml("", "");
   list.appendChild(form);
   form.querySelector(".edit-subsec-title").focus();
+  wireFormattedPaste(form.querySelector(".edit-subsec-text"));
 
   let newImage = null;
   renderSubsecImageEditor(form, () => newImage, (img) => { newImage = img; });
@@ -364,6 +365,7 @@ function startAddSubsection(card, sec) {
 
 function startEditSubsection(subCard, sub) {
   subCard.innerHTML = subsecEditorHtml(sub.title, sub.text);
+  wireFormattedPaste(subCard.querySelector(".edit-subsec-text"));
 
   let editImage = sub.image || null;
   renderSubsecImageEditor(subCard, () => editImage, (img) => { editImage = img; });
@@ -402,6 +404,8 @@ function startEditSection(card, chapter, sec) {
       <button class="cancel-edit">ยกเลิก</button>
     </div>
   `;
+
+  wireFormattedPaste(card.querySelector(".edit-text"));
 
   const mediaWrap = card.querySelector(".edit-media-wrap");
   const imageLabelText = card.querySelector(".edit-image-label-text");
@@ -470,6 +474,47 @@ function escapeHtml(str) {
   }[m]));
 }
 function escapeAttr(str) { return escapeHtml(str); }
+
+/* ---------- Paste formatted content (e.g. from a webpage/Word/Docs) into a
+   plain textarea while keeping the source's paragraph/line breaks — a
+   browser's default plain-text paste often collapses those since HTML
+   spaces paragraphs with margins, not literal newlines. ---------- */
+
+function htmlToPlainTextPreservingParagraphs(html) {
+  const container = document.createElement("div");
+  container.innerHTML = html;
+
+  container.querySelectorAll("br").forEach(br => br.replaceWith("\n"));
+  container.querySelectorAll("li").forEach(li => li.prepend("- "));
+
+  container.querySelectorAll("p,div,li,tr,h1,h2,h3,h4,h5,h6,blockquote,section,article,table").forEach(el => {
+    el.insertAdjacentText("afterend", "\n\n");
+  });
+
+  return (container.textContent || "")
+    .split("\n")
+    .map(line => line.trim())
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function insertTextAtCursor(el, text) {
+  const start = el.selectionStart;
+  const end = el.selectionEnd;
+  el.value = el.value.slice(0, start) + text + el.value.slice(end);
+  el.selectionStart = el.selectionEnd = start + text.length;
+  el.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+function wireFormattedPaste(el) {
+  el.addEventListener("paste", (e) => {
+    const html = e.clipboardData && e.clipboardData.getData("text/html");
+    if (!html) return;
+    e.preventDefault();
+    insertTextAtCursor(el, htmlToPlainTextPreservingParagraphs(html));
+  });
+}
 
 /* ---------- Export / Import (backup, move between devices) ----------
    IndexedDB is per-browser/per-device only, so this gives users a way to
@@ -580,6 +625,7 @@ const chapterSelect = document.getElementById("chapterSelect");
 const newChapterRow = document.getElementById("newChapterRow");
 const newChapterName = document.getElementById("newChapterName");
 const sectionTitle = document.getElementById("sectionTitle");
+wireFormattedPaste(document.getElementById("manualText"));
 
 function openModal() {
   populateChapterSelect();
@@ -646,6 +692,7 @@ function renderModalSubsections() {
     });
     div.querySelector(".modal-subsec-title").addEventListener("input", (e) => { item.title = e.target.value; });
     div.querySelector(".modal-subsec-text").addEventListener("input", (e) => { item.text = e.target.value; });
+    wireFormattedPaste(div.querySelector(".modal-subsec-text"));
 
     const mediaWrap = div.querySelector(".edit-media-wrap");
     const labelText = div.querySelector(".edit-image-label-text");
@@ -807,6 +854,7 @@ function renderImageItems() {
     div.querySelector(".image-item-text").addEventListener("input", (e) => {
       item.text = e.target.value;
     });
+    wireFormattedPaste(div.querySelector(".image-item-text"));
     imageItemsList.appendChild(div);
   });
 }
