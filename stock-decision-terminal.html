@@ -157,6 +157,9 @@
     <input type="password" id="apiKeyInput" placeholder="Twelve Data API key" style="width:220px" />
     <input type="password" id="finnhubKeyInput" placeholder="Finnhub API key (ข่าว/ข้อมูลเพิ่มเติม — ไม่บังคับ)" style="width:260px" />
     <button class="ghost" id="saveKeyBtn">บันทึก key</button>
+    <button class="ghost" id="exportBtn" title="ส่งออกข้อมูลทั้งหมด (Elliott Wave + Trade Journal + Stock/Decide) เป็นไฟล์เดียว">⬇ ส่งออกข้อมูลทั้งหมด</button>
+    <button class="ghost" id="importBtn" title="นำเข้าไฟล์สำรองรวม — จะเพิ่มต่อท้ายข้อมูลเดิมของทั้ง 3 ระบบ ไม่ทับของเดิม">⬆ นำเข้าข้อมูลทั้งหมด</button>
+    <input type="file" id="importInput" accept="application/json" hidden>
     <button class="download" id="downloadBtn" title="ดาวน์โหลดไฟล์นี้เก็บไว้ในเครื่องออฟไลน์">⬇ ดาวน์โหลดไฟล์นี้</button>
   </div>
 </div>
@@ -461,6 +464,7 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
 (function () {
   "use strict";
@@ -966,6 +970,187 @@
   // ---------- persistence ----------
   function saveWatchlist() { localStorage.setItem("sd_watchlist", JSON.stringify(state.watchlist)); }
   function saveLog() { localStorage.setItem("sd_log", JSON.stringify(state.log)); }
+
+  // ---------- cross-app backup (Elliott Wave + Trade Journal + Stock/Decide) ----------
+  // All three pages share one origin, so localStorage/IndexedDB are visible from any
+  // of them — export/import cover the whole suite from a single button, regardless of
+  // which page you're on, without a build step or shared JS file.
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+
+  function triggerDownload(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function ewOpenDB() {
+    return new Promise(function (resolve, reject) {
+      const req = indexedDB.open("ewReviewDB", 1);
+      req.onupgradeneeded = function () { req.result.createObjectStore("chapters"); };
+      req.onsuccess = function () { resolve(req.result); };
+      req.onerror = function () { reject(req.error); };
+    });
+  }
+  function ewGetChapters() {
+    return ewOpenDB().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        const tx = db.transaction("chapters", "readonly");
+        const req = tx.objectStore("chapters").get("data");
+        req.onsuccess = function () { resolve(req.result || []); };
+        req.onerror = function () { reject(req.error); };
+      });
+    });
+  }
+  function ewSetChapters(data) {
+    return ewOpenDB().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        const tx = db.transaction("chapters", "readwrite");
+        tx.objectStore("chapters").put(data, "data");
+        tx.oncomplete = function () { resolve(); };
+        tx.onerror = function () { reject(tx.error); };
+      });
+    });
+  }
+  function blobToBase64(blob) {
+    return new Promise(function (resolve, reject) {
+      const reader = new FileReader();
+      reader.onload = function () { resolve(reader.result); };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
+  function base64ToBlob(dataUrl) {
+    return fetch(dataUrl).then(function (res) { return res.blob(); });
+  }
+
+  async function collectAllData() {
+    const ewChapters = await ewGetChapters().catch(function () { return []; });
+    const exportChapters = [];
+    for (const ch of ewChapters) {
+      const sections = [];
+      for (const sec of (ch.sections || [])) {
+        const copy = Object.assign({}, sec);
+        if (sec.pdf instanceof Blob) copy.pdf = await blobToBase64(sec.pdf);
+        sections.push(copy);
+      }
+      exportChapters.push({ title: ch.title, desc: ch.desc, sections: sections });
+    }
+    return {
+      version: 1,
+      app: "ee-suite-backup",
+      exportedAt: new Date().toISOString(),
+      elliottWave: { chapters: exportChapters },
+      tradeJournal: {
+        trades: JSON.parse(localStorage.getItem("tj_trades_v1") || "[]"),
+        capital: Number(localStorage.getItem("tj_capital") || 0),
+      },
+      stockDecide: {
+        watchlist: state.watchlist,
+        log: state.log,
+        watchlistScores: state.watchlistScores,
+        apiKey: state.apiKey,
+        finnhubKey: state.finnhubKey,
+      },
+    };
+  }
+
+  async function restoreAllData(parsed) {
+    const counts = { chapters: 0, trades: 0, watchlist: 0, log: 0 };
+
+    // Stock/Decide (own data)
+    if (parsed.stockDecide) {
+      const sd = parsed.stockDecide;
+      if (Array.isArray(sd.watchlist) && sd.watchlist.length) {
+        state.watchlist = Array.from(new Set(state.watchlist.concat(sd.watchlist)));
+        saveWatchlist();
+        counts.watchlist = sd.watchlist.length;
+      }
+      if (Array.isArray(sd.log) && sd.log.length) {
+        state.log = state.log.concat(sd.log);
+        saveLog();
+        counts.log = sd.log.length;
+      }
+      if (sd.watchlistScores && typeof sd.watchlistScores === "object") {
+        state.watchlistScores = Object.assign({}, state.watchlistScores, sd.watchlistScores);
+        saveWatchlistScores();
+      }
+      if (sd.apiKey) { state.apiKey = sd.apiKey; localStorage.setItem("sd_api_key", sd.apiKey); }
+      if (sd.finnhubKey) { state.finnhubKey = sd.finnhubKey; localStorage.setItem("sd_finnhub_key", sd.finnhubKey); }
+    }
+
+    // Trade Journal (remote — merge straight into its localStorage keys)
+    if (parsed.tradeJournal) {
+      const tj = parsed.tradeJournal;
+      if (Array.isArray(tj.trades) && tj.trades.length) {
+        const existing = JSON.parse(localStorage.getItem("tj_trades_v1") || "[]");
+        const imported = tj.trades.map(function (t) { return Object.assign({}, t, { id: uid() }); });
+        localStorage.setItem("tj_trades_v1", JSON.stringify(existing.concat(imported)));
+        counts.trades = imported.length;
+      }
+      if (tj.capital != null && !isNaN(Number(tj.capital))) {
+        localStorage.setItem("tj_capital", String(Number(tj.capital)));
+      }
+    }
+
+    // Elliott Wave (remote — merge straight into its IndexedDB)
+    const ewChapters = (parsed.elliottWave && parsed.elliottWave.chapters) || [];
+    if (Array.isArray(ewChapters) && ewChapters.length) {
+      const existing = await ewGetChapters().catch(function () { return []; });
+      const importedChapters = [];
+      for (const ch of ewChapters) {
+        const sections = [];
+        for (const sec of (ch.sections || [])) {
+          const newSec = Object.assign({}, sec, { id: uid() });
+          if (typeof newSec.pdf === "string" && newSec.pdf.indexOf("data:") === 0) {
+            newSec.pdf = await base64ToBlob(newSec.pdf);
+          }
+          sections.push(newSec);
+        }
+        importedChapters.push({ id: uid(), title: ch.title || "บทที่นำเข้า", desc: ch.desc || "", sections: sections });
+      }
+      await ewSetChapters(existing.concat(importedChapters));
+      counts.chapters = importedChapters.length;
+    }
+
+    return counts;
+  }
+
+  document.getElementById("exportBtn").addEventListener("click", async function () {
+    try {
+      const payload = await collectAllData();
+      const blob = new Blob([JSON.stringify(payload)], { type: "application/json" });
+      const stamp = new Date().toISOString().slice(0, 10);
+      triggerDownload(blob, "ee-suite-backup-" + stamp + ".json");
+    } catch (err) {
+      console.error(err);
+      Swal.fire({ icon: "error", title: "ส่งออกข้อมูลไม่สำเร็จ" });
+    }
+  });
+
+  const importInput = document.getElementById("importInput");
+  document.getElementById("importBtn").addEventListener("click", function () { importInput.click(); });
+  importInput.addEventListener("change", async function () {
+    const file = importInput.files[0];
+    importInput.value = "";
+    if (!file) return;
+    try {
+      const parsed = JSON.parse(await file.text());
+      if (!parsed || typeof parsed !== "object") { Swal.fire({ icon: "error", title: "รูปแบบไฟล์ไม่ถูกต้อง" }); return; }
+      const counts = await restoreAllData(parsed);
+      renderWatchlist();
+      renderLog();
+      Swal.fire({
+        icon: "success",
+        title: "นำเข้าข้อมูลเรียบร้อย",
+        html: "Watchlist: " + counts.watchlist + "<br>บันทึกการตัดสินใจ: " + counts.log + "<br>เทรด: " + counts.trades + "<br>บทความ Elliott Wave: " + counts.chapters,
+      });
+    } catch (err) {
+      console.error(err);
+      Swal.fire({ icon: "error", title: "นำเข้าข้อมูลไม่สำเร็จ", text: "ไฟล์อาจเสียหายหรือไม่ใช่ไฟล์สำรองที่ถูกต้อง" });
+    }
+  });
 
   function updateNoKeyNotice() {
     document.getElementById("noKeyNotice").style.display = state.apiKey ? "none" : "block";

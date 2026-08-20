@@ -270,8 +270,8 @@
   <div class="row">
     <a href="index.html" class="back-link">← ทบทวน Elliott Wave</a>
     <a href="stock-decision-terminal.html" class="back-link">STOCK/DECIDE</a>
-    <button class="ghost" id="exportBtn">⬇ ส่งออกข้อมูล</button>
-    <button class="ghost" id="importBtn">⬆ นำเข้าข้อมูล</button>
+    <button class="ghost" id="exportBtn" title="ส่งออกข้อมูลทั้งหมด (Elliott Wave + Trade Journal + Stock/Decide) เป็นไฟล์เดียว">⬇ ส่งออกข้อมูลทั้งหมด</button>
+    <button class="ghost" id="importBtn" title="นำเข้าไฟล์สำรองรวม — จะเพิ่มต่อท้ายข้อมูลเดิมของทั้ง 3 ระบบ ไม่ทับของเดิม">⬆ นำเข้าข้อมูลทั้งหมด</button>
     <input type="file" id="importInput" accept="application/json" hidden>
     <button class="primary" id="addTradeBtn">+ เพิ่มเทรด</button>
     <button id="themeToggle" class="icon-btn" aria-label="สลับโหมดสี" title="สลับโหมดสว่าง/มืด">
@@ -1337,7 +1337,10 @@
     });
   });
 
-  /* ---------- export / import ---------- */
+  /* ---------- cross-app backup (Elliott Wave + Trade Journal + Stock/Decide) ----------
+     All three pages share one origin, so localStorage/IndexedDB are visible from any
+     of them — export/import cover the whole suite from a single button, regardless of
+     which page you're on, without a build step or shared JS file. */
   function triggerDownload(blob, filename) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -1346,10 +1349,140 @@
     URL.revokeObjectURL(url);
   }
 
-  document.getElementById("exportBtn").addEventListener("click", () => {
-    const payload = { version: 1, exportedAt: new Date().toISOString(), trades };
-    const blob = new Blob([JSON.stringify(payload)], { type: "application/json" });
-    triggerDownload(blob, `trade-journal-backup-${todayKey()}.json`);
+  function ewOpenDB() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open("ewReviewDB", 1);
+      req.onupgradeneeded = () => req.result.createObjectStore("chapters");
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+  function ewGetChapters() {
+    return ewOpenDB().then(db => new Promise((resolve, reject) => {
+      const tx = db.transaction("chapters", "readonly");
+      const req = tx.objectStore("chapters").get("data");
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => reject(req.error);
+    }));
+  }
+  function ewSetChapters(data) {
+    return ewOpenDB().then(db => new Promise((resolve, reject) => {
+      const tx = db.transaction("chapters", "readwrite");
+      tx.objectStore("chapters").put(data, "data");
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    }));
+  }
+  function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
+  async function base64ToBlob(dataUrl) {
+    const res = await fetch(dataUrl);
+    return res.blob();
+  }
+
+  async function collectAllData() {
+    const ewChapters = await ewGetChapters().catch(() => []);
+    const exportChapters = [];
+    for (const ch of ewChapters) {
+      const sections = [];
+      for (const sec of (ch.sections || [])) {
+        const copy = { ...sec };
+        if (sec.pdf instanceof Blob) copy.pdf = await blobToBase64(sec.pdf);
+        sections.push(copy);
+      }
+      exportChapters.push({ title: ch.title, desc: ch.desc, sections });
+    }
+    return {
+      version: 1,
+      app: "ee-suite-backup",
+      exportedAt: new Date().toISOString(),
+      elliottWave: { chapters: exportChapters },
+      tradeJournal: { trades, capital },
+      stockDecide: {
+        watchlist: JSON.parse(localStorage.getItem("sd_watchlist") || "[]"),
+        log: JSON.parse(localStorage.getItem("sd_log") || "[]"),
+        watchlistScores: JSON.parse(localStorage.getItem("sd_watchlist_scores") || "{}"),
+        apiKey: localStorage.getItem("sd_api_key") || "",
+        finnhubKey: localStorage.getItem("sd_finnhub_key") || "",
+      },
+    };
+  }
+
+  async function restoreAllData(parsed) {
+    const counts = { chapters: 0, trades: 0, watchlist: 0, log: 0 };
+
+    // Trade Journal (own data) — legacy exports had trades at the top level
+    const tj = parsed.tradeJournal || (Array.isArray(parsed.trades) ? { trades: parsed.trades } : null);
+    if (tj && Array.isArray(tj.trades) && tj.trades.length) {
+      const imported = tj.trades.map(t => ({ ...t, id: uid() }));
+      trades = trades.concat(imported);
+      saveTrades();
+      counts.trades = imported.length;
+    }
+    if (tj && tj.capital != null && !isNaN(Number(tj.capital))) {
+      capital = Number(tj.capital);
+      saveCapital();
+    }
+
+    // Elliott Wave (remote — merge straight into its IndexedDB)
+    const ewChapters = (parsed.elliottWave && parsed.elliottWave.chapters) || [];
+    if (Array.isArray(ewChapters) && ewChapters.length) {
+      const existing = await ewGetChapters().catch(() => []);
+      const importedChapters = [];
+      for (const ch of ewChapters) {
+        const sections = [];
+        for (const sec of (ch.sections || [])) {
+          const newSec = { ...sec, id: uid() };
+          if (typeof newSec.pdf === "string" && newSec.pdf.startsWith("data:")) {
+            newSec.pdf = await base64ToBlob(newSec.pdf);
+          }
+          sections.push(newSec);
+        }
+        importedChapters.push({ id: uid(), title: ch.title || "บทที่นำเข้า", desc: ch.desc || "", sections });
+      }
+      await ewSetChapters(existing.concat(importedChapters));
+      counts.chapters = importedChapters.length;
+    }
+
+    // Stock/Decide (remote — merge straight into its localStorage keys)
+    if (parsed.stockDecide) {
+      const sd = parsed.stockDecide;
+      if (Array.isArray(sd.watchlist) && sd.watchlist.length) {
+        const existing = JSON.parse(localStorage.getItem("sd_watchlist") || "[]");
+        localStorage.setItem("sd_watchlist", JSON.stringify(Array.from(new Set(existing.concat(sd.watchlist)))));
+        counts.watchlist = sd.watchlist.length;
+      }
+      if (Array.isArray(sd.log) && sd.log.length) {
+        const existing = JSON.parse(localStorage.getItem("sd_log") || "[]");
+        localStorage.setItem("sd_log", JSON.stringify(existing.concat(sd.log)));
+        counts.log = sd.log.length;
+      }
+      if (sd.watchlistScores && typeof sd.watchlistScores === "object") {
+        const existing = JSON.parse(localStorage.getItem("sd_watchlist_scores") || "{}");
+        localStorage.setItem("sd_watchlist_scores", JSON.stringify(Object.assign(existing, sd.watchlistScores)));
+      }
+      if (sd.apiKey) localStorage.setItem("sd_api_key", sd.apiKey);
+      if (sd.finnhubKey) localStorage.setItem("sd_finnhub_key", sd.finnhubKey);
+    }
+
+    return counts;
+  }
+
+  document.getElementById("exportBtn").addEventListener("click", async () => {
+    try {
+      const payload = await collectAllData();
+      const blob = new Blob([JSON.stringify(payload)], { type: "application/json" });
+      triggerDownload(blob, `ee-suite-backup-${todayKey()}.json`);
+    } catch (err) {
+      console.error(err);
+      Swal.fire({ icon: "error", title: "ส่งออกข้อมูลไม่สำเร็จ" });
+    }
   });
 
   const importInput = document.getElementById("importInput");
@@ -1360,16 +1493,18 @@
     if (!file) return;
     try {
       const parsed = JSON.parse(await file.text());
-      if (!parsed || !Array.isArray(parsed.trades)) { alert("รูปแบบไฟล์ไม่ถูกต้อง"); return; }
-      const imported = parsed.trades.map(t => ({ ...t, id: uid() }));
-      trades = trades.concat(imported);
-      saveTrades();
+      if (!parsed || typeof parsed !== "object") { Swal.fire({ icon: "error", title: "รูปแบบไฟล์ไม่ถูกต้อง" }); return; }
+      const counts = await restoreAllData(parsed);
       renderCalendar();
       renderLog();
-      alert(`นำเข้าเรียบร้อย ${imported.length} รายการ`);
+      Swal.fire({
+        icon: "success",
+        title: "นำเข้าข้อมูลเรียบร้อย",
+        html: `เทรด: ${counts.trades}<br>บทความ Elliott Wave: ${counts.chapters}<br>Watchlist: ${counts.watchlist}<br>บันทึกการตัดสินใจ (Stock/Decide): ${counts.log}`,
+      });
     } catch (err) {
       console.error(err);
-      alert("นำเข้าข้อมูลไม่สำเร็จ ไฟล์อาจเสียหายหรือไม่ใช่ไฟล์สำรองที่ถูกต้อง");
+      Swal.fire({ icon: "error", title: "นำเข้าข้อมูลไม่สำเร็จ", text: "ไฟล์อาจเสียหายหรือไม่ใช่ไฟล์สำรองที่ถูกต้อง" });
     }
   });
 
