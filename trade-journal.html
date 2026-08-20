@@ -377,7 +377,7 @@
 
     <div class="field">
       <label class="small">กำไร/ขาดทุน ($)</label>
-      <input type="number" id="tfPnl" step="any" placeholder="ใส่ค่าลบถ้าขาดทุน เช่น -45.50">
+      <input type="number" id="tfPnl" step="any" placeholder="เว้นว่างได้ถ้ายังไม่ปิดเทรด ใส่ค่าลบถ้าขาดทุน เช่น -45.50">
     </div>
 
     <div class="row">
@@ -524,6 +524,12 @@
     const sign = v > 0 ? "+" : "";
     return sign + v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
+  function isPending(t) { return t.pnl === null || t.pnl === undefined; }
+  function pnlHtml(t, cls) {
+    if (isPending(t)) return `<span class="${cls || ""} mono" style="color:var(--muted);font-style:italic;">รอผล</span>`;
+    const n = Number(t.pnl);
+    return `<span class="${cls || ""} mono ${n >= 0 ? "pos" : "neg"}">${fmtMoney(n)}</span>`;
+  }
   function successToast(title) {
     Swal.fire({
       icon: "success",
@@ -654,11 +660,13 @@
           continue;
         }
         const dayTrades = byDate[key] || [];
-        const dayTotal = dayTrades.reduce((s, t) => s + (Number(t.pnl) || 0), 0);
+        const closedDayTrades = dayTrades.filter(t => !isPending(t));
+        const dayTotal = closedDayTrades.reduce((s, t) => s + Number(t.pnl), 0);
+        const dayHasClosed = closedDayTrades.length > 0;
         if (key === todayKey()) div.classList.add("today");
         if (dayTrades.length) {
           div.classList.add("has-trades");
-          div.classList.add(dayTotal >= 0 ? "profit" : "loss");
+          if (dayHasClosed) div.classList.add(dayTotal >= 0 ? "profit" : "loss");
         }
         monthTotal += dayTotal;
 
@@ -674,7 +682,7 @@
 
         div.innerHTML = `
           <div class="calendar-day-num">${dt.getDate()}</div>
-          ${dayTrades.length ? `<div class="calendar-day-pnl ${dayTotal >= 0 ? "pos" : "neg"} mono">${fmtMoney(dayTotal)}</div>
+          ${dayTrades.length ? `<div class="calendar-day-pnl ${dayHasClosed ? (dayTotal >= 0 ? "pos" : "neg") : ""} mono" ${dayHasClosed ? "" : 'style="color:var(--muted);font-style:italic;"'}>${dayHasClosed ? fmtMoney(dayTotal) : "รอผล"}</div>
           <div class="calendar-day-count">${dayTrades.length} เทรด</div>` : ""}
           ${tagsHtml}
         `;
@@ -685,11 +693,13 @@
       }
 
       // weekly summary cell (sums all 7 days, including weekend, even though only Mon-Fri are shown)
-      let weekTotal = 0, weekCount2 = 0;
+      let weekTotal = 0, weekCount2 = 0, weekHasClosed = false;
       weekDates.forEach(dt => {
         const key = dateKey(dt.getFullYear(), dt.getMonth(), dt.getDate());
         const dayTrades = byDate[key] || [];
-        weekTotal += dayTrades.reduce((s, t) => s + (Number(t.pnl) || 0), 0);
+        const closed = dayTrades.filter(t => !isPending(t));
+        if (closed.length) weekHasClosed = true;
+        weekTotal += closed.reduce((s, t) => s + Number(t.pnl), 0);
         weekCount2 += dayTrades.length;
       });
       const sumDiv = document.createElement("div");
@@ -697,7 +707,9 @@
       if (weekCount2) {
         sumDiv.innerHTML = `
           <div class="calendar-summary-label">สัปดาห์นี้</div>
-          <div class="calendar-summary-pnl ${weekTotal >= 0 ? "pos" : "neg"} mono">${fmtMoney(weekTotal)}</div>
+          ${weekHasClosed
+            ? `<div class="calendar-summary-pnl ${weekTotal >= 0 ? "pos" : "neg"} mono">${fmtMoney(weekTotal)}</div>`
+            : `<div class="calendar-summary-pnl mono" style="color:var(--muted);font-style:italic;">รอผล</div>`}
           <div class="calendar-summary-count">${weekCount2} เทรด</div>
         `;
       } else {
@@ -732,7 +744,6 @@
   let dayModalDate = null;
 
   function tradeCardHtml(t) {
-    const pnlNum = Number(t.pnl) || 0;
     const details = [];
     if (t.marketType === "forex") {
       if (t.lot != null) details.push(["Lot Size", t.lot]);
@@ -748,6 +759,7 @@
     if (t.account) details.push(["Account", t.account]);
 
     const flags = [];
+    if (isPending(t)) flags.push("⏳ รอผลเทรด");
     if (t.followedRules) flags.push("ทำตามแผน ✓");
     if (t.breakeven) flags.push("Breakeven");
     if (t.enteredWindow) flags.push("เข้าตามช่วงเวลา ✓");
@@ -763,7 +775,7 @@
         ${t.grade ? `<span class="grade-stamp grade-${t.grade}" title="เกรด ${t.grade}">${t.grade}</span>` : ""}
         <span class="badge market">${MARKET_LABEL[t.marketType] || t.marketType}</span>
         <span class="badge ${t.side === "long" ? "up" : "down"}">${t.side === "long" ? "BUY" : "SELL"}</span>
-        <span class="trade-card-pnl mono ${pnlNum >= 0 ? "pos" : "neg"}">${fmtMoney(pnlNum)}</span>
+        ${pnlHtml(t, "trade-card-pnl")}
         <button type="button" class="trade-card-edit" data-id="${t.id}" title="แก้ไขเทรดนี้">✎</button>
       </div>
       <div class="trade-card-symbol">${escapeHtml(t.symbol || "—")}</div>
@@ -781,11 +793,13 @@
   function openDayModal(key) {
     dayModalDate = key;
     const dayTrades = trades.filter(t => t.date === key).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-    const total = dayTrades.reduce((s, t) => s + (Number(t.pnl) || 0), 0);
+    const closedDayTrades = dayTrades.filter(t => !isPending(t));
+    const total = closedDayTrades.reduce((s, t) => s + Number(t.pnl), 0);
+    const hasClosed = closedDayTrades.length > 0;
 
     document.getElementById("dayModalTitle").textContent = key;
     document.getElementById("dayModalSummary").innerHTML = `
-      <div class="day-modal-total ${total >= 0 ? "pos" : "neg"} mono">${fmtMoney(total)}</div>
+      <div class="day-modal-total ${hasClosed ? (total >= 0 ? "pos" : "neg") : ""} mono" ${hasClosed ? "" : 'style="color:var(--muted);font-style:italic;"'}>${hasClosed ? fmtMoney(total) : "รอผล"}</div>
       <div class="day-modal-count">${dayTrades.length} เทรด</div>
     `;
     document.getElementById("dayModalTrades").innerHTML = dayTrades.map(tradeCardHtml).join("");
@@ -833,10 +847,12 @@
   /* ---------- overview: stats + charts ---------- */
   function computeStats() {
     const total = trades.length;
-    const wins = trades.filter(t => Number(t.pnl) > 0);
-    const losses = trades.filter(t => Number(t.pnl) < 0);
-    const totalPnl = trades.reduce((s, t) => s + (Number(t.pnl) || 0), 0);
-    const winRate = total ? (wins.length / total * 100) : 0;
+    const closed = trades.filter(t => !isPending(t));
+    const pendingCount = total - closed.length;
+    const wins = closed.filter(t => Number(t.pnl) > 0);
+    const losses = closed.filter(t => Number(t.pnl) < 0);
+    const totalPnl = closed.reduce((s, t) => s + Number(t.pnl), 0);
+    const winRate = closed.length ? (wins.length / closed.length * 100) : 0;
     const avgWin = wins.length ? wins.reduce((s, t) => s + Number(t.pnl), 0) / wins.length : 0;
     const avgLoss = losses.length ? losses.reduce((s, t) => s + Number(t.pnl), 0) / losses.length : 0;
     const grossWin = wins.reduce((s, t) => s + Number(t.pnl), 0);
@@ -846,16 +862,18 @@
     const byDate = tradesByDate();
     let bestDay = null, worstDay = null;
     Object.keys(byDate).forEach(key => {
-      const sum = byDate[key].reduce((s, t) => s + (Number(t.pnl) || 0), 0);
+      const dayClosed = byDate[key].filter(t => !isPending(t));
+      if (!dayClosed.length) return;
+      const sum = dayClosed.reduce((s, t) => s + Number(t.pnl), 0);
       if (!bestDay || sum > bestDay.sum) bestDay = { key, sum };
       if (!worstDay || sum < worstDay.sum) worstDay = { key, sum };
     });
 
-    return { total, wins: wins.length, losses: losses.length, totalPnl, winRate, avgWin, avgLoss, profitFactor, bestDay, worstDay };
+    return { total, pendingCount, wins: wins.length, losses: losses.length, totalPnl, winRate, avgWin, avgLoss, profitFactor, bestDay, worstDay };
   }
 
   function computeMaxDrawdown() {
-    const sorted = [...trades].sort((a, b) => a.date.localeCompare(b.date) || (a.createdAt || 0) - (b.createdAt || 0));
+    const sorted = [...trades].filter(t => !isPending(t)).sort((a, b) => a.date.localeCompare(b.date) || (a.createdAt || 0) - (b.createdAt || 0));
     let cum = 0, peak = 0, maxDD = 0;
     sorted.forEach(t => {
       cum += Number(t.pnl) || 0;
@@ -875,9 +893,9 @@
     const planAdherence = rulesTrades.length ? (rulesTrades.filter(t => t.followedRules).length / rulesTrades.length * 100) : 0;
 
     const byDate = tradesByDate();
-    const days = Object.keys(byDate);
-    const profitableDays = days.filter(k => byDate[k].reduce((sum, t) => sum + (Number(t.pnl) || 0), 0) > 0).length;
-    const consistency = days.length ? (profitableDays / days.length * 100) : 0;
+    const closedDays = Object.keys(byDate).filter(k => byDate[k].some(t => !isPending(t)));
+    const profitableDays = closedDays.filter(k => byDate[k].reduce((sum, t) => sum + (isPending(t) ? 0 : Number(t.pnl)), 0) > 0).length;
+    const consistency = closedDays.length ? (profitableDays / closedDays.length * 100) : 0;
 
     const rr = (s.avgWin && s.avgLoss) ? (s.avgWin / Math.abs(s.avgLoss)) : 0;
     const rrScaled = Math.max(0, Math.min(100, (rr / 3) * 100));
@@ -935,6 +953,7 @@
 
   function renderOverview() {
     const s = computeStats();
+    const closedCount = s.total - s.pendingCount;
     const grid = document.getElementById("statsGrid");
     function metric(label, value, cls) {
       return `<div class="metric"><div class="metric-label">${label}</div><div class="metric-value mono ${cls || ""}">${value}</div></div>`;
@@ -942,11 +961,12 @@
     grid.innerHTML = [
       metric("กำไร/ขาดทุนรวม", fmtMoney(s.totalPnl), s.totalPnl >= 0 ? "pos" : "neg"),
       metric("จำนวนเทรดทั้งหมด", s.total),
-      metric("Win Rate", s.total ? s.winRate.toFixed(1) + "%" : "—"),
+      metric("รอผลเทรด", s.pendingCount),
+      metric("Win Rate", closedCount ? s.winRate.toFixed(1) + "%" : "—"),
       metric("เทรดชนะ / แพ้", `${s.wins} / ${s.losses}`),
       metric("กำไรเฉลี่ย/ครั้ง", s.wins ? fmtMoney(s.avgWin) : "—", "pos"),
       metric("ขาดทุนเฉลี่ย/ครั้ง", s.losses ? fmtMoney(s.avgLoss) : "—", "neg"),
-      metric("Profit Factor", s.profitFactor === Infinity ? "∞" : s.total ? s.profitFactor.toFixed(2) : "—"),
+      metric("Profit Factor", s.profitFactor === Infinity ? "∞" : closedCount ? s.profitFactor.toFixed(2) : "—"),
       metric("วันที่ดีที่สุด", s.bestDay ? `${s.bestDay.key} (${fmtMoney(s.bestDay.sum)})` : "—", s.bestDay && s.bestDay.sum >= 0 ? "pos" : ""),
       metric("วันที่แย่ที่สุด", s.worstDay ? `${s.worstDay.key} (${fmtMoney(s.worstDay.sum)})` : "—", s.worstDay && s.worstDay.sum < 0 ? "neg" : ""),
     ].join("");
@@ -957,10 +977,10 @@
   }
 
   function buildEquityCurveSvg() {
-    if (!trades.length) return '<div class="empty">ยังไม่มีข้อมูลเทรด</div>';
-    const sorted = [...trades].sort((a, b) => a.date.localeCompare(b.date) || (a.createdAt || 0) - (b.createdAt || 0));
+    const sorted = [...trades].filter(t => !isPending(t)).sort((a, b) => a.date.localeCompare(b.date) || (a.createdAt || 0) - (b.createdAt || 0));
+    if (!sorted.length) return '<div class="empty">ยังไม่มีเทรดที่ปิดแล้ว</div>';
     let cum = 0;
-    const points = sorted.map(t => { cum += Number(t.pnl) || 0; return cum; });
+    const points = sorted.map(t => { cum += Number(t.pnl); return cum; });
 
     const w = 900, h = 260, padL = 60, padR = 20, padT = 20, padB = 30;
     const minV = Math.min(0, ...points);
@@ -995,9 +1015,10 @@
       months.push({ y: d.getFullYear(), m: d.getMonth(), total: 0 });
     }
     trades.forEach(t => {
+      if (isPending(t)) return;
       const [y, m] = t.date.split("-").map(Number);
       const bucket = months.find(mo => mo.y === y && mo.m === (m - 1));
-      if (bucket) bucket.total += Number(t.pnl) || 0;
+      if (bucket) bucket.total += Number(t.pnl);
     });
     const maxAbs = Math.max(1, ...months.map(m => Math.abs(m.total)));
 
@@ -1039,7 +1060,7 @@
             <td><span class="badge market">${MARKET_LABEL[t.marketType] || t.marketType}</span></td>
             <td><div class="row-symbol">${(t.imageAfter || t.imageBefore || t.image) ? `<img class="row-thumb" src="${t.imageAfter || t.imageBefore || t.image}">` : ""}${escapeHtml(t.symbol || "—")}</div></td>
             <td><span class="badge ${t.side === "long" ? "up" : "down"}">${t.side === "long" ? "BUY" : "SELL"}</span></td>
-            <td class="mono" style="color:${Number(t.pnl) >= 0 ? "var(--bull)" : "var(--bear)"}">${fmtMoney(t.pnl)}</td>
+            <td>${pnlHtml(t)}</td>
             <td>${(t.tags || []).map(tag => `<span class="tag-chip">${escapeHtml(tag)}</span>`).join("")}</td>
           </tr>
         `).join("")}
@@ -1141,7 +1162,7 @@
     document.getElementById("tfPoints").value = t && t.points != null ? t.points : "";
     document.getElementById("tfEntry").value = t && t.entry != null ? t.entry : "";
     document.getElementById("tfExit").value = t && t.exit != null ? t.exit : "";
-    document.getElementById("tfPnl").value = t ? t.pnl : "";
+    document.getElementById("tfPnl").value = (t && t.pnl != null) ? t.pnl : "";
     document.getElementById("tfSession").value = t ? (t.session || "") : "";
     document.getElementById("tfAccount").value = t ? (t.account || "") : "";
     document.getElementById("tfModel").value = t ? (t.model || "") : "";
@@ -1176,7 +1197,7 @@
     const isEdit = !!editingId;
     const date = document.getElementById("tfDate").value || todayKey();
     const pnlRaw = document.getElementById("tfPnl").value;
-    const pnl = (pnlRaw === "" || isNaN(Number(pnlRaw))) ? 0 : Number(pnlRaw);
+    const pnl = (pnlRaw === "" || isNaN(Number(pnlRaw))) ? null : Number(pnlRaw);
 
     const marketType = tfMarketType.value;
     const tags = document.getElementById("tfTags").value
