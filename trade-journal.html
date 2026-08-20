@@ -51,16 +51,20 @@
     padding-bottom: 60px;
   }
   .mono { font-family: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", monospace; }
-  .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; flex-wrap: wrap; gap: 10px; }
+  .header {
+    display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; flex-wrap: wrap; gap: 10px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 14px 20px; box-shadow: var(--shadow);
+  }
   .brand { font-size: 20px; font-weight: 800; letter-spacing: 0.2px; }
   .brand .dot { color: var(--accent); }
   .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   .back-link {
-    background: var(--surface); border: 1px solid var(--border); color: var(--text);
+    background: var(--accent-soft); border: 1px solid transparent; color: var(--accent);
     padding: 9px 14px; border-radius: 10px; font-size: 13px; text-decoration: none;
-    display: inline-flex; align-items: center; font-weight: 600;
+    display: inline-flex; align-items: center; font-weight: 700;
   }
-  .back-link:hover { border-color: var(--accent); color: var(--accent); }
+  .back-link:hover { background: var(--accent); color: #fff; }
   .tabs { display: flex; gap: 6px; margin-bottom: 18px; flex-wrap: wrap; background: var(--surface-alt); padding: 5px; border-radius: 12px; width: fit-content; }
   .tab-btn { background: transparent; border: none; color: var(--muted); padding: 9px 16px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 700; }
   .tab-btn.active { color: var(--accent); background: var(--surface); box-shadow: var(--shadow); }
@@ -123,6 +127,15 @@
   .metric-edit-btn { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 11px; padding: 0; line-height: 1; }
   .metric-edit-btn:hover { color: var(--accent); }
   .metric.capital-metric { border-color: var(--accent); background: var(--accent-soft); }
+  .metric.equity-hero {
+    grid-column: 1 / -1; border: none; border-radius: 14px; padding: 22px 26px;
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;
+    box-shadow: 0 10px 24px rgba(79,70,229,.25);
+  }
+  .equity-hero-label { font-size: 12px; color: rgba(255,255,255,.85); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
+  .equity-hero-value { font-family: ui-monospace, monospace; font-size: 36px; font-weight: 900; color: #fff; margin-top: 6px; line-height: 1; }
+  .equity-hero-sub { font-size: 12.5px; color: rgba(255,255,255,.75); margin-top: 8px; font-family: ui-monospace, monospace; }
+  .equity-hero-badge { background: rgba(255,255,255,.18); color: #fff; padding: 10px 18px; border-radius: 12px; font-weight: 800; font-size: 20px; font-family: ui-monospace, monospace; white-space: nowrap; }
   .metric-value { font-family: ui-monospace, monospace; font-size: 18px; font-weight: 800; }
   .metric-value.pos { color: var(--bull); }
   .metric-value.neg { color: var(--bear); }
@@ -974,10 +987,21 @@
     function metric(label, value, cls) {
       return `<div class="metric"><div class="metric-label">${label}</div><div class="metric-value mono ${cls || ""}">${value}</div></div>`;
     }
+    const equityUp = currentEquity >= capital;
+    const heroGradient = equityUp ? "var(--accent), var(--accent-hover)" : "var(--bear), #b91c1c";
+    const equityHeroHtml = `<div class="metric equity-hero" style="background:linear-gradient(135deg, ${heroGradient});">
+      <div>
+        <div class="equity-hero-label">ยอดรวมปัจจุบัน (ทุน + กำไร/ขาดทุน)</div>
+        <div class="equity-hero-value">${fmtPlain(currentEquity)}</div>
+        <div class="equity-hero-sub">ทุน ${fmtPlain(capital)} ${s.totalPnl >= 0 ? "+" : "−"} ${fmtPlain(Math.abs(s.totalPnl))}</div>
+      </div>
+      ${returnPct !== null ? `<div class="equity-hero-badge">${returnPct >= 0 ? "+" : ""}${returnPct.toFixed(2)}%</div>` : ""}
+    </div>`;
+
     grid.innerHTML = [
+      equityHeroHtml,
       `<div class="metric capital-metric"><div class="metric-label">ทุนเริ่มต้น <button type="button" id="editCapitalBtn" class="metric-edit-btn" title="แก้ไขทุนเริ่มต้น">✎</button></div><div class="metric-value mono">${fmtPlain(capital)}</div></div>`,
       metric("กำไร/ขาดทุนรวม", fmtMoney(s.totalPnl), s.totalPnl >= 0 ? "pos" : "neg"),
-      metric("ยอดรวมปัจจุบัน (ทุน+กำไรขาดทุน)", fmtPlain(currentEquity), currentEquity >= capital ? "pos" : "neg"),
       metric("ผลตอบแทน (%)", returnPct !== null ? (returnPct >= 0 ? "+" : "") + returnPct.toFixed(2) + "%" : "—", returnPct !== null ? (returnPct >= 0 ? "pos" : "neg") : ""),
       metric("จำนวนเทรดทั้งหมด", s.total),
       metric("รอผลเทรด", s.pendingCount),
