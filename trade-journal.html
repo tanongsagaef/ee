@@ -160,15 +160,21 @@
   .day-modal-total.neg { color: var(--bear); }
   .day-modal-count { color: var(--muted); font-size: 13px; }
   .day-modal-trades { display: flex; flex-direction: column; gap: 10px; }
-  .trade-card { background: var(--surface-alt); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; cursor: pointer; }
-  .trade-card:hover { border-color: var(--accent); }
-  .trade-card-head { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
-  .trade-card-pnl { margin-left: auto; font-family: ui-monospace, monospace; font-weight: 800; font-size: 14px; }
+  .trade-card { background: var(--surface-alt); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+  .trade-card-head { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+  .trade-card-pnl { margin-left: auto; font-family: ui-monospace, monospace; font-weight: 800; font-size: 15px; }
   .trade-card-pnl.pos { color: var(--bull); }
   .trade-card-pnl.neg { color: var(--bear); }
-  .trade-card-symbol { font-weight: 700; font-size: 14px; margin-bottom: 4px; }
-  .trade-card-image { max-width: 100%; max-height: 200px; border-radius: 8px; border: 1px solid var(--border); margin: 6px 0; display: block; }
-  .trade-card-notes { font-size: 12.5px; color: var(--muted); margin-top: 4px; line-height: 1.5; }
+  .trade-card-edit { background: var(--surface); border: 1px solid var(--border); color: var(--muted); width: 28px; height: 28px; border-radius: 7px; cursor: pointer; font-size: 13px; display: inline-flex; align-items: center; justify-content: center; }
+  .trade-card-edit:hover { border-color: var(--accent); color: var(--accent); }
+  .trade-card-symbol { font-weight: 700; font-size: 15px; margin-bottom: 6px; }
+  .trade-card-image { max-width: 100%; max-height: 300px; width: 100%; object-fit: contain; background: var(--surface); border-radius: 10px; border: 1px solid var(--border); margin: 8px 0; display: block; }
+  .trade-card-details { display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 8px 14px; margin: 8px 0; padding: 10px 12px; background: var(--surface); border-radius: 8px; border: 1px solid var(--border); }
+  .trade-card-detail { display: flex; flex-direction: column; }
+  .trade-card-detail span:first-child { color: var(--muted); font-size: 10px; text-transform: uppercase; margin-bottom: 2px; font-weight: 700; letter-spacing: 0.3px; }
+  .trade-card-detail span:last-child { font-weight: 700; font-size: 12.5px; }
+  .trade-card-tags-row { margin-top: 6px; }
+  .trade-card-notes { font-size: 12.5px; color: var(--muted); margin-top: 8px; line-height: 1.6; }
 </style>
 </head>
 <body>
@@ -515,15 +521,28 @@
 
   function tradeCardHtml(t) {
     const pnlNum = Number(t.pnl) || 0;
+    const details = [];
+    if (t.marketType === "forex") {
+      if (t.lot != null) details.push(["Lot Size", t.lot]);
+      if (t.pips != null) details.push(["Pips", t.pips]);
+    } else if (t.marketType === "futures") {
+      if (t.contracts != null) details.push(["Contracts", t.contracts]);
+      if (t.points != null) details.push(["Points", t.points]);
+    }
+    if (t.entry != null) details.push(["ราคาเข้า", t.entry]);
+    if (t.exit != null) details.push(["ราคาออก", t.exit]);
+
     return `<div class="trade-card" data-id="${t.id}">
       <div class="trade-card-head">
         <span class="badge market">${MARKET_LABEL[t.marketType] || t.marketType}</span>
         <span class="badge ${t.side === "long" ? "up" : "down"}">${t.side === "long" ? "BUY" : "SELL"}</span>
         <span class="trade-card-pnl mono ${pnlNum >= 0 ? "pos" : "neg"}">${fmtMoney(pnlNum)}</span>
+        <button type="button" class="trade-card-edit" data-id="${t.id}" title="แก้ไขเทรดนี้">✎</button>
       </div>
       <div class="trade-card-symbol">${escapeHtml(t.symbol || "—")}</div>
       ${t.image ? `<img class="trade-card-image" src="${t.image}">` : ""}
-      ${(t.tags || []).length ? `<div>${t.tags.map(tag => `<span class="tag-chip">${escapeHtml(tag)}</span>`).join("")}</div>` : ""}
+      ${details.length ? `<div class="trade-card-details">${details.map(([k, v]) => `<div class="trade-card-detail"><span>${k}</span><span class="mono">${v}</span></div>`).join("")}</div>` : ""}
+      ${(t.tags || []).length ? `<div class="trade-card-tags-row">${t.tags.map(tag => `<span class="tag-chip">${escapeHtml(tag)}</span>`).join("")}</div>` : ""}
       ${t.notes ? `<div class="trade-card-notes">${escapeHtml(t.notes)}</div>` : ""}
     </div>`;
   }
@@ -539,10 +558,11 @@
       <div class="day-modal-count">${dayTrades.length} เทรด</div>
     `;
     document.getElementById("dayModalTrades").innerHTML = dayTrades.map(tradeCardHtml).join("");
-    document.querySelectorAll("#dayModalTrades .trade-card").forEach(card => {
-      card.addEventListener("click", () => {
+    document.querySelectorAll("#dayModalTrades .trade-card-edit").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const id = btn.dataset.id;
         closeDayModal();
-        openTradeModal(card.dataset.id);
+        openTradeModal(id);
       });
     });
 
