@@ -119,7 +119,10 @@
   /* metrics */
   .metrics-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
   .metric { background: var(--surface-alt); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
-  .metric-label { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 5px; font-weight: 700; }
+  .metric-label { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 5px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+  .metric-edit-btn { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 11px; padding: 0; line-height: 1; }
+  .metric-edit-btn:hover { color: var(--accent); }
+  .metric.capital-metric { border-color: var(--accent); background: var(--accent-soft); }
   .metric-value { font-family: ui-monospace, monospace; font-size: 18px; font-weight: 800; }
   .metric-value.pos { color: var(--bull); }
   .metric-value.neg { color: var(--bear); }
@@ -510,7 +513,15 @@
   }
   function saveTrades() { localStorage.setItem(LS_KEY, JSON.stringify(trades)); }
 
+  const CAPITAL_KEY = "tj_capital";
+  function loadCapital() {
+    const v = localStorage.getItem(CAPITAL_KEY);
+    return v !== null && !isNaN(Number(v)) ? Number(v) : 0;
+  }
+  function saveCapital() { localStorage.setItem(CAPITAL_KEY, String(capital)); }
+
   let trades = loadTrades();
+  let capital = loadCapital();
 
   function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
   function pad2(n) { return String(n).padStart(2, "0"); }
@@ -523,6 +534,9 @@
     const v = Number(n) || 0;
     const sign = v > 0 ? "+" : "";
     return sign + v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  function fmtPlain(n) {
+    return (Number(n) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
   function isPending(t) { return t.pnl === null || t.pnl === undefined; }
   function pnlHtml(t, cls) {
@@ -954,12 +968,17 @@
   function renderOverview() {
     const s = computeStats();
     const closedCount = s.total - s.pendingCount;
+    const currentEquity = capital + s.totalPnl;
+    const returnPct = capital > 0 ? (s.totalPnl / capital * 100) : null;
     const grid = document.getElementById("statsGrid");
     function metric(label, value, cls) {
       return `<div class="metric"><div class="metric-label">${label}</div><div class="metric-value mono ${cls || ""}">${value}</div></div>`;
     }
     grid.innerHTML = [
+      `<div class="metric capital-metric"><div class="metric-label">ทุนเริ่มต้น <button type="button" id="editCapitalBtn" class="metric-edit-btn" title="แก้ไขทุนเริ่มต้น">✎</button></div><div class="metric-value mono">${fmtPlain(capital)}</div></div>`,
       metric("กำไร/ขาดทุนรวม", fmtMoney(s.totalPnl), s.totalPnl >= 0 ? "pos" : "neg"),
+      metric("ยอดรวมปัจจุบัน (ทุน+กำไรขาดทุน)", fmtPlain(currentEquity), currentEquity >= capital ? "pos" : "neg"),
+      metric("ผลตอบแทน (%)", returnPct !== null ? (returnPct >= 0 ? "+" : "") + returnPct.toFixed(2) + "%" : "—", returnPct !== null ? (returnPct >= 0 ? "pos" : "neg") : ""),
       metric("จำนวนเทรดทั้งหมด", s.total),
       metric("รอผลเทรด", s.pendingCount),
       metric("Win Rate", closedCount ? s.winRate.toFixed(1) + "%" : "—"),
@@ -971,6 +990,27 @@
       metric("วันที่แย่ที่สุด", s.worstDay ? `${s.worstDay.key} (${fmtMoney(s.worstDay.sum)})` : "—", s.worstDay && s.worstDay.sum < 0 ? "neg" : ""),
     ].join("");
 
+    document.getElementById("editCapitalBtn").addEventListener("click", () => {
+      Swal.fire({
+        title: "ตั้งค่าทุนเริ่มต้น",
+        input: "number",
+        inputLabel: "ทุนเริ่มต้น ($)",
+        inputValue: capital,
+        showCancelButton: true,
+        confirmButtonText: "บันทึก",
+        cancelButtonText: "ยกเลิก",
+        inputValidator: (value) => {
+          if (value === "" || isNaN(Number(value))) return "กรุณาใส่ตัวเลข";
+        },
+      }).then((result) => {
+        if (!result.isConfirmed) return;
+        capital = Number(result.value);
+        saveCapital();
+        renderOverview();
+        successToast("บันทึกทุนเริ่มต้นเรียบร้อย");
+      });
+    });
+
     document.getElementById("radarChartWrap").innerHTML = buildRadarChart(s);
     document.getElementById("equityChartWrap").innerHTML = buildEquityCurveSvg();
     document.getElementById("monthlyChartWrap").innerHTML = buildMonthlyBarChart();
@@ -979,26 +1019,30 @@
   function buildEquityCurveSvg() {
     const sorted = [...trades].filter(t => !isPending(t)).sort((a, b) => a.date.localeCompare(b.date) || (a.createdAt || 0) - (b.createdAt || 0));
     if (!sorted.length) return '<div class="empty">ยังไม่มีเทรดที่ปิดแล้ว</div>';
-    let cum = 0;
+    let cum = capital;
     const points = sorted.map(t => { cum += Number(t.pnl); return cum; });
 
     const w = 900, h = 260, padL = 60, padR = 20, padT = 20, padB = 30;
-    const minV = Math.min(0, ...points);
-    const maxV = Math.max(0, ...points);
+    const minV = Math.min(capital, ...points);
+    const maxV = Math.max(capital, ...points);
     const range = (maxV - minV) || 1;
     const xStep = points.length > 1 ? (w - padL - padR) / (points.length - 1) : 0;
     const xAt = i => padL + i * xStep;
     const yAt = v => padT + (h - padT - padB) * (1 - (v - minV) / range);
-    const zeroY = yAt(0);
+    const zeroY = yAt(capital);
     const pathPts = points.map((v, i) => `${xAt(i).toFixed(1)},${yAt(v).toFixed(1)}`).join(" ");
     const last = points[points.length - 1];
-    const lineColor = last >= 0 ? "var(--bull)" : "var(--bear)";
+    const lineColor = last >= capital ? "var(--bull)" : "var(--bear)";
+    const maxLabelY = yAt(maxV);
+    const minLabelY = yAt(minV);
+    const showMaxLabel = Math.abs(maxLabelY - zeroY) > 14;
+    const showMinLabel = Math.abs(minLabelY - zeroY) > 14;
 
     return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="260" preserveAspectRatio="none">
       <line x1="${padL}" y1="${zeroY.toFixed(1)}" x2="${w - padR}" y2="${zeroY.toFixed(1)}" style="stroke:var(--border)" stroke-dasharray="4 4"/>
-      <text x="${padL - 8}" y="${zeroY.toFixed(1)}" font-size="10" text-anchor="end" dy="4" style="fill:var(--muted)">0</text>
-      <text x="${padL - 8}" y="${padT}" font-size="10" text-anchor="end" dy="4" style="fill:var(--muted)">${maxV.toFixed(0)}</text>
-      <text x="${padL - 8}" y="${h - padB}" font-size="10" text-anchor="end" dy="4" style="fill:var(--muted)">${minV.toFixed(0)}</text>
+      <text x="${padL - 8}" y="${zeroY.toFixed(1)}" font-size="10" text-anchor="end" dy="4" style="fill:var(--muted)">${fmtPlain(capital)}</text>
+      ${showMaxLabel ? `<text x="${padL - 8}" y="${maxLabelY.toFixed(1)}" font-size="10" text-anchor="end" dy="4" style="fill:var(--muted)">${maxV.toFixed(0)}</text>` : ""}
+      ${showMinLabel ? `<text x="${padL - 8}" y="${minLabelY.toFixed(1)}" font-size="10" text-anchor="end" dy="4" style="fill:var(--muted)">${minV.toFixed(0)}</text>` : ""}
       <polyline points="${pathPts}" fill="none" style="stroke:${lineColor}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
       <circle cx="${xAt(points.length - 1).toFixed(1)}" cy="${yAt(last).toFixed(1)}" r="4" style="fill:${lineColor}"/>
       <text x="${padL}" y="${h - 8}" font-size="11" style="fill:var(--muted)">${sorted[0].date}</text>
