@@ -72,10 +72,24 @@
   .side-btn.buy.active { background: var(--bull-soft); border-color: var(--bull); color: var(--bull); }
   .side-btn.sell.active { background: var(--bear-soft); border-color: var(--bear); color: var(--bear); }
 
-  /* star rating */
-  .star-rating { display: flex; gap: 4px; }
-  .star-btn { background: none; border: none; font-size: 24px; color: var(--border); cursor: pointer; padding: 2px; line-height: 1; }
-  .star-btn.filled { color: #f5a623; }
+  /* trade grade */
+  .grade-toggle { display: flex; gap: 6px; }
+  .grade-btn { flex: 1; padding: 10px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--surface-alt); color: var(--muted); font-weight: 800; cursor: pointer; font-size: 14px; }
+  .grade-btn.active[data-grade="A"] { background: var(--bull-soft); border-color: var(--bull); color: var(--bull); }
+  .grade-btn.active[data-grade="B"] { background: rgba(101,163,13,0.12); border-color: #65a30d; color: #65a30d; }
+  .grade-btn.active[data-grade="C"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+  .grade-btn.active[data-grade="D"] { background: rgba(217,119,6,0.12); border-color: #d97706; color: #d97706; }
+  .grade-btn.active[data-grade="E"] { background: var(--bear-soft); border-color: var(--bear); color: var(--bear); }
+  .grade-pill { font-size: 11px; font-weight: 800; border-radius: 20px; padding: 3px 10px; display: inline-block; }
+  .grade-pill.grade-A { background: var(--bull-soft); color: var(--bull); }
+  .grade-pill.grade-B { background: rgba(101,163,13,0.12); color: #65a30d; }
+  .grade-pill.grade-C { background: var(--accent-soft); color: var(--accent); }
+  .grade-pill.grade-D { background: rgba(217,119,6,0.12); color: #d97706; }
+  .grade-pill.grade-E { background: var(--bear-soft); color: var(--bear); }
+
+  /* tradingview link */
+  .tv-link-btn { display: inline-flex; align-items: center; gap: 6px; background: var(--accent-soft); border: 1px solid rgba(79,70,229,0.3); color: var(--accent); padding: 8px 14px; border-radius: 8px; font-size: 12.5px; font-weight: 700; text-decoration: none; margin: 6px 0; }
+  .tv-link-btn:hover { background: var(--accent); color: #fff; }
 
   /* checkbox row */
   .check-row { display: flex; flex-wrap: wrap; gap: 14px; }
@@ -341,20 +355,19 @@
       </div>
     </div>
 
-    <div class="row">
-      <div class="field">
-        <label class="small">กลยุทธ์ / Model</label>
-        <input type="text" id="tfModel" placeholder="เช่น Breakout Retest, ICT FVG">
-      </div>
-      <div class="field">
-        <label class="small">คะแนนการเทรด (Rating)</label>
-        <div class="star-rating" id="tfRatingStars">
-          <button type="button" class="star-btn" data-val="1">★</button>
-          <button type="button" class="star-btn" data-val="2">★</button>
-          <button type="button" class="star-btn" data-val="3">★</button>
-          <button type="button" class="star-btn" data-val="4">★</button>
-          <button type="button" class="star-btn" data-val="5">★</button>
-        </div>
+    <div class="field">
+      <label class="small">กลยุทธ์ / Model</label>
+      <input type="text" id="tfModel" placeholder="เช่น Breakout Retest, ICT FVG">
+    </div>
+
+    <div class="field">
+      <label class="small">เกรดการเทรด (เมื่อเทรดเสร็จ)</label>
+      <div class="grade-toggle" id="tfGradeToggle">
+        <button type="button" class="grade-btn" data-grade="A">A</button>
+        <button type="button" class="grade-btn" data-grade="B">B</button>
+        <button type="button" class="grade-btn" data-grade="C">C</button>
+        <button type="button" class="grade-btn" data-grade="D">D</button>
+        <button type="button" class="grade-btn" data-grade="E">E</button>
       </div>
     </div>
 
@@ -378,18 +391,33 @@
       </div>
     </div>
 
-    <div class="field">
-      <label class="small">รูปภาพ (สกรีนช็อตกราฟ/หลักฐาน)</label>
-      <div id="tfImagePreview"></div>
-      <label class="file-btn">
-        <span id="tfImageLabelText">+ เพิ่มรูปภาพ</span>
-        <input type="file" accept="image/*" id="tfImageInput" hidden>
-      </label>
+    <div class="row">
+      <div class="field">
+        <label class="small">รูปก่อนเข้าเทรด</label>
+        <div id="tfImageBeforePreview"></div>
+        <label class="file-btn">
+          <span id="tfImageBeforeLabelText">+ เพิ่มรูปภาพ</span>
+          <input type="file" accept="image/*" id="tfImageBeforeInput" hidden>
+        </label>
+      </div>
+      <div class="field">
+        <label class="small">รูปหลังเทรดเสร็จ</label>
+        <div id="tfImageAfterPreview"></div>
+        <label class="file-btn">
+          <span id="tfImageAfterLabelText">+ เพิ่มรูปภาพ</span>
+          <input type="file" accept="image/*" id="tfImageAfterInput" hidden>
+        </label>
+      </div>
     </div>
 
     <div class="field">
-      <label class="small">หมายเหตุ</label>
-      <textarea id="tfNotes" rows="3"></textarea>
+      <label class="small">ลิงก์ TradingView (ถ้ามี)</label>
+      <input type="text" id="tfTvLink" placeholder="https://www.tradingview.com/x/xxxxxxxx/">
+    </div>
+
+    <div class="field">
+      <label class="small">ความเห็นหลังเทรด (Trade Review)</label>
+      <textarea id="tfNotes" rows="3" placeholder="สิ่งที่เรียนรู้ สิ่งที่ควรทำต่างไปครั้งหน้า ฯลฯ"></textarea>
     </div>
 
     <div class="modal-footer">
@@ -632,7 +660,6 @@
     if (t.session) details.push(["Session", t.session]);
     if (t.model) details.push(["Model", t.model]);
     if (t.account) details.push(["Account", t.account]);
-    if (t.rating) details.push(["Rating", "★".repeat(t.rating)]);
 
     const flags = [];
     if (t.followedRules) flags.push("ทำตามแผน ✓");
@@ -641,16 +668,22 @@
 
     const posTags = t.tags || [];
     const negTags = t.negTags || [];
+    // t.image is the legacy single-image field from before before/after images existed
+    const imgBefore = t.imageBefore || null;
+    const imgAfter = t.imageAfter || (!t.imageBefore ? t.image : null) || null;
 
     return `<div class="trade-card" data-id="${t.id}">
       <div class="trade-card-head">
         <span class="badge market">${MARKET_LABEL[t.marketType] || t.marketType}</span>
         <span class="badge ${t.side === "long" ? "up" : "down"}">${t.side === "long" ? "BUY" : "SELL"}</span>
+        ${t.grade ? `<span class="grade-pill grade-${t.grade}">เกรด ${t.grade}</span>` : ""}
         <span class="trade-card-pnl mono ${pnlNum >= 0 ? "pos" : "neg"}">${fmtMoney(pnlNum)}</span>
         <button type="button" class="trade-card-edit" data-id="${t.id}" title="แก้ไขเทรดนี้">✎</button>
       </div>
       <div class="trade-card-symbol">${escapeHtml(t.symbol || "—")}</div>
-      ${t.image ? `<img class="trade-card-image" src="${t.image}">` : ""}
+      ${imgBefore ? `<div class="trade-card-detail" style="margin-bottom:6px;"><span>ก่อนเข้าเทรด</span></div><img class="trade-card-image" src="${imgBefore}">` : ""}
+      ${imgAfter ? `<div class="trade-card-detail" style="margin:6px 0;"><span>หลังเทรดเสร็จ</span></div><img class="trade-card-image" src="${imgAfter}">` : ""}
+      ${t.tvLink ? `<a class="tv-link-btn" href="${escapeHtml(t.tvLink)}" target="_blank" rel="noopener">📈 เปิดกราฟ TradingView ↗</a>` : ""}
       ${details.length ? `<div class="trade-card-details">${details.map(([k, v]) => `<div class="trade-card-detail"><span>${k}</span><span class="mono">${escapeHtml(String(v))}</span></div>`).join("")}</div>` : ""}
       ${flags.length ? `<div class="trade-card-tags-row">${flags.map(f => `<span class="flag-badge">${f}</span>`).join("")}</div>` : ""}
       ${posTags.length ? `<div class="trade-card-tags-row">${posTags.map(tag => `<span class="tag-chip positive">${escapeHtml(tag)}</span>`).join("")}</div>` : ""}
@@ -898,7 +931,7 @@
           <tr class="trade-row" data-id="${t.id}">
             <td class="mono">${t.date}</td>
             <td><span class="badge market">${MARKET_LABEL[t.marketType] || t.marketType}</span></td>
-            <td><div class="row-symbol">${t.image ? `<img class="row-thumb" src="${t.image}">` : ""}${escapeHtml(t.symbol || "—")}</div></td>
+            <td><div class="row-symbol">${(t.imageAfter || t.imageBefore || t.image) ? `<img class="row-thumb" src="${t.imageAfter || t.imageBefore || t.image}">` : ""}${escapeHtml(t.symbol || "—")}</div></td>
             <td><span class="badge ${t.side === "long" ? "up" : "down"}">${t.side === "long" ? "BUY" : "SELL"}</span></td>
             <td class="mono" style="color:${Number(t.pnl) >= 0 ? "var(--bull)" : "var(--bear)"}">${fmtMoney(t.pnl)}</td>
             <td>${(t.tags || []).map(tag => `<span class="tag-chip">${escapeHtml(tag)}</span>`).join("")}</td>
@@ -917,8 +950,9 @@
   const tfMarketType = document.getElementById("tfMarketType");
   let editingId = null;
   let currentSide = "long";
-  let currentImage = null;
-  let currentRating = 0;
+  let currentImageBefore = null;
+  let currentImageAfter = null;
+  let currentGrade = null;
 
   function toggleMarketFields() {
     const type = tfMarketType.value;
@@ -943,35 +977,45 @@
     });
   });
 
-  function updateStarRating() {
-    document.querySelectorAll("#tfRatingStars .star-btn").forEach(btn => {
-      btn.classList.toggle("filled", Number(btn.dataset.val) <= currentRating);
+  function updateGradeToggle() {
+    document.querySelectorAll("#tfGradeToggle .grade-btn").forEach(btn => {
+      btn.classList.toggle("active", btn.dataset.grade === currentGrade);
     });
   }
-  document.querySelectorAll("#tfRatingStars .star-btn").forEach(btn => {
+  document.querySelectorAll("#tfGradeToggle .grade-btn").forEach(btn => {
     btn.addEventListener("click", () => {
-      const val = Number(btn.dataset.val);
-      currentRating = (val === currentRating) ? 0 : val;
-      updateStarRating();
+      currentGrade = (btn.dataset.grade === currentGrade) ? null : btn.dataset.grade;
+      updateGradeToggle();
     });
   });
 
-  function renderImagePreview() {
-    const wrap = document.getElementById("tfImagePreview");
-    const labelText = document.getElementById("tfImageLabelText");
-    labelText.textContent = currentImage ? "เปลี่ยนรูปภาพ" : "+ เพิ่มรูปภาพ";
-    wrap.innerHTML = currentImage
-      ? `<div class="image-preview-item"><img src="${currentImage}"><button type="button" id="tfImageRemove">ลบรูปนี้</button></div>`
-      : "";
-    const removeBtn = document.getElementById("tfImageRemove");
-    if (removeBtn) removeBtn.addEventListener("click", () => { currentImage = null; renderImagePreview(); });
+  function wireImageField(inputId, previewWrapId, labelTextId, getImage, setImage) {
+    function render() {
+      const wrap = document.getElementById(previewWrapId);
+      const labelText = document.getElementById(labelTextId);
+      labelText.textContent = getImage() ? "เปลี่ยนรูปภาพ" : "+ เพิ่มรูปภาพ";
+      wrap.innerHTML = getImage()
+        ? `<div class="image-preview-item"><img src="${getImage()}"><button type="button" class="img-remove-btn">ลบรูปนี้</button></div>`
+        : "";
+      const removeBtn = wrap.querySelector(".img-remove-btn");
+      if (removeBtn) removeBtn.addEventListener("click", () => { setImage(null); render(); });
+    }
+    document.getElementById(inputId).addEventListener("change", async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      setImage(await resizeImageToDataUrl(file, 1000));
+      render();
+    });
+    return render;
   }
-  document.getElementById("tfImageInput").addEventListener("change", async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    currentImage = await resizeImageToDataUrl(file, 1000);
-    renderImagePreview();
-  });
+  const renderImageBeforePreview = wireImageField(
+    "tfImageBeforeInput", "tfImageBeforePreview", "tfImageBeforeLabelText",
+    () => currentImageBefore, (v) => { currentImageBefore = v; }
+  );
+  const renderImageAfterPreview = wireImageField(
+    "tfImageAfterInput", "tfImageAfterPreview", "tfImageAfterLabelText",
+    () => currentImageAfter, (v) => { currentImageAfter = v; }
+  );
 
   function openTradeModal(id, prefillDate) {
     editingId = id || null;
@@ -1000,11 +1044,14 @@
     document.getElementById("tfEntryWindow").checked = t ? !!t.enteredWindow : false;
     document.getElementById("tfTags").value = t ? (t.tags || []).join(", ") : "";
     document.getElementById("tfNegTags").value = t ? (t.negTags || []).join(", ") : "";
+    document.getElementById("tfTvLink").value = t ? (t.tvLink || "") : "";
     document.getElementById("tfNotes").value = t ? (t.notes || "") : "";
-    currentImage = t ? (t.image || null) : null;
-    renderImagePreview();
-    currentRating = t ? (t.rating || 0) : 0;
-    updateStarRating();
+    currentImageBefore = t ? (t.imageBefore || null) : null;
+    currentImageAfter = t ? (t.imageAfter || t.image || null) : null; // t.image = legacy single-image field
+    renderImageBeforePreview();
+    renderImageAfterPreview();
+    currentGrade = t ? (t.grade || null) : null;
+    updateGradeToggle();
 
     toggleMarketFields();
     tradeModal.classList.add("open");
@@ -1047,13 +1094,15 @@
       session: document.getElementById("tfSession").value,
       account: document.getElementById("tfAccount").value.trim(),
       model: document.getElementById("tfModel").value.trim(),
-      rating: currentRating || null,
+      grade: currentGrade,
       followedRules: document.getElementById("tfFollowedRules").checked,
       breakeven: document.getElementById("tfBreakeven").checked,
       enteredWindow: document.getElementById("tfEntryWindow").checked,
       tags,
       negTags,
-      image: currentImage,
+      imageBefore: currentImageBefore,
+      imageAfter: currentImageAfter,
+      tvLink: document.getElementById("tfTvLink").value.trim(),
       notes: document.getElementById("tfNotes").value.trim(),
       createdAt: editingId ? (trades.find(x => x.id === editingId) || {}).createdAt || Date.now() : Date.now(),
     };
