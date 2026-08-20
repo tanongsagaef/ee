@@ -98,12 +98,6 @@
   .grade-btn.active[data-grade="C"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
   .grade-btn.active[data-grade="D"] { background: rgba(217,119,6,0.12); border-color: #d97706; color: #d97706; }
   .grade-btn.active[data-grade="E"] { background: var(--bear-soft); border-color: var(--bear); color: var(--bear); }
-  .grade-pill { font-size: 11px; font-weight: 800; border-radius: 20px; padding: 3px 10px; display: inline-block; }
-  .grade-pill.grade-A { background: var(--bull-soft); color: var(--bull); }
-  .grade-pill.grade-B { background: rgba(101,163,13,0.12); color: #65a30d; }
-  .grade-pill.grade-C { background: var(--accent-soft); color: var(--accent); }
-  .grade-pill.grade-D { background: rgba(217,119,6,0.12); color: #d97706; }
-  .grade-pill.grade-E { background: var(--bear-soft); color: var(--bear); }
 
   /* tradingview link */
   .tv-link-btn { display: inline-flex; align-items: center; gap: 6px; background: var(--accent-soft); border: 1px solid rgba(79,70,229,0.3); color: var(--accent); padding: 8px 14px; border-radius: 8px; font-size: 12.5px; font-weight: 700; text-decoration: none; margin: 6px 0; }
@@ -205,27 +199,52 @@
   .modal-footer .spacer { flex: 1; }
 
   /* day-detail modal */
+  #dayModal .modal { max-width: 680px; }
   .day-modal-summary { display: flex; align-items: baseline; gap: 14px; margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
-  .day-modal-total { font-family: ui-monospace, monospace; font-size: 24px; font-weight: 800; }
+  .day-modal-total { font-family: ui-monospace, monospace; font-size: 26px; font-weight: 800; }
   .day-modal-total.pos { color: var(--bull); }
   .day-modal-total.neg { color: var(--bear); }
-  .day-modal-count { color: var(--muted); font-size: 13px; }
-  .day-modal-trades { display: flex; flex-direction: column; gap: 10px; }
-  .trade-card { background: var(--surface-alt); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
-  .trade-card-head { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
-  .trade-card-pnl { margin-left: auto; font-family: ui-monospace, monospace; font-weight: 800; font-size: 15px; }
+  .day-modal-count { color: var(--muted); font-size: 14px; }
+  .day-modal-trades { display: flex; flex-direction: column; gap: 16px; }
+  .trade-card { background: var(--surface-alt); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; }
+  .trade-card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .trade-card-pnl { margin-left: auto; font-family: ui-monospace, monospace; font-weight: 800; font-size: 19px; }
   .trade-card-pnl.pos { color: var(--bull); }
   .trade-card-pnl.neg { color: var(--bear); }
-  .trade-card-edit { background: var(--surface); border: 1px solid var(--border); color: var(--muted); width: 28px; height: 28px; border-radius: 7px; cursor: pointer; font-size: 13px; display: inline-flex; align-items: center; justify-content: center; }
+  .trade-card-edit { background: var(--surface); border: 1px solid var(--border); color: var(--muted); width: 30px; height: 30px; border-radius: 7px; cursor: pointer; font-size: 14px; display: inline-flex; align-items: center; justify-content: center; }
   .trade-card-edit:hover { border-color: var(--accent); color: var(--accent); }
-  .trade-card-symbol { font-weight: 700; font-size: 15px; margin-bottom: 6px; }
-  .trade-card-image { max-width: 100%; max-height: 300px; width: 100%; object-fit: contain; background: var(--surface); border-radius: 10px; border: 1px solid var(--border); margin: 8px 0; display: block; }
-  .trade-card-details { display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 8px 14px; margin: 8px 0; padding: 10px 12px; background: var(--surface); border-radius: 8px; border: 1px solid var(--border); }
+  .trade-card-symbol { font-weight: 700; font-size: 19px; margin-bottom: 8px; }
+  .trade-card-image { max-width: 100%; max-height: 420px; width: 100%; object-fit: contain; background: var(--surface); border-radius: 10px; border: 1px solid var(--border); margin: 8px 0; display: block; cursor: zoom-in; }
+  .trade-card-image:hover { border-color: var(--accent); }
+  .trade-card-details { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 10px 16px; margin: 10px 0; padding: 12px 14px; background: var(--surface); border-radius: 8px; border: 1px solid var(--border); }
   .trade-card-detail { display: flex; flex-direction: column; }
-  .trade-card-detail span:first-child { color: var(--muted); font-size: 10px; text-transform: uppercase; margin-bottom: 2px; font-weight: 700; letter-spacing: 0.3px; }
-  .trade-card-detail span:last-child { font-weight: 700; font-size: 12.5px; }
-  .trade-card-tags-row { margin-top: 6px; }
-  .trade-card-notes { font-size: 12.5px; color: var(--muted); margin-top: 8px; line-height: 1.6; }
+  .trade-card-detail span:first-child { color: var(--muted); font-size: 11.5px; text-transform: uppercase; margin-bottom: 3px; font-weight: 700; letter-spacing: 0.3px; }
+  .trade-card-detail span:last-child { font-weight: 700; font-size: 15px; }
+  .trade-card-tags-row { margin-top: 8px; }
+  .trade-card-notes { font-size: 14.5px; color: var(--muted); margin-top: 10px; line-height: 1.7; }
+  .trade-card .badge { font-size: 12.5px; padding: 4px 11px; }
+  .trade-card .tag-chip { font-size: 12px; padding: 3px 10px; }
+  .trade-card .flag-badge { font-size: 12px; padding: 3px 11px; }
+
+  /* grade stamp */
+  .grade-stamp {
+    width: 42px; height: 42px; flex-shrink: 0; border-radius: 50%;
+    border: 2.5px solid currentColor; display: inline-flex; align-items: center; justify-content: center;
+    font-size: 19px; font-weight: 900; transform: rotate(-8deg); position: relative;
+  }
+  .grade-stamp::after { content: ""; position: absolute; inset: 3px; border: 1px solid currentColor; border-radius: 50%; opacity: 0.5; }
+  .grade-stamp.grade-A { color: var(--bull); }
+  .grade-stamp.grade-B { color: #65a30d; }
+  .grade-stamp.grade-C { color: var(--accent); }
+  .grade-stamp.grade-D { color: #d97706; }
+  .grade-stamp.grade-E { color: var(--bear); }
+
+  /* image lightbox */
+  .lightbox-backdrop { display: none; position: fixed; inset: 0; background: rgba(8,9,16,.9); z-index: 60; align-items: center; justify-content: center; padding: 24px; }
+  .lightbox-backdrop.open { display: flex; }
+  .lightbox-backdrop img { max-width: 95vw; max-height: 95vh; object-fit: contain; border-radius: 8px; }
+  .lightbox-close { position: fixed; top: 18px; right: 18px; background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.3); color: #fff; }
+  .lightbox-close:hover { background: rgba(255,255,255,.25); border-color: #fff; color: #fff; }
 </style>
 </head>
 <body>
@@ -449,6 +468,12 @@
       <button class="primary" id="tradeSaveBtn">บันทึก</button>
     </div>
   </div>
+</div>
+
+<!-- Image Lightbox -->
+<div id="imageLightbox" class="lightbox-backdrop">
+  <button class="icon-btn lightbox-close" id="lightboxClose">✕</button>
+  <img id="lightboxImg" src="" alt="">
 </div>
 
 <!-- Day-detail Modal -->
@@ -723,9 +748,9 @@
 
     return `<div class="trade-card" data-id="${t.id}">
       <div class="trade-card-head">
+        ${t.grade ? `<span class="grade-stamp grade-${t.grade}" title="เกรด ${t.grade}">${t.grade}</span>` : ""}
         <span class="badge market">${MARKET_LABEL[t.marketType] || t.marketType}</span>
         <span class="badge ${t.side === "long" ? "up" : "down"}">${t.side === "long" ? "BUY" : "SELL"}</span>
-        ${t.grade ? `<span class="grade-pill grade-${t.grade}">เกรด ${t.grade}</span>` : ""}
         <span class="trade-card-pnl mono ${pnlNum >= 0 ? "pos" : "neg"}">${fmtMoney(pnlNum)}</span>
         <button type="button" class="trade-card-edit" data-id="${t.id}" title="แก้ไขเทรดนี้">✎</button>
       </div>
@@ -759,9 +784,29 @@
         openTradeModal(id);
       });
     });
+    document.querySelectorAll("#dayModalTrades .trade-card-image").forEach(img => {
+      img.addEventListener("click", () => openLightbox(img.src));
+    });
 
     dayModal.classList.add("open");
   }
+
+  /* ---------- image lightbox ---------- */
+  const imageLightbox = document.getElementById("imageLightbox");
+  const lightboxImg = document.getElementById("lightboxImg");
+  function openLightbox(src) {
+    lightboxImg.src = src;
+    imageLightbox.classList.add("open");
+  }
+  function closeLightbox() {
+    imageLightbox.classList.remove("open");
+    lightboxImg.src = "";
+  }
+  document.getElementById("lightboxClose").addEventListener("click", closeLightbox);
+  imageLightbox.addEventListener("click", (e) => { if (e.target === imageLightbox) closeLightbox(); });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && imageLightbox.classList.contains("open")) closeLightbox();
+  });
   function closeDayModal() {
     dayModal.classList.remove("open");
   }
