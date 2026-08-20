@@ -72,6 +72,16 @@
   .side-btn.buy.active { background: var(--bull-soft); border-color: var(--bull); color: var(--bull); }
   .side-btn.sell.active { background: var(--bear-soft); border-color: var(--bear); color: var(--bear); }
 
+  /* star rating */
+  .star-rating { display: flex; gap: 4px; }
+  .star-btn { background: none; border: none; font-size: 24px; color: var(--border); cursor: pointer; padding: 2px; line-height: 1; }
+  .star-btn.filled { color: #f5a623; }
+
+  /* checkbox row */
+  .check-row { display: flex; flex-wrap: wrap; gap: 14px; }
+  .check-item { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600; color: var(--text); cursor: pointer; }
+  .check-item input { width: auto; accent-color: var(--accent); cursor: pointer; }
+
   /* image upload */
   .file-btn { display: inline-flex; align-items: center; background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 9px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; }
   .file-btn:hover { border-color: var(--accent); color: var(--accent); }
@@ -94,7 +104,13 @@
   .calendar-month-label { font-size: 17px; font-weight: 800; min-width: 150px; text-align: center; }
   .calendar-total { font-size: 14px; color: var(--muted); font-weight: 600; }
   .calendar-total .mono { font-weight: 800; font-size: 16px; }
-  .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 7px; }
+  .calendar-grid { display: grid; grid-template-columns: repeat(5, 1fr) 1.3fr; gap: 7px; }
+  .calendar-summary-cell { min-height: 84px; border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; background: var(--surface); display: flex; flex-direction: column; justify-content: center; }
+  .calendar-summary-label { font-size: 9.5px; color: var(--muted); text-transform: uppercase; font-weight: 700; margin-bottom: 4px; }
+  .calendar-summary-pnl { font-family: ui-monospace, monospace; font-weight: 800; font-size: 13px; }
+  .calendar-summary-pnl.pos { color: var(--bull); }
+  .calendar-summary-pnl.neg { color: var(--bear); }
+  .calendar-summary-count { font-size: 10px; color: var(--muted); margin-top: 2px; }
   .calendar-dow { font-size: 11px; color: var(--muted); text-transform: uppercase; text-align: center; padding-bottom: 4px; font-weight: 700; }
   .calendar-day { min-height: 84px; border: 1px solid var(--border); border-radius: 10px; padding: 7px 9px; background: var(--surface-alt); display: flex; flex-direction: column; }
   .calendar-day.other-month { opacity: 0.35; }
@@ -142,7 +158,10 @@
   .badge.up { color: var(--bull); background: var(--bull-soft); }
   .badge.down { color: var(--bear); background: var(--bear-soft); }
   .badge.market { color: var(--accent); background: var(--accent-soft); }
-  .tag-chip { font-size: 10px; background: var(--surface-alt); border: 1px solid var(--border); border-radius: 5px; padding: 2px 7px; margin-right: 3px; display: inline-block; color: var(--muted); font-weight: 600; }
+  .tag-chip { font-size: 10px; background: var(--surface-alt); border: 1px solid var(--border); border-radius: 5px; padding: 2px 7px; margin-right: 3px; margin-bottom: 3px; display: inline-block; color: var(--muted); font-weight: 600; }
+  .tag-chip.positive { background: var(--bull-soft); border-color: rgba(22,163,74,0.35); color: var(--bull); }
+  .tag-chip.negative { background: var(--bear-soft); border-color: rgba(220,38,38,0.35); color: var(--bear); }
+  .flag-badge { font-size: 10.5px; background: var(--accent-soft); border: 1px solid rgba(79,70,229,0.3); color: var(--accent); border-radius: 5px; padding: 2px 8px; margin-right: 4px; margin-bottom: 3px; display: inline-block; font-weight: 700; }
 
   /* modal */
   .modal-backdrop { display: none; position: fixed; inset: 0; background: rgba(20,22,42,.45); z-index: 30; align-items: center; justify-content: center; padding: 16px; }
@@ -219,6 +238,10 @@
   <div class="panel">
     <h3>สรุปสถิติทั้งหมด</h3>
     <div class="metrics-grid" id="statsGrid"></div>
+  </div>
+  <div class="panel">
+    <h3>Performance Profile</h3>
+    <div class="chart-wrap" id="radarChartWrap"></div>
   </div>
   <div class="panel">
     <h3>กราฟการเติบโต (Equity Curve)</h3>
@@ -302,9 +325,57 @@
       <input type="number" id="tfPnl" step="any" placeholder="ใส่ค่าลบถ้าขาดทุน เช่น -45.50">
     </div>
 
+    <div class="row">
+      <div class="field">
+        <label class="small">ช่วงเวลาเทรด (Session)</label>
+        <select id="tfSession">
+          <option value="">-- ไม่ระบุ --</option>
+          <option value="London">London</option>
+          <option value="New York">New York</option>
+          <option value="Asia">Asia</option>
+        </select>
+      </div>
+      <div class="field">
+        <label class="small">บัญชี (Account)</label>
+        <input type="text" id="tfAccount" placeholder="เช่น Live 1, Demo">
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="field">
+        <label class="small">กลยุทธ์ / Model</label>
+        <input type="text" id="tfModel" placeholder="เช่น Breakout Retest, ICT FVG">
+      </div>
+      <div class="field">
+        <label class="small">คะแนนการเทรด (Rating)</label>
+        <div class="star-rating" id="tfRatingStars">
+          <button type="button" class="star-btn" data-val="1">★</button>
+          <button type="button" class="star-btn" data-val="2">★</button>
+          <button type="button" class="star-btn" data-val="3">★</button>
+          <button type="button" class="star-btn" data-val="4">★</button>
+          <button type="button" class="star-btn" data-val="5">★</button>
+        </div>
+      </div>
+    </div>
+
     <div class="field">
-      <label class="small">Setup / แท็ก (คั่นด้วยคอมมา)</label>
-      <input type="text" id="tfTags" placeholder="เช่น BREAKOUT, FOMO, RSI CROSSED">
+      <label class="small">การวินัยในการเทรด</label>
+      <div class="check-row">
+        <label class="check-item"><input type="checkbox" id="tfFollowedRules"> ทำตามแผน</label>
+        <label class="check-item"><input type="checkbox" id="tfBreakeven"> ปิดที่จุดคุ้มทุน (BE)</label>
+        <label class="check-item"><input type="checkbox" id="tfEntryWindow"> เข้าตามช่วงเวลาที่วางแผน</label>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="field">
+        <label class="small">แท็กบวก — สิ่งที่ทำได้ดี (คั่นด้วยคอมมา)</label>
+        <input type="text" id="tfTags" placeholder="เช่น BREAKOUT, FOLLOWED PLAN">
+      </div>
+      <div class="field">
+        <label class="small">แท็กลบ — ข้อผิดพลาด (คั่นด้วยคอมมา)</label>
+        <input type="text" id="tfNegTags" placeholder="เช่น FOMO, REVENGE TRADE">
+      </div>
     </div>
 
     <div class="field">
@@ -352,7 +423,7 @@
   const LS_KEY = "tj_trades_v1";
   const MONTH_NAMES_TH = ["มกราคม","กุมภาพันธ์","มีนาคม","เมษายน","พฤษภาคม","มิถุนายน","กรกฎาคม","สิงหาคม","กันยายน","ตุลาคม","พฤศจิกายน","ธันวาคม"];
   const MONTH_SHORT_TH = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
-  const DOW_TH = ["อา","จ","อ","พ","พฤ","ศ","ส"];
+  const DOW_TH = ["จ","อ","พ","พฤ","ศ","สรุป"];
   const MARKET_LABEL = { forex: "Forex", futures: "Futures", other: "อื่นๆ" };
 
   function loadTrades() {
@@ -414,9 +485,10 @@
   let calMonth = today.getMonth();
 
   const calendarDow = document.getElementById("calendarDow");
-  DOW_TH.forEach(d => {
+  DOW_TH.forEach((d, i) => {
     const el = document.createElement("div");
     el.className = "calendar-dow";
+    if (i === DOW_TH.length - 1) el.style.color = "var(--accent)";
     el.textContent = d;
     calendarDow.appendChild(el);
   });
@@ -436,63 +508,89 @@
     const grid = document.getElementById("calendarGrid");
     grid.innerHTML = "";
 
-    const firstDow = new Date(calYear, calMonth, 1).getDay();
+    // Monday-indexed first day of month (0=Mon ... 6=Sun)
+    const firstDowSun = new Date(calYear, calMonth, 1).getDay();
+    const firstDowMon = (firstDowSun + 6) % 7;
     const daysInThisMonth = new Date(calYear, calMonth + 1, 0).getDate();
-    const daysInPrevMonth = new Date(calYear, calMonth, 0).getDate();
+    const firstCellDate = new Date(calYear, calMonth, 1 - firstDowMon);
+    const totalCells = Math.ceil((firstDowMon + daysInThisMonth) / 7) * 7;
+    const weekCount = totalCells / 7;
 
     let monthTotal = 0;
-    const cells = [];
 
-    for (let i = 0; i < firstDow; i++) {
-      const d = daysInPrevMonth - firstDow + 1 + i;
-      cells.push({ day: d, otherMonth: true });
-    }
-    for (let d = 1; d <= daysInThisMonth; d++) {
-      cells.push({ day: d, otherMonth: false, key: dateKey(calYear, calMonth, d) });
-    }
-    while (cells.length % 7 !== 0) {
-      cells.push({ day: cells.length - (firstDow + daysInThisMonth) + 1, otherMonth: true });
-    }
-
-    cells.forEach(cell => {
-      const div = document.createElement("div");
-      div.className = "calendar-day";
-      if (cell.otherMonth) {
-        div.classList.add("other-month");
-        div.innerHTML = `<div class="calendar-day-num">${cell.day}</div>`;
-        grid.appendChild(div);
-        return;
+    for (let w = 0; w < weekCount; w++) {
+      const weekDates = [];
+      for (let d = 0; d < 7; d++) {
+        const dt = new Date(firstCellDate);
+        dt.setDate(firstCellDate.getDate() + w * 7 + d);
+        weekDates.push(dt);
       }
-      const dayTrades = byDate[cell.key] || [];
-      const dayTotal = dayTrades.reduce((s, t) => s + (Number(t.pnl) || 0), 0);
-      if (cell.key === todayKey()) div.classList.add("today");
-      if (dayTrades.length) {
-        div.classList.add("has-trades");
-        div.classList.add(dayTotal >= 0 ? "profit" : "loss");
+
+      // Mon-Fri visible cells
+      for (let d = 0; d < 5; d++) {
+        const dt = weekDates[d];
+        const inMonth = dt.getMonth() === calMonth;
+        const key = dateKey(dt.getFullYear(), dt.getMonth(), dt.getDate());
+        const div = document.createElement("div");
+        div.className = "calendar-day";
+        if (!inMonth) {
+          div.classList.add("other-month");
+          div.innerHTML = `<div class="calendar-day-num">${dt.getDate()}</div>`;
+          grid.appendChild(div);
+          continue;
+        }
+        const dayTrades = byDate[key] || [];
+        const dayTotal = dayTrades.reduce((s, t) => s + (Number(t.pnl) || 0), 0);
+        if (key === todayKey()) div.classList.add("today");
+        if (dayTrades.length) {
+          div.classList.add("has-trades");
+          div.classList.add(dayTotal >= 0 ? "profit" : "loss");
+        }
         monthTotal += dayTotal;
+
+        let tagsHtml = "";
+        if (dayTrades.length) {
+          const allTags = [].concat(...dayTrades.map(t => t.tags || []));
+          const shown = allTags.slice(0, 2);
+          tagsHtml = `<div class="calendar-day-tags">` +
+            shown.map(tag => `<span class="calendar-tag">${escapeHtml(tag)}</span>`).join("") +
+            (allTags.length > shown.length ? `<span class="calendar-tag">+${allTags.length - shown.length}</span>` : "") +
+            `</div>`;
+        }
+
+        div.innerHTML = `
+          <div class="calendar-day-num">${dt.getDate()}</div>
+          ${dayTrades.length ? `<div class="calendar-day-pnl ${dayTotal >= 0 ? "pos" : "neg"} mono">${fmtMoney(dayTotal)}</div>
+          <div class="calendar-day-count">${dayTrades.length} เทรด</div>` : ""}
+          ${tagsHtml}
+        `;
+        if (dayTrades.length) {
+          div.addEventListener("click", () => openDayModal(key));
+        }
+        grid.appendChild(div);
       }
 
-      let tagsHtml = "";
-      if (dayTrades.length) {
-        const allTags = [].concat(...dayTrades.map(t => t.tags || []));
-        const shown = allTags.slice(0, 2);
-        tagsHtml = `<div class="calendar-day-tags">` +
-          shown.map(t => `<span class="calendar-tag">${escapeHtml(t)}</span>`).join("") +
-          (allTags.length > shown.length ? `<span class="calendar-tag">+${allTags.length - shown.length}</span>` : "") +
-          `</div>`;
+      // weekly summary cell (sums all 7 days, including weekend, even though only Mon-Fri are shown)
+      let weekTotal = 0, weekCount2 = 0;
+      weekDates.forEach(dt => {
+        const key = dateKey(dt.getFullYear(), dt.getMonth(), dt.getDate());
+        const dayTrades = byDate[key] || [];
+        weekTotal += dayTrades.reduce((s, t) => s + (Number(t.pnl) || 0), 0);
+        weekCount2 += dayTrades.length;
+      });
+      const sumDiv = document.createElement("div");
+      sumDiv.className = "calendar-summary-cell";
+      if (weekCount2) {
+        sumDiv.innerHTML = `
+          <div class="calendar-summary-label">สัปดาห์นี้</div>
+          <div class="calendar-summary-pnl ${weekTotal >= 0 ? "pos" : "neg"} mono">${fmtMoney(weekTotal)}</div>
+          <div class="calendar-summary-count">${weekCount2} เทรด</div>
+        `;
+      } else {
+        sumDiv.innerHTML = `<div class="calendar-summary-label">สัปดาห์นี้</div><div class="calendar-summary-count">—</div>`;
       }
-
-      div.innerHTML = `
-        <div class="calendar-day-num">${cell.day}</div>
-        ${dayTrades.length ? `<div class="calendar-day-pnl ${dayTotal >= 0 ? "pos" : "neg"} mono">${fmtMoney(dayTotal)}</div>
-        <div class="calendar-day-count">${dayTrades.length} เทรด</div>` : ""}
-        ${tagsHtml}
-      `;
-      if (dayTrades.length) {
-        div.addEventListener("click", () => openDayModal(cell.key));
-      }
-      grid.appendChild(div);
-    });
+      grid.appendChild(sumDiv);
+    }
 
     const totalEl = document.getElementById("calMonthTotal");
     totalEl.textContent = fmtMoney(monthTotal);
@@ -531,6 +629,18 @@
     }
     if (t.entry != null) details.push(["ราคาเข้า", t.entry]);
     if (t.exit != null) details.push(["ราคาออก", t.exit]);
+    if (t.session) details.push(["Session", t.session]);
+    if (t.model) details.push(["Model", t.model]);
+    if (t.account) details.push(["Account", t.account]);
+    if (t.rating) details.push(["Rating", "★".repeat(t.rating)]);
+
+    const flags = [];
+    if (t.followedRules) flags.push("ทำตามแผน ✓");
+    if (t.breakeven) flags.push("Breakeven");
+    if (t.enteredWindow) flags.push("เข้าตามช่วงเวลา ✓");
+
+    const posTags = t.tags || [];
+    const negTags = t.negTags || [];
 
     return `<div class="trade-card" data-id="${t.id}">
       <div class="trade-card-head">
@@ -541,8 +651,10 @@
       </div>
       <div class="trade-card-symbol">${escapeHtml(t.symbol || "—")}</div>
       ${t.image ? `<img class="trade-card-image" src="${t.image}">` : ""}
-      ${details.length ? `<div class="trade-card-details">${details.map(([k, v]) => `<div class="trade-card-detail"><span>${k}</span><span class="mono">${v}</span></div>`).join("")}</div>` : ""}
-      ${(t.tags || []).length ? `<div class="trade-card-tags-row">${t.tags.map(tag => `<span class="tag-chip">${escapeHtml(tag)}</span>`).join("")}</div>` : ""}
+      ${details.length ? `<div class="trade-card-details">${details.map(([k, v]) => `<div class="trade-card-detail"><span>${k}</span><span class="mono">${escapeHtml(String(v))}</span></div>`).join("")}</div>` : ""}
+      ${flags.length ? `<div class="trade-card-tags-row">${flags.map(f => `<span class="flag-badge">${f}</span>`).join("")}</div>` : ""}
+      ${posTags.length ? `<div class="trade-card-tags-row">${posTags.map(tag => `<span class="tag-chip positive">${escapeHtml(tag)}</span>`).join("")}</div>` : ""}
+      ${negTags.length ? `<div class="trade-card-tags-row">${negTags.map(tag => `<span class="tag-chip negative">${escapeHtml(tag)}</span>`).join("")}</div>` : ""}
       ${t.notes ? `<div class="trade-card-notes">${escapeHtml(t.notes)}</div>` : ""}
     </div>`;
   }
@@ -603,6 +715,85 @@
     return { total, wins: wins.length, losses: losses.length, totalPnl, winRate, avgWin, avgLoss, profitFactor, bestDay, worstDay };
   }
 
+  function computeMaxDrawdown() {
+    const sorted = [...trades].sort((a, b) => a.date.localeCompare(b.date) || (a.createdAt || 0) - (b.createdAt || 0));
+    let cum = 0, peak = 0, maxDD = 0;
+    sorted.forEach(t => {
+      cum += Number(t.pnl) || 0;
+      if (cum > peak) peak = cum;
+      const dd = peak - cum;
+      if (dd > maxDD) maxDD = dd;
+    });
+    return maxDD;
+  }
+
+  function computeRadarMetrics(s) {
+    const maxDD = computeMaxDrawdown();
+    const recoveryFactor = maxDD > 0 ? s.totalPnl / maxDD : (s.totalPnl > 0 ? 5 : 0);
+    const recoveryScaled = Math.max(0, Math.min(100, (recoveryFactor / 5) * 100));
+
+    const rulesTrades = trades.filter(t => t.followedRules !== undefined && t.followedRules !== null);
+    const planAdherence = rulesTrades.length ? (rulesTrades.filter(t => t.followedRules).length / rulesTrades.length * 100) : 0;
+
+    const byDate = tradesByDate();
+    const days = Object.keys(byDate);
+    const profitableDays = days.filter(k => byDate[k].reduce((sum, t) => sum + (Number(t.pnl) || 0), 0) > 0).length;
+    const consistency = days.length ? (profitableDays / days.length * 100) : 0;
+
+    const rr = (s.avgWin && s.avgLoss) ? (s.avgWin / Math.abs(s.avgLoss)) : 0;
+    const rrScaled = Math.max(0, Math.min(100, (rr / 3) * 100));
+
+    return [
+      { label: "Win Rate", value: s.winRate },
+      { label: "Plan Adherence", value: planAdherence },
+      { label: "Recovery Factor", value: recoveryScaled },
+      { label: "Risk/Reward", value: rrScaled },
+      { label: "Consistency", value: consistency },
+    ];
+  }
+
+  function buildRadarChart(s) {
+    if (!trades.length) return '<div class="empty">ยังไม่มีข้อมูลเทรด</div>';
+    const metrics = computeRadarMetrics(s);
+    const size = 300, cx = size / 2, cy = size / 2 - 6, radius = 95;
+    const n = metrics.length;
+    const angleStep = (Math.PI * 2) / n;
+    const startAngle = -Math.PI / 2;
+
+    function pointAt(i, r) {
+      const angle = startAngle + i * angleStep;
+      return [cx + r * Math.cos(angle), cy + r * Math.sin(angle)];
+    }
+
+    const rings = [0.25, 0.5, 0.75, 1.0];
+    const gridPolys = rings.map(frac => {
+      const pts = metrics.map((_, i) => pointAt(i, radius * frac).map(v => v.toFixed(1)).join(",")).join(" ");
+      return `<polygon points="${pts}" fill="none" style="stroke:var(--border)" stroke-width="1"/>`;
+    }).join("");
+
+    const axisLines = metrics.map((_, i) => {
+      const [x, y] = pointAt(i, radius);
+      return `<line x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" style="stroke:var(--border)" stroke-width="1"/>`;
+    }).join("");
+
+    const dataPts = metrics.map((m, i) => pointAt(i, radius * Math.max(0, Math.min(1, m.value / 100))).map(v => v.toFixed(1)).join(",")).join(" ");
+
+    const labels = metrics.map((m, i) => {
+      const [x, y] = pointAt(i, radius + 30);
+      let anchor = "middle";
+      if (Math.abs(x - cx) > 8) anchor = x > cx ? "start" : "end";
+      return `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" font-size="10.5" text-anchor="${anchor}" dy="0" style="fill:var(--muted)" font-weight="700">${m.label}</text>
+        <text x="${x.toFixed(1)}" y="${(y + 13).toFixed(1)}" font-size="11" text-anchor="${anchor}" style="fill:var(--accent)" font-weight="800">${m.value.toFixed(0)}%</text>`;
+    }).join("");
+
+    return `<svg viewBox="0 0 ${size} ${size + 10}" width="100%" height="320" style="max-width:440px;display:block;margin:0 auto;overflow:visible;">
+      ${gridPolys}
+      ${axisLines}
+      <polygon points="${dataPts}" fill="var(--accent-soft)" style="stroke:var(--accent)" stroke-width="2" stroke-linejoin="round"/>
+      ${labels}
+    </svg>`;
+  }
+
   function renderOverview() {
     const s = computeStats();
     const grid = document.getElementById("statsGrid");
@@ -621,6 +812,7 @@
       metric("วันที่แย่ที่สุด", s.worstDay ? `${s.worstDay.key} (${fmtMoney(s.worstDay.sum)})` : "—", s.worstDay && s.worstDay.sum < 0 ? "neg" : ""),
     ].join("");
 
+    document.getElementById("radarChartWrap").innerHTML = buildRadarChart(s);
     document.getElementById("equityChartWrap").innerHTML = buildEquityCurveSvg();
     document.getElementById("monthlyChartWrap").innerHTML = buildMonthlyBarChart();
   }
@@ -726,6 +918,7 @@
   let editingId = null;
   let currentSide = "long";
   let currentImage = null;
+  let currentRating = 0;
 
   function toggleMarketFields() {
     const type = tfMarketType.value;
@@ -747,6 +940,19 @@
     btn.addEventListener("click", () => {
       currentSide = btn.dataset.side;
       updateSideToggle();
+    });
+  });
+
+  function updateStarRating() {
+    document.querySelectorAll("#tfRatingStars .star-btn").forEach(btn => {
+      btn.classList.toggle("filled", Number(btn.dataset.val) <= currentRating);
+    });
+  }
+  document.querySelectorAll("#tfRatingStars .star-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const val = Number(btn.dataset.val);
+      currentRating = (val === currentRating) ? 0 : val;
+      updateStarRating();
     });
   });
 
@@ -786,10 +992,19 @@
     document.getElementById("tfEntry").value = t && t.entry != null ? t.entry : "";
     document.getElementById("tfExit").value = t && t.exit != null ? t.exit : "";
     document.getElementById("tfPnl").value = t ? t.pnl : "";
+    document.getElementById("tfSession").value = t ? (t.session || "") : "";
+    document.getElementById("tfAccount").value = t ? (t.account || "") : "";
+    document.getElementById("tfModel").value = t ? (t.model || "") : "";
+    document.getElementById("tfFollowedRules").checked = t ? !!t.followedRules : false;
+    document.getElementById("tfBreakeven").checked = t ? !!t.breakeven : false;
+    document.getElementById("tfEntryWindow").checked = t ? !!t.enteredWindow : false;
     document.getElementById("tfTags").value = t ? (t.tags || []).join(", ") : "";
+    document.getElementById("tfNegTags").value = t ? (t.negTags || []).join(", ") : "";
     document.getElementById("tfNotes").value = t ? (t.notes || "") : "";
     currentImage = t ? (t.image || null) : null;
     renderImagePreview();
+    currentRating = t ? (t.rating || 0) : 0;
+    updateStarRating();
 
     toggleMarketFields();
     tradeModal.classList.add("open");
@@ -813,6 +1028,8 @@
     const marketType = tfMarketType.value;
     const tags = document.getElementById("tfTags").value
       .split(",").map(s => s.trim()).filter(Boolean);
+    const negTags = document.getElementById("tfNegTags").value
+      .split(",").map(s => s.trim()).filter(Boolean);
 
     const record = {
       id: editingId || uid(),
@@ -827,7 +1044,15 @@
       entry: document.getElementById("tfEntry").value !== "" ? Number(document.getElementById("tfEntry").value) : null,
       exit: document.getElementById("tfExit").value !== "" ? Number(document.getElementById("tfExit").value) : null,
       pnl: Number(pnlRaw),
+      session: document.getElementById("tfSession").value,
+      account: document.getElementById("tfAccount").value.trim(),
+      model: document.getElementById("tfModel").value.trim(),
+      rating: currentRating || null,
+      followedRules: document.getElementById("tfFollowedRules").checked,
+      breakeven: document.getElementById("tfBreakeven").checked,
+      enteredWindow: document.getElementById("tfEntryWindow").checked,
       tags,
+      negTags,
       image: currentImage,
       notes: document.getElementById("tfNotes").value.trim(),
       createdAt: editingId ? (trades.find(x => x.id === editingId) || {}).createdAt || Date.now() : Date.now(),
