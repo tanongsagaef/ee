@@ -299,6 +299,15 @@ button, input, select, textarea {
   color: var(--text-muted);
 }
 
+.search-bar { margin: 14px 0; max-width: 420px; }
+.search-bar input { width: 100%; }
+
+.home-card-wrap { position: relative; }
+.home-card { width: 100%; display: block; }
+.home-card-reorder { position: absolute; top: 8px; right: 8px; display: flex; gap: 4px; }
+.home-card-reorder .icon-btn { width: 26px; height: 26px; border-radius: 7px; font-size: 12px; }
+.home-card-reorder .icon-btn:disabled { opacity: .3; cursor: not-allowed; }
+
 .chapter-footer {
   margin-top: 32px;
   padding-top: 20px;

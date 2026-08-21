@@ -329,12 +329,18 @@
   <div class="panel">
     <div class="row" style="justify-content:space-between;">
       <h3 style="margin:0;">บันทึกเทรดทั้งหมด</h3>
-      <select id="logMarketFilter" style="width:auto;">
-        <option value="">ทุกประเภทตลาด</option>
-        <option value="forex">Forex</option>
-        <option value="futures">Futures</option>
-        <option value="other">อื่นๆ</option>
-      </select>
+      <div class="row" style="gap:8px;">
+        <input type="text" id="logSearchInput" placeholder="ค้นหาสัญลักษณ์ / แท็ก / โน้ต..." style="width:220px;">
+        <input type="date" id="logDateFrom" title="ตั้งแต่วันที่" style="width:auto;">
+        <input type="date" id="logDateTo" title="ถึงวันที่" style="width:auto;">
+        <select id="logMarketFilter" style="width:auto;">
+          <option value="">ทุกประเภทตลาด</option>
+          <option value="forex">Forex</option>
+          <option value="futures">Futures</option>
+          <option value="other">อื่นๆ</option>
+        </select>
+        <button class="ghost" id="logFilterClearBtn" title="ล้างตัวกรอง">ล้าง</button>
+      </div>
     </div>
     <div id="logTableWrap" style="margin-top:12px;"></div>
   </div>
@@ -1102,12 +1108,34 @@
 
   /* ---------- trade log ---------- */
   document.getElementById("logMarketFilter").addEventListener("change", renderLog);
+  document.getElementById("logSearchInput").addEventListener("input", renderLog);
+  document.getElementById("logDateFrom").addEventListener("change", renderLog);
+  document.getElementById("logDateTo").addEventListener("change", renderLog);
+  document.getElementById("logFilterClearBtn").addEventListener("click", () => {
+    document.getElementById("logMarketFilter").value = "";
+    document.getElementById("logSearchInput").value = "";
+    document.getElementById("logDateFrom").value = "";
+    document.getElementById("logDateTo").value = "";
+    renderLog();
+  });
 
   function renderLog() {
     const marketFilter = document.getElementById("logMarketFilter").value;
+    const searchQuery = document.getElementById("logSearchInput").value.trim().toLowerCase();
+    const dateFrom = document.getElementById("logDateFrom").value;
+    const dateTo = document.getElementById("logDateTo").value;
 
     let list = [...trades];
     if (marketFilter) list = list.filter(t => t.marketType === marketFilter);
+    if (dateFrom) list = list.filter(t => t.date >= dateFrom);
+    if (dateTo) list = list.filter(t => t.date <= dateTo);
+    if (searchQuery) {
+      list = list.filter(t => {
+        const haystack = [t.symbol, ...(t.tags || []), ...(t.negTags || []), t.notes]
+          .filter(Boolean).join(" ").toLowerCase();
+        return haystack.includes(searchQuery);
+      });
+    }
     list.sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt || 0) - (a.createdAt || 0));
 
     const wrap = document.getElementById("logTableWrap");

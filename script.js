@@ -53,7 +53,12 @@ async function loadData() {
 }
 
 async function saveData() {
-  await dbSetChapters(chapters);
+  try {
+    await dbSetChapters(chapters);
+  } catch (err) {
+    console.error(err);
+    alert("บันทึกข้อมูลไม่สำเร็จ (พื้นที่จัดเก็บในเบราว์เซอร์อาจเต็ม) ลองลบเนื้อหาเก่าบางส่วน หรือใช้รูป/PDF ที่มีขนาดเล็กลง");
+  }
 }
 
 /* ---------- State ---------- */
@@ -61,6 +66,8 @@ async function saveData() {
 let chapters = [];
 let activeChapterId = null;
 let activeView = "home"; // "home" | "chapter"
+let homeSearchQuery = "";
+let chapterSearchQuery = "";
 
 function uid() {
   return Math.random().toString(36).slice(2, 9);
@@ -130,18 +137,35 @@ function renderHomeContent() {
   const footer = `<div class="chapter-footer"><button id="resetBtn" class="link-btn">ลบเนื้อหาทั้งหมด</button></div>`;
 
   let html = `<h1>ทบทวน Elliott Wave</h1><p class="chapter-desc">สรุปเนื้อหาทั้งหมด — เลือกบทที่ต้องการอ่านต่อ</p>`;
-  html += `<div class="home-grid">`;
-  chapters.forEach(ch => {
-    const subCount = ch.sections.reduce((n, s) => n + (s.subsections ? s.subsections.length : 0), 0);
-    let meta = `${ch.sections.length} หัวข้อหลัก`;
-    if (subCount) meta += ` · ${subCount} หัวข้อย่อย`;
-    html += `<button class="home-card" data-chapter-id="${ch.id}">
-      <div class="home-card-title">${escapeHtml(ch.title)}</div>
-      <div class="home-card-desc">${escapeHtml(ch.desc || "")}</div>
-      <div class="home-card-meta">${meta}</div>
-    </button>`;
-  });
-  html += `</div>`;
+  html += `<div class="search-bar"><input type="text" id="homeSearchInput" placeholder="ค้นหาบท (ชื่อ/คำอธิบาย)..." value="${escapeAttr(homeSearchQuery)}"></div>`;
+
+  const query = homeSearchQuery.trim().toLowerCase();
+  const filtered = query
+    ? chapters.filter(ch => (ch.title || "").toLowerCase().includes(query) || (ch.desc || "").toLowerCase().includes(query))
+    : chapters;
+
+  if (!filtered.length) {
+    html += `<p class="empty-chapter">ไม่พบบทที่ตรงกับคำค้นหา</p>`;
+  } else {
+    html += `<div class="home-grid">`;
+    filtered.forEach((ch, idx) => {
+      const subCount = ch.sections.reduce((n, s) => n + (s.subsections ? s.subsections.length : 0), 0);
+      let meta = `${ch.sections.length} หัวข้อหลัก`;
+      if (subCount) meta += ` · ${subCount} หัวข้อย่อย`;
+      html += `<div class="home-card-wrap">
+        <button class="home-card" data-chapter-id="${ch.id}">
+          <div class="home-card-title">${escapeHtml(ch.title)}</div>
+          <div class="home-card-desc">${escapeHtml(ch.desc || "")}</div>
+          <div class="home-card-meta">${meta}</div>
+        </button>
+        ${!query ? `<div class="home-card-reorder">
+          <button type="button" class="icon-btn move-chapter-up" data-chapter-id="${ch.id}" aria-label="เลื่อนบทนี้ขึ้น" title="เลื่อนขึ้น" ${idx === 0 ? "disabled" : ""}>↑</button>
+          <button type="button" class="icon-btn move-chapter-down" data-chapter-id="${ch.id}" aria-label="เลื่อนบทนี้ลง" title="เลื่อนลง" ${idx === filtered.length - 1 ? "disabled" : ""}>↓</button>
+        </div>` : ""}
+      </div>`;
+    });
+    html += `</div>`;
+  }
   html += footer;
   content.innerHTML = html;
 
@@ -149,11 +173,39 @@ function renderHomeContent() {
     btn.addEventListener("click", () => {
       activeView = "chapter";
       activeChapterId = btn.dataset.chapterId;
+      chapterSearchQuery = "";
       renderContent();
     });
   });
 
+  const searchInput = document.getElementById("homeSearchInput");
+  searchInput.addEventListener("input", () => {
+    homeSearchQuery = searchInput.value;
+    const cursorPos = searchInput.selectionStart;
+    renderHomeContent();
+    const newInput = document.getElementById("homeSearchInput");
+    newInput.focus();
+    newInput.setSelectionRange(cursorPos, cursorPos);
+  });
+
+  content.querySelectorAll(".move-chapter-up").forEach(btn => {
+    btn.addEventListener("click", () => moveChapter(btn.dataset.chapterId, -1));
+  });
+  content.querySelectorAll(".move-chapter-down").forEach(btn => {
+    btn.addEventListener("click", () => moveChapter(btn.dataset.chapterId, 1));
+  });
+
   wireResetBtn();
+}
+
+async function moveChapter(chapterId, dir) {
+  const idx = chapters.findIndex(c => c.id === chapterId);
+  const newIdx = idx + dir;
+  if (idx < 0 || newIdx < 0 || newIdx >= chapters.length) return;
+  const [ch] = chapters.splice(idx, 1);
+  chapters.splice(newIdx, 0, ch);
+  await saveData();
+  renderContent();
 }
 
 function wireResetBtn() {
@@ -182,9 +234,24 @@ function renderChapterContent() {
 
   if (!chapter.sections.length) {
     html += `<p class="empty-chapter">บทนี้ยังไม่มีเนื้อหา</p>`;
+  } else {
+    html += `<div class="search-bar"><input type="text" id="chapterSearchInput" placeholder="ค้นหาในบทนี้ (หัวข้อ/เนื้อหา)..." value="${escapeAttr(chapterSearchQuery)}"></div>`;
   }
 
-  chapter.sections.forEach(sec => {
+  const secQuery = chapterSearchQuery.trim().toLowerCase();
+  const matchesQuery = (title, text) =>
+    (title || "").toLowerCase().includes(secQuery) || (text || "").toLowerCase().includes(secQuery);
+  const visibleSections = secQuery
+    ? chapter.sections.filter(sec =>
+        matchesQuery(sec.title, sec.text) ||
+        (sec.subsections || []).some(sub => matchesQuery(sub.title, sub.text)))
+    : chapter.sections;
+
+  if (secQuery && !visibleSections.length) {
+    html += `<p class="empty-chapter">ไม่พบเนื้อหาที่ตรงกับคำค้นหาในบทนี้</p>`;
+  }
+
+  visibleSections.forEach(sec => {
     if (!sec.subsections) sec.subsections = [];
     html += `<article class="section-card" data-section-id="${sec.id}">`;
     if (sec.title) html += `<h3>${escapeHtml(sec.title)}</h3>`;
@@ -234,6 +301,20 @@ function renderChapterContent() {
   content.innerHTML = html;
 
   content.querySelector("#backHomeLink").addEventListener("click", goHome);
+
+  const chapterSearchInput = document.getElementById("chapterSearchInput");
+  if (chapterSearchInput) {
+    chapterSearchInput.addEventListener("input", () => {
+      chapterSearchQuery = chapterSearchInput.value;
+      const cursorPos = chapterSearchInput.selectionStart;
+      renderChapterContent();
+      const newInput = document.getElementById("chapterSearchInput");
+      if (newInput) {
+        newInput.focus();
+        newInput.setSelectionRange(cursorPos, cursorPos);
+      }
+    });
+  }
 
   content.querySelectorAll(".del-sec").forEach(btn => {
     btn.addEventListener("click", async () => {

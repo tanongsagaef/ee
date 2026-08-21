@@ -69,7 +69,8 @@
   textarea { width: 100%; background: var(--panel-2); border: 1px solid var(--line); color: var(--text); border-radius: 4px; padding: 8px 10px; font-size: 13px; font-family: -apple-system, sans-serif; resize: vertical; }
   label.small { font-size: 11px; color: var(--muted); display: block; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.3px; }
   .field { margin-bottom: 10px; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .table-scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 480px; }
   th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--line); }
   th { color: var(--muted); font-size: 11px; text-transform: uppercase; font-weight: 600; }
   .badge { padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: 700; font-family: ui-monospace, monospace; }
@@ -376,15 +377,15 @@
     <div class="row" style="margin-bottom:12px;">
       <div class="field">
         <label class="small">มูลค่าพอร์ต ($)</label>
-        <input type="number" id="portfolioValue" value="100000" />
+        <input type="number" id="portfolioValue" value="100000" min="0" />
       </div>
       <div class="field">
         <label class="small">ความเสี่ยงต่อการเทรด (%)</label>
-        <input type="number" id="riskPct" step="0.1" value="1" />
+        <input type="number" id="riskPct" step="0.1" value="1" min="0" />
       </div>
       <div class="field">
         <label class="small">Stop loss (% จากราคาซื้อ)</label>
-        <input type="number" id="stopLossPct" step="0.5" value="8" />
+        <input type="number" id="stopLossPct" step="0.5" value="8" min="0" />
       </div>
     </div>
     <div id="sizeContent"></div>
@@ -394,8 +395,18 @@
 <!-- LOG TAB -->
 <div id="tab-log" class="hidden">
   <div class="panel">
-    <h3>บันทึกการตัดสินใจ</h3>
-    <div id="logContent"></div>
+    <div class="row" style="justify-content:space-between;align-items:center;">
+      <h3 style="margin:0;">บันทึกการตัดสินใจ</h3>
+      <div class="row" style="gap:8px;">
+        <input type="text" id="logSearchInput" placeholder="ค้นหาสัญลักษณ์..." style="width:180px;">
+        <select id="logDecisionFilter" style="width:auto;">
+          <option value="">ทุกการตัดสินใจ</option>
+          <option value="ซื้อ">ซื้อ</option>
+          <option value="ไม่ซื้อ">ไม่ซื้อ</option>
+        </select>
+      </div>
+    </div>
+    <div id="logContent" style="margin-top:12px;"></div>
   </div>
 </div>
 
@@ -1487,10 +1498,21 @@
     });
     el.querySelectorAll('[data-action="remove-watchlist"]').forEach(function (btn) {
       btn.addEventListener("click", function () {
-        state.watchlist = state.watchlist.filter(function (s) { return s !== btn.dataset.sym; });
-        saveWatchlist();
-        renderWatchlist();
-        renderTickerStrip();
+        const sym = btn.dataset.sym;
+        Swal.fire({
+          icon: "warning",
+          title: "ลบ " + sym + " ออกจาก watchlist?",
+          showCancelButton: true,
+          confirmButtonText: "ลบ",
+          cancelButtonText: "ยกเลิก",
+          confirmButtonColor: "#dc2626",
+        }).then(function (result) {
+          if (!result.isConfirmed) return;
+          state.watchlist = state.watchlist.filter(function (s) { return s !== sym; });
+          saveWatchlist();
+          renderWatchlist();
+          renderTickerStrip();
+        });
       });
     });
   }
@@ -1515,6 +1537,10 @@
     const portfolioValue = Number(document.getElementById("portfolioValue").value);
     const riskPct = Number(document.getElementById("riskPct").value);
     const stopLossPct = Number(document.getElementById("stopLossPct").value);
+    if (!(portfolioValue > 0) || !(riskPct > 0) || !(stopLossPct > 0)) {
+      el.innerHTML = '<div class="empty">กรอกเงินทุน, % ความเสี่ยง และ % Stop Loss เป็นค่ามากกว่า 0 ทั้งหมดก่อนจึงจะคำนวณได้</div>';
+      return;
+    }
     const riskDollars = (portfolioValue * riskPct) / 100;
     const riskPerShare = (state.result.price * stopLossPct) / 100;
     const shares = riskPerShare > 0 ? Math.floor(riskDollars / riskPerShare) : 0;
@@ -1556,17 +1582,27 @@
   function renderLog() {
     const el = document.getElementById("logContent");
     if (state.log.length === 0) { el.innerHTML = '<div class="empty">ยังไม่มีบันทึก — วิเคราะห์หุ้นแล้วกดบันทึกการตัดสินใจเข้าที่นี่</div>'; return; }
-    let html = '<table><thead><tr><th>วันที่</th><th>สัญลักษณ์</th><th>ราคา</th><th>สัญญาณ</th><th>ความเสี่ยง</th><th>ตัดสินใจ</th></tr></thead><tbody>';
-    state.log.forEach(function (entry) {
+
+    const searchQuery = (document.getElementById("logSearchInput").value || "").trim().toUpperCase();
+    const decisionFilter = document.getElementById("logDecisionFilter").value;
+    let rows = state.log;
+    if (searchQuery) rows = rows.filter(function (entry) { return entry.symbol.toUpperCase().indexOf(searchQuery) !== -1; });
+    if (decisionFilter) rows = rows.filter(function (entry) { return entry.decision === decisionFilter; });
+    if (rows.length === 0) { el.innerHTML = '<div class="empty">ไม่มีบันทึกที่ตรงเงื่อนไข</div>'; return; }
+
+    let html = '<div class="table-scroll"><table><thead><tr><th>วันที่</th><th>สัญลักษณ์</th><th>ราคา</th><th>สัญญาณ</th><th>ความเสี่ยง</th><th>ตัดสินใจ</th></tr></thead><tbody>';
+    rows.forEach(function (entry) {
       const badgeClass = entry.verdict === "ขาขึ้น" ? "up" : entry.verdict === "ขาลง" ? "down" : "flat";
       html += '<tr><td class="mono">' + entry.date + '</td><td class="mono">' + entry.symbol + '</td>' +
         '<td class="mono">$' + entry.price.toFixed(2) + '</td>' +
         '<td><span class="badge ' + badgeClass + '">' + entry.verdict + '</span></td>' +
         '<td>' + entry.riskLevel + '</td><td>' + entry.decision + '</td></tr>';
     });
-    html += '</tbody></table>';
+    html += '</tbody></table></div>';
     el.innerHTML = html;
   }
+  document.getElementById("logSearchInput").addEventListener("input", renderLog);
+  document.getElementById("logDecisionFilter").addEventListener("change", renderLog);
 
   // ---------- bulk scan ----------
   const BULK_PRESET = ["AAPL","MSFT","NVDA","AMZN","GOOGL","META","TSLA","AVGO","COST","PEP",
@@ -1784,7 +1820,7 @@
 
     function teamTable(label, list) {
       if (list.length === 0) return '<div class="empty">ทีม ' + label + ': ยังไม่มีผลลัพธ์</div>';
-      let html = '<div style="margin-bottom:16px;"><div style="font-weight:700;margin-bottom:6px;">ทีม ' + label + '</div><table><thead><tr>' +
+      let html = '<div style="margin-bottom:16px;"><div style="font-weight:700;margin-bottom:6px;">ทีม ' + label + '</div><div class="table-scroll"><table><thead><tr>' +
         '<th>สัญลักษณ์</th><th>ราคา</th><th>คะแนน</th><th>สัญญาณ</th><th>1 เดือน</th><th>3 เดือน</th></tr></thead><tbody>';
       list.forEach(function (r) {
         if (r.error) {
@@ -1800,7 +1836,7 @@
           '<td class="mono" style="color:' + (r.return1m >= 0 ? "var(--bull)" : "var(--bear)") + ';">' + (r.return1m > 0 ? "+" : "") + r.return1m.toFixed(1) + '%</td>' +
           '<td class="mono" style="color:' + (r.return3m >= 0 ? "var(--bull)" : "var(--bear)") + ';">' + (r.return3m > 0 ? "+" : "") + r.return3m.toFixed(1) + '%</td></tr>';
       });
-      html += '</tbody></table></div>';
+      html += '</tbody></table></div></div>';
       return html;
     }
 
@@ -1847,7 +1883,7 @@
       { key: "rel", label: "RS vs SPY 3m" },
       { key: "risk", label: "ความผันผวน" },
     ];
-    let html = '<table><thead><tr>';
+    let html = '<div class="table-scroll"><table><thead><tr>';
     headers.forEach(function (h) {
       const arrow = state.bulkSortKey === h.key ? (state.bulkSortDir === 1 ? " ▲" : " ▼") : "";
       html += '<th class="sortable" data-sortkey="' + h.key + '">' + h.label + arrow + '</th>';
@@ -1869,7 +1905,7 @@
         '<td class="mono">' + (r.relStrength !== null ? (r.relStrength > 0 ? "+" : "") + r.relStrength.toFixed(1) + "%" : "—") + '</td>' +
         '<td class="mono">' + r.vol.toFixed(1) + '%</td></tr>';
     });
-    html += '</tbody></table>';
+    html += '</tbody></table></div>';
     el.innerHTML = html;
 
     el.querySelectorAll('th.sortable').forEach(function (th) {
