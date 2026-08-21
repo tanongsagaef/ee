@@ -177,6 +177,12 @@ button, input, select, textarea {
   line-height: 1.6;
 }
 
+.chapter-header-row { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.chapter-header-row h1 { margin-bottom: 0; }
+.chapter-edit-header { margin-bottom: 20px; }
+.chapter-edit-header input { margin-bottom: 8px; }
+.chapter-edit-header .section-actions { margin-top: 8px; }
+
 .section-card {
   background: var(--surface);
   border: 1px solid var(--border);

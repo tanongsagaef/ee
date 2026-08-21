@@ -68,6 +68,7 @@ let activeChapterId = null;
 let activeView = "home"; // "home" | "chapter"
 let homeSearchQuery = "";
 let chapterSearchQuery = "";
+let chapterEditMode = false;
 
 function uid() {
   return Math.random().toString(36).slice(2, 9);
@@ -106,6 +107,7 @@ document.getElementById("themeToggle").addEventListener("click", () => {
 function goHome() {
   activeView = "home";
   activeChapterId = null;
+  chapterEditMode = false;
   renderContent();
 }
 
@@ -174,6 +176,7 @@ function renderHomeContent() {
       activeView = "chapter";
       activeChapterId = btn.dataset.chapterId;
       chapterSearchQuery = "";
+      chapterEditMode = false;
       renderContent();
     });
   });
@@ -208,6 +211,16 @@ async function moveChapter(chapterId, dir) {
   renderContent();
 }
 
+async function moveSection(chapter, sectionId, dir) {
+  const idx = chapter.sections.findIndex(s => s.id === sectionId);
+  const newIdx = idx + dir;
+  if (idx < 0 || newIdx < 0 || newIdx >= chapter.sections.length) return;
+  const [sec] = chapter.sections.splice(idx, 1);
+  chapter.sections.splice(newIdx, 0, sec);
+  await saveData();
+  renderContent();
+}
+
 function wireResetBtn() {
   document.getElementById("resetBtn").addEventListener("click", async () => {
     if (confirm("ลบเนื้อหาทั้งหมดหรือไม่? การลบนี้ไม่สามารถย้อนกลับได้")) {
@@ -229,8 +242,22 @@ function renderChapterContent() {
   }
 
   let html = `<button class="back-home-link" id="backHomeLink">← หน้าหลัก</button>`;
-  html += `<h1>${escapeHtml(chapter.title)}</h1>`;
-  if (chapter.desc) html += `<p class="chapter-desc">${escapeHtml(chapter.desc)}</p>`;
+  if (chapterEditMode) {
+    html += `<div class="chapter-edit-header">
+      <input type="text" id="editChapterTitle" value="${escapeAttr(chapter.title)}" placeholder="ชื่อบท">
+      <textarea id="editChapterDesc" rows="2" placeholder="คำอธิบายบท (ถ้ามี)">${chapter.desc || ""}</textarea>
+      <div class="section-actions">
+        <button id="saveChapterHeaderBtn">บันทึก</button>
+        <button id="cancelChapterHeaderBtn">ยกเลิก</button>
+      </div>
+    </div>`;
+  } else {
+    html += `<div class="chapter-header-row">
+      <h1>${escapeHtml(chapter.title)}</h1>
+      <button class="link-btn" id="editChapterHeaderBtn">แก้ไขชื่อ/คำอธิบายบท</button>
+    </div>`;
+    if (chapter.desc) html += `<p class="chapter-desc">${escapeHtml(chapter.desc)}</p>`;
+  }
 
   if (!chapter.sections.length) {
     html += `<p class="empty-chapter">บทนี้ยังไม่มีเนื้อหา</p>`;
@@ -251,7 +278,7 @@ function renderChapterContent() {
     html += `<p class="empty-chapter">ไม่พบเนื้อหาที่ตรงกับคำค้นหาในบทนี้</p>`;
   }
 
-  visibleSections.forEach(sec => {
+  visibleSections.forEach((sec, secIdx) => {
     if (!sec.subsections) sec.subsections = [];
     html += `<article class="section-card" data-section-id="${sec.id}">`;
     if (sec.title) html += `<h3>${escapeHtml(sec.title)}</h3>`;
@@ -286,6 +313,10 @@ function renderChapterContent() {
     }
 
     html += `<div class="section-actions">`;
+    if (!secQuery) {
+      html += `<button type="button" class="move-sec-up" data-section-id="${sec.id}" title="เลื่อนขึ้น" ${secIdx === 0 ? "disabled" : ""}>↑</button>
+        <button type="button" class="move-sec-down" data-section-id="${sec.id}" title="เลื่อนลง" ${secIdx === visibleSections.length - 1 ? "disabled" : ""}>↓</button>`;
+    }
     if (!sec.html) {
       html += `<button class="edit-sec">แก้ไข</button><button class="danger del-sec">ลบ</button>`;
     }
@@ -301,6 +332,33 @@ function renderChapterContent() {
   content.innerHTML = html;
 
   content.querySelector("#backHomeLink").addEventListener("click", goHome);
+
+  if (chapterEditMode) {
+    document.getElementById("saveChapterHeaderBtn").addEventListener("click", async () => {
+      const newTitle = document.getElementById("editChapterTitle").value.trim();
+      chapter.title = newTitle || chapter.title;
+      chapter.desc = document.getElementById("editChapterDesc").value.trim();
+      chapterEditMode = false;
+      await saveData();
+      renderContent();
+    });
+    document.getElementById("cancelChapterHeaderBtn").addEventListener("click", () => {
+      chapterEditMode = false;
+      renderContent();
+    });
+  } else {
+    document.getElementById("editChapterHeaderBtn").addEventListener("click", () => {
+      chapterEditMode = true;
+      renderContent();
+    });
+  }
+
+  content.querySelectorAll(".move-sec-up").forEach(btn => {
+    btn.addEventListener("click", () => moveSection(chapter, btn.dataset.sectionId, -1));
+  });
+  content.querySelectorAll(".move-sec-down").forEach(btn => {
+    btn.addEventListener("click", () => moveSection(chapter, btn.dataset.sectionId, 1));
+  });
 
   const chapterSearchInput = document.getElementById("chapterSearchInput");
   if (chapterSearchInput) {

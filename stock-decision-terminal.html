@@ -1590,16 +1590,39 @@
     if (decisionFilter) rows = rows.filter(function (entry) { return entry.decision === decisionFilter; });
     if (rows.length === 0) { el.innerHTML = '<div class="empty">ไม่มีบันทึกที่ตรงเงื่อนไข</div>'; return; }
 
-    let html = '<div class="table-scroll"><table><thead><tr><th>วันที่</th><th>สัญลักษณ์</th><th>ราคา</th><th>สัญญาณ</th><th>ความเสี่ยง</th><th>ตัดสินใจ</th></tr></thead><tbody>';
+    let html = '<div class="table-scroll"><table><thead><tr><th>วันที่</th><th>สัญลักษณ์</th><th>ราคา</th><th>สัญญาณ</th><th>ความเสี่ยง</th><th>ตัดสินใจ</th><th></th></tr></thead><tbody>';
     rows.forEach(function (entry) {
       const badgeClass = entry.verdict === "ขาขึ้น" ? "up" : entry.verdict === "ขาลง" ? "down" : "flat";
       html += '<tr><td class="mono">' + entry.date + '</td><td class="mono">' + entry.symbol + '</td>' +
         '<td class="mono">$' + entry.price.toFixed(2) + '</td>' +
         '<td><span class="badge ' + badgeClass + '">' + entry.verdict + '</span></td>' +
-        '<td>' + entry.riskLevel + '</td><td>' + entry.decision + '</td></tr>';
+        '<td>' + entry.riskLevel + '</td><td>' + entry.decision + '</td>' +
+        '<td><button type="button" class="link-btn del-log-entry" data-idx="' + state.log.indexOf(entry) + '">ลบ</button></td></tr>';
     });
     html += '</tbody></table></div>';
     el.innerHTML = html;
+
+    el.querySelectorAll(".del-log-entry").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        const idx = Number(btn.dataset.idx);
+        const entry = state.log[idx];
+        if (!entry) return;
+        Swal.fire({
+          icon: "warning",
+          title: "ลบบันทึกนี้?",
+          text: entry.symbol + " · " + entry.date,
+          showCancelButton: true,
+          confirmButtonText: "ลบ",
+          cancelButtonText: "ยกเลิก",
+          confirmButtonColor: "#dc2626",
+        }).then(function (result) {
+          if (!result.isConfirmed) return;
+          state.log.splice(idx, 1);
+          saveLog();
+          renderLog();
+        });
+      });
+    });
   }
   document.getElementById("logSearchInput").addEventListener("input", renderLog);
   document.getElementById("logDecisionFilter").addEventListener("change", renderLog);

@@ -51,6 +51,8 @@
     padding-bottom: 60px;
   }
   .mono { font-family: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", monospace; }
+  .pos { color: var(--bull); }
+  .neg { color: var(--bear); }
   .header {
     display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; flex-wrap: wrap; gap: 10px;
     background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
@@ -322,6 +324,10 @@
     <h3>กำไร/ขาดทุนรายเดือน (12 เดือนล่าสุด)</h3>
     <div class="chart-wrap" id="monthlyChartWrap"></div>
   </div>
+  <div class="panel">
+    <h3>ผลตอบแทนตามแท็ก</h3>
+    <div id="tagStatsWrap"></div>
+  </div>
 </div>
 
 <!-- LOG TAB -->
@@ -340,6 +346,7 @@
           <option value="other">อื่นๆ</option>
         </select>
         <button class="ghost" id="logFilterClearBtn" title="ล้างตัวกรอง">ล้าง</button>
+        <button class="ghost" id="logExportCsvBtn" title="ส่งออกรายการที่กรองอยู่นี้เป็น CSV">⬇ CSV</button>
       </div>
     </div>
     <div id="logTableWrap" style="margin-top:12px;"></div>
@@ -904,6 +911,49 @@
     return { total, pendingCount, wins: wins.length, losses: losses.length, totalPnl, winRate, avgWin, avgLoss, profitFactor, bestDay, worstDay };
   }
 
+  function computeTagStats() {
+    const map = {};
+    function add(tag, pnl, type) {
+      const key = type + "::" + tag;
+      if (!map[key]) map[key] = { tag, type, count: 0, totalPnl: 0, wins: 0 };
+      map[key].count++;
+      map[key].totalPnl += pnl;
+      if (pnl > 0) map[key].wins++;
+    }
+    trades.forEach(t => {
+      if (isPending(t)) return;
+      const pnl = Number(t.pnl);
+      (t.tags || []).forEach(tag => add(tag, pnl, "positive"));
+      (t.negTags || []).forEach(tag => add(tag, pnl, "negative"));
+    });
+    return Object.values(map)
+      .map(d => ({ ...d, winRate: d.count ? d.wins / d.count * 100 : 0, avgPnl: d.count ? d.totalPnl / d.count : 0 }))
+      .sort((a, b) => b.totalPnl - a.totalPnl);
+  }
+
+  function renderTagStats() {
+    const wrap = document.getElementById("tagStatsWrap");
+    const rows = computeTagStats();
+    if (!rows.length) {
+      wrap.innerHTML = '<div class="empty">ยังไม่มีเทรดที่ปิดแล้วและมีแท็ก</div>';
+      return;
+    }
+    wrap.innerHTML = `<div class="table-scroll"><table>
+      <thead><tr><th>แท็ก</th><th>จำนวนเทรด</th><th>Win Rate</th><th>กำไร/ขาดทุนเฉลี่ย</th><th>กำไร/ขาดทุนรวม</th></tr></thead>
+      <tbody>
+        ${rows.map(r => `
+          <tr>
+            <td><span class="tag-chip ${r.type}">${escapeHtml(r.tag)}</span></td>
+            <td>${r.count}</td>
+            <td>${r.winRate.toFixed(0)}%</td>
+            <td class="mono ${r.avgPnl >= 0 ? "pos" : "neg"}">${fmtMoney(r.avgPnl)}</td>
+            <td class="mono ${r.totalPnl >= 0 ? "pos" : "neg"}">${fmtMoney(r.totalPnl)}</td>
+          </tr>
+        `).join("")}
+      </tbody>
+    </table></div>`;
+  }
+
   function computeMaxDrawdown() {
     const sorted = [...trades].filter(t => !isPending(t)).sort((a, b) => a.date.localeCompare(b.date) || (a.createdAt || 0) - (b.createdAt || 0));
     let cum = 0, peak = 0, maxDD = 0;
@@ -1043,6 +1093,7 @@
     document.getElementById("radarChartWrap").innerHTML = buildRadarChart(s);
     document.getElementById("equityChartWrap").innerHTML = buildEquityCurveSvg();
     document.getElementById("monthlyChartWrap").innerHTML = buildMonthlyBarChart();
+    renderTagStats();
   }
 
   function buildEquityCurveSvg() {
@@ -1107,6 +1158,34 @@
   }
 
   /* ---------- trade log ---------- */
+  let lastLogList = [];
+
+  function csvEscape(v) {
+    const s = String(v == null ? "" : v);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  }
+
+  document.getElementById("logExportCsvBtn").addEventListener("click", () => {
+    if (!lastLogList.length) {
+      Swal.fire({ icon: "info", title: "ไม่มีรายการเทรดที่ตรงเงื่อนไขให้ส่งออก" });
+      return;
+    }
+    const headers = ["วันที่", "ตลาด", "สัญลักษณ์", "ทิศทาง", "กำไร/ขาดทุน", "แท็กบวก", "แท็กลบ", "โน้ต"];
+    const rows = lastLogList.map(t => [
+      t.date,
+      MARKET_LABEL[t.marketType] || t.marketType,
+      t.symbol || "",
+      t.side === "long" ? "BUY" : "SELL",
+      isPending(t) ? "" : Number(t.pnl).toFixed(2),
+      (t.tags || []).join("; "),
+      (t.negTags || []).join("; "),
+      t.notes || "",
+    ]);
+    const csv = "﻿" + [headers, ...rows].map(r => r.map(csvEscape).join(",")).join("\r\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    triggerDownload(blob, `trade-journal-log-${todayKey()}.csv`);
+  });
+
   document.getElementById("logMarketFilter").addEventListener("change", renderLog);
   document.getElementById("logSearchInput").addEventListener("input", renderLog);
   document.getElementById("logDateFrom").addEventListener("change", renderLog);
@@ -1137,6 +1216,7 @@
       });
     }
     list.sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt || 0) - (a.createdAt || 0));
+    lastLogList = list;
 
     const wrap = document.getElementById("logTableWrap");
     if (!list.length) {
