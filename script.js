@@ -156,8 +156,8 @@ function renderHomeContent() {
       if (subCount) meta += ` · ${subCount} หัวข้อย่อย`;
       html += `<div class="home-card-wrap">
         <button class="home-card" data-chapter-id="${ch.id}">
-          <div class="home-card-title">${escapeHtml(ch.title)}</div>
-          <div class="home-card-desc">${escapeHtml(ch.desc || "")}</div>
+          <div class="home-card-title">${highlightText(ch.title, homeSearchQuery)}</div>
+          <div class="home-card-desc">${highlightText(ch.desc || "", homeSearchQuery)}</div>
           <div class="home-card-meta">${meta}</div>
         </button>
         ${!query ? `<div class="home-card-reorder">
@@ -281,9 +281,9 @@ function renderChapterContent() {
   visibleSections.forEach((sec, secIdx) => {
     if (!sec.subsections) sec.subsections = [];
     html += `<article class="section-card" data-section-id="${sec.id}">`;
-    if (sec.title) html += `<h3>${escapeHtml(sec.title)}</h3>`;
+    if (sec.title) html += `<h3>${highlightText(sec.title, secQuery)}</h3>`;
     if (sec.html) html += sec.html;
-    if (sec.text) html += `<div class="section-text">${renderBodyText(sec.text)}</div>`;
+    if (sec.text) html += `<div class="section-text">${renderBodyText(sec.text, secQuery)}</div>`;
     if (sec.image) html += `<img class="section-image" src="${sec.image}" alt="${escapeHtml(sec.title || "")}">`;
     if (sec.pdf) {
       const url = URL.createObjectURL(sec.pdf);
@@ -300,8 +300,8 @@ function renderChapterContent() {
       html += `<div class="subsection-list">`;
       sec.subsections.forEach(sub => {
         html += `<div class="subsection-card" data-subsection-id="${sub.id}">
-          <h4>${escapeHtml(sub.title)}</h4>
-          ${sub.text ? `<div class="section-text">${renderBodyText(sub.text)}</div>` : ""}
+          <h4>${highlightText(sub.title, secQuery)}</h4>
+          ${sub.text ? `<div class="section-text">${renderBodyText(sub.text, secQuery)}</div>` : ""}
           ${sub.image ? `<img class="section-image" src="${sub.image}" alt="${escapeHtml(sub.title || "")}">` : ""}
           <div class="section-actions">
             <button class="edit-subsec">แก้ไข</button>
@@ -614,8 +614,28 @@ function escapeHtml(str) {
 }
 function escapeAttr(str) { return escapeHtml(str); }
 
-function renderBodyText(str) {
-  return escapeHtml(str).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// highlights `query` inside text that has already been through escapeHtml —
+// matching happens on the escaped string so a query containing HTML-special
+// characters (e.g. "<") still lines up with how that text was escaped
+function highlightEscaped(escapedStr, query) {
+  const q = escapeRegex(escapeHtml(query || "").trim());
+  if (!q) return escapedStr;
+  return escapedStr.replace(new RegExp(q, "gi"), m => `<mark>${m}</mark>`);
+}
+
+function highlightText(str, query) {
+  const escaped = escapeHtml(str || "");
+  return query ? highlightEscaped(escaped, query) : escaped;
+}
+
+function renderBodyText(str, query) {
+  let escaped = escapeHtml(str || "");
+  if (query) escaped = highlightEscaped(escaped, query);
+  return escaped.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
 }
 
 /* ---------- Paste formatted content (e.g. from a webpage/Word/Docs) into a
