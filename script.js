@@ -586,7 +586,7 @@ async function collectAllData() {
       if (sec.pdf) copy.pdf = await blobToBase64(sec.pdf);
       sections.push(copy);
     }
-    exportChapters.push({ title: ch.title, desc: ch.desc, sections });
+    exportChapters.push({ id: ch.id, title: ch.title, desc: ch.desc, sections });
   }
   return {
     version: 1,
@@ -613,17 +613,19 @@ async function restoreAllData(parsed) {
   // Elliott Wave (own data) — legacy exports had chapters at the top level
   const ewChapters = (parsed.elliottWave && parsed.elliottWave.chapters) || parsed.chapters || [];
   if (Array.isArray(ewChapters) && ewChapters.length) {
+    const existingChapterIds = new Set(chapters.map(c => c.id));
     const importedChapters = [];
     for (const ch of ewChapters) {
+      if (ch.id && existingChapterIds.has(ch.id)) continue; // already imported before — skip duplicate
       const sections = [];
       for (const sec of (ch.sections || [])) {
-        const newSec = { ...sec, id: uid() };
+        const newSec = { ...sec, id: sec.id || uid() };
         if (typeof newSec.pdf === "string" && newSec.pdf.startsWith("data:")) {
           newSec.pdf = await base64ToBlob(newSec.pdf);
         }
         sections.push(newSec);
       }
-      importedChapters.push({ id: uid(), title: ch.title || "บทที่นำเข้า", desc: ch.desc || "", sections });
+      importedChapters.push({ id: ch.id || uid(), title: ch.title || "บทที่นำเข้า", desc: ch.desc || "", sections });
     }
     chapters = chapters.concat(importedChapters);
     await saveData();
@@ -635,7 +637,10 @@ async function restoreAllData(parsed) {
     const tj = parsed.tradeJournal;
     if (Array.isArray(tj.trades) && tj.trades.length) {
       const existing = JSON.parse(localStorage.getItem("tj_trades_v1") || "[]");
-      const imported = tj.trades.map(t => ({ ...t, id: uid() }));
+      const existingIds = new Set(existing.map(t => t.id));
+      const imported = tj.trades
+        .filter(t => !(t.id && existingIds.has(t.id)))
+        .map(t => ({ ...t, id: t.id || uid() }));
       localStorage.setItem("tj_trades_v1", JSON.stringify(existing.concat(imported)));
       counts.trades = imported.length;
     }
@@ -654,8 +659,10 @@ async function restoreAllData(parsed) {
     }
     if (Array.isArray(sd.log) && sd.log.length) {
       const existing = JSON.parse(localStorage.getItem("sd_log") || "[]");
-      localStorage.setItem("sd_log", JSON.stringify(existing.concat(sd.log)));
-      counts.log = sd.log.length;
+      const existingLogIds = new Set(existing.map(e => e.id).filter(Boolean));
+      const imported = sd.log.filter(e => !(e.id && existingLogIds.has(e.id)));
+      localStorage.setItem("sd_log", JSON.stringify(existing.concat(imported)));
+      counts.log = imported.length;
     }
     if (sd.watchlistScores && typeof sd.watchlistScores === "object") {
       const existing = JSON.parse(localStorage.getItem("sd_watchlist_scores") || "{}");

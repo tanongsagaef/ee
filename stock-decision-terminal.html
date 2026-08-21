@@ -1035,7 +1035,7 @@
         if (sec.pdf instanceof Blob) copy.pdf = await blobToBase64(sec.pdf);
         sections.push(copy);
       }
-      exportChapters.push({ title: ch.title, desc: ch.desc, sections: sections });
+      exportChapters.push({ id: ch.id, title: ch.title, desc: ch.desc, sections: sections });
     }
     return {
       version: 1,
@@ -1068,9 +1068,11 @@
         counts.watchlist = sd.watchlist.length;
       }
       if (Array.isArray(sd.log) && sd.log.length) {
-        state.log = state.log.concat(sd.log);
+        const existingLogIds = new Set(state.log.map(function (e) { return e.id; }).filter(Boolean));
+        const importedLog = sd.log.filter(function (e) { return !(e.id && existingLogIds.has(e.id)); });
+        state.log = state.log.concat(importedLog);
         saveLog();
-        counts.log = sd.log.length;
+        counts.log = importedLog.length;
       }
       if (sd.watchlistScores && typeof sd.watchlistScores === "object") {
         state.watchlistScores = Object.assign({}, state.watchlistScores, sd.watchlistScores);
@@ -1085,7 +1087,10 @@
       const tj = parsed.tradeJournal;
       if (Array.isArray(tj.trades) && tj.trades.length) {
         const existing = JSON.parse(localStorage.getItem("tj_trades_v1") || "[]");
-        const imported = tj.trades.map(function (t) { return Object.assign({}, t, { id: uid() }); });
+        const existingIds = new Set(existing.map(function (t) { return t.id; }));
+        const imported = tj.trades
+          .filter(function (t) { return !(t.id && existingIds.has(t.id)); })
+          .map(function (t) { return Object.assign({}, t, { id: t.id || uid() }); });
         localStorage.setItem("tj_trades_v1", JSON.stringify(existing.concat(imported)));
         counts.trades = imported.length;
       }
@@ -1098,17 +1103,19 @@
     const ewChapters = (parsed.elliottWave && parsed.elliottWave.chapters) || [];
     if (Array.isArray(ewChapters) && ewChapters.length) {
       const existing = await ewGetChapters().catch(function () { return []; });
+      const existingChapterIds = new Set(existing.map(function (c) { return c.id; }));
       const importedChapters = [];
       for (const ch of ewChapters) {
+        if (ch.id && existingChapterIds.has(ch.id)) continue; // already imported before — skip duplicate
         const sections = [];
         for (const sec of (ch.sections || [])) {
-          const newSec = Object.assign({}, sec, { id: uid() });
+          const newSec = Object.assign({}, sec, { id: sec.id || uid() });
           if (typeof newSec.pdf === "string" && newSec.pdf.indexOf("data:") === 0) {
             newSec.pdf = await base64ToBlob(newSec.pdf);
           }
           sections.push(newSec);
         }
-        importedChapters.push({ id: uid(), title: ch.title || "บทที่นำเข้า", desc: ch.desc || "", sections: sections });
+        importedChapters.push({ id: ch.id || uid(), title: ch.title || "บทที่นำเข้า", desc: ch.desc || "", sections: sections });
       }
       await ewSetChapters(existing.concat(importedChapters));
       counts.chapters = importedChapters.length;
@@ -1529,6 +1536,7 @@
     if (!state.result) return;
     const notes = Array.prototype.slice.call(document.querySelectorAll(".devilNote")).map(function (t) { return t.value; }).filter(Boolean);
     const entry = {
+      id: uid(),
       symbol: state.result.symbol,
       date: new Date().toISOString().slice(0, 10),
       price: state.result.price,
