@@ -146,7 +146,7 @@
   .calendar-month-label { font-size: 17px; font-weight: 800; min-width: 150px; text-align: center; }
   .calendar-total { font-size: 14px; color: var(--muted); font-weight: 600; }
   .calendar-total .mono { font-weight: 800; font-size: 16px; }
-  .calendar-grid { display: grid; grid-template-columns: repeat(5, 1fr) 1.3fr; gap: 7px; }
+  .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr) 1.3fr; gap: 7px; }
   .calendar-summary-cell { min-height: 84px; border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; background: var(--surface); display: flex; flex-direction: column; justify-content: center; }
   .calendar-summary-label { font-size: 9.5px; color: var(--muted); text-transform: uppercase; font-weight: 700; margin-bottom: 4px; }
   .calendar-summary-pnl { font-family: ui-monospace, monospace; font-weight: 800; font-size: 13px; }
@@ -515,7 +515,7 @@
   const LS_KEY = "tj_trades_v1";
   const MONTH_NAMES_TH = ["มกราคม","กุมภาพันธ์","มีนาคม","เมษายน","พฤษภาคม","มิถุนายน","กรกฎาคม","สิงหาคม","กันยายน","ตุลาคม","พฤศจิกายน","ธันวาคม"];
   const MONTH_SHORT_TH = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
-  const DOW_TH = ["จ","อ","พ","พฤ","ศ","สรุป"];
+  const DOW_TH = ["อา","จ","อ","พ","พฤ","ศ","ส","สรุป"];
   const MARKET_LABEL = { forex: "Forex", futures: "Futures", other: "อื่นๆ" };
 
   function loadTrades() {
@@ -655,12 +655,11 @@
     const grid = document.getElementById("calendarGrid");
     grid.innerHTML = "";
 
-    // Monday-indexed first day of month (0=Mon ... 6=Sun)
+    // Sunday-indexed first day of month (0=Sun ... 6=Sat)
     const firstDowSun = new Date(calYear, calMonth, 1).getDay();
-    const firstDowMon = (firstDowSun + 6) % 7;
     const daysInThisMonth = new Date(calYear, calMonth + 1, 0).getDate();
-    const firstCellDate = new Date(calYear, calMonth, 1 - firstDowMon);
-    const totalCells = Math.ceil((firstDowMon + daysInThisMonth) / 7) * 7;
+    const firstCellDate = new Date(calYear, calMonth, 1 - firstDowSun);
+    const totalCells = Math.ceil((firstDowSun + daysInThisMonth) / 7) * 7;
     const weekCount = totalCells / 7;
 
     let monthTotal = 0;
@@ -673,8 +672,8 @@
         weekDates.push(dt);
       }
 
-      // Mon-Fri visible cells
-      for (let d = 0; d < 5; d++) {
+      // Sun-Sat visible cells
+      for (let d = 0; d < 7; d++) {
         const dt = weekDates[d];
         const inMonth = dt.getMonth() === calMonth;
         const key = dateKey(dt.getFullYear(), dt.getMonth(), dt.getDate());
@@ -719,7 +718,7 @@
         grid.appendChild(div);
       }
 
-      // weekly summary cell (sums all 7 days, including weekend, even though only Mon-Fri are shown)
+      // weekly summary cell (sums all 7 days of the week)
       let weekTotal = 0, weekCount2 = 0, weekHasClosed = false;
       weekDates.forEach(dt => {
         const key = dateKey(dt.getFullYear(), dt.getMonth(), dt.getDate());
