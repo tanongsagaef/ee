@@ -2256,7 +2256,7 @@
     ].join("\n");
   }
 
-  async function cvLoadModels(key) {
+  async function cvLoadModels(key, forcePrefer) {
     key = (key || cvEl("cvGeminiKey").value || "").trim();
     if (!key) { cvShowMsg("ใส่ Gemini API key ก่อน แล้วค่อยโหลดรายชื่อโมเดล"); return; }
     const btn = cvEl("cvLoadModelsBtn");
@@ -2279,11 +2279,12 @@
       const cur = cvEl("cvModel").value;
       cvEl("cvModel").innerHTML = models.map(m =>
         `<option value="${escapeHtml(m.id)}">${escapeHtml(m.label || m.id)} — ${escapeHtml(m.id)}</option>`).join("");
+      // flash tiers carry a much higher free quota than pro/preview models — prefer them
       const prefer = models.find(m => /^gemini-3.*flash/.test(m.id))
         || models.find(m => /flash/.test(m.id))
         || models.find(m => /pro/.test(m.id))
         || models[0];
-      const want = models.some(m => m.id === cur) ? cur : prefer.id;
+      const want = (!forcePrefer && models.some(m => m.id === cur)) ? cur : prefer.id;
       cvEl("cvModel").value = want;
       cv.model = want;
       try { localStorage.setItem(CV_LS.model, want); } catch (e) {}
@@ -2392,6 +2393,9 @@
       if (/no longer available|not found for API version|is not supported|update your code/i.test(msg)) {
         cvAddBubble("ai", "โมเดลนี้ใช้ไม่ได้แล้ว — กำลังสลับให้อัตโนมัติ แล้วลองส่งคำถามใหม่อีกครั้ง", "loading");
         cvLoadModels();
+      } else if (/exceeded your current quota|quota|RESOURCE_EXHAUSTED|rate limit/i.test(msg) && !/flash/i.test(cv.model)) {
+        cvAddBubble("ai", "โมเดล " + cv.model + " เกินโควต้าฟรีของคีย์นี้ (มักเกิดกับรุ่น Pro/Preview) — กำลังสลับไปรุ่น Flash ที่โควต้าฟรีสูงกว่า แล้วลองส่งคำถามใหม่อีกครั้ง", "loading");
+        cvLoadModels(key, true);
       }
     } finally {
       cvEl("cvChatSend").disabled = false;
