@@ -2344,12 +2344,18 @@
 
       const fnTool = { function_declarations: [CV_RENDER_TOOL] };
       const searchTool = { google_search: {} };
-      let r = await callGemini(drawFocused ? [fnTool] : [fnTool, searchTool]);
+      const usedSearch = !drawFocused;
+      let r = await callGemini(usedSearch ? [fnTool, searchTool] : [fnTool]);
+      let droppedSearch = false;
       if (!r.ok) {
         const em = String((r.j && r.j.error && r.j.error.message) || "");
         // some model versions reject search + function together — retry search-only
-        if (!drawFocused && /google_?search|search tool|combin|together|not supported with/i.test(em)) {
+        if (usedSearch && /google_?search|search tool|combin|together|not supported with/i.test(em)) {
           r = await callGemini([searchTool]);
+        } else if (usedSearch && /exceeded your current quota|quota|RESOURCE_EXHAUSTED/i.test(em)) {
+          // Google Search grounding often needs a billed project even on an otherwise-free key — drop it and retry
+          r = await callGemini([fnTool]);
+          droppedSearch = r.ok;
         }
       }
       const j = r.j;
@@ -2361,6 +2367,7 @@
       let textOut = parts.filter(p => typeof p.text === "string").map(p => p.text).join("\n").trim();
       const calls = parts.filter(p => p.functionCall && p.functionCall.name === "render_levels");
       textOut += cvGroundingText(cand);
+      if (droppedSearch) textOut += "\n\n(หมายเหตุ: ค้นเว็บไม่ได้ — คีย์นี้เกินโควต้าฟรีของฟีเจอร์ Google Search grounding จึงตอบแบบไม่อ้างอิงข่าวล่าสุด)";
       textOut = textOut.trim();
 
       loading.remove();
