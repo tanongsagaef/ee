@@ -402,8 +402,16 @@
         <input type="text" id="cvSymbol" placeholder="เช่น NASDAQ:AAPL, BINANCE:BTCUSDT">
       </div>
       <div class="field" style="min-width:150px;">
-        <label class="small">สัญลักษณ์ข้อมูลราคา (Twelve Data)</label>
+        <label class="small">สัญลักษณ์ข้อมูลราคา</label>
         <input type="text" id="cvDataSymbol" placeholder="เช่น AAPL, BTC/USD, EUR/USD">
+      </div>
+      <div class="field" style="min-width:150px; flex:0 0 auto;">
+        <label class="small">แหล่งข้อมูล</label>
+        <select id="cvDataSrc">
+          <option value="auto" selected>อัตโนมัติ (Twelve Data → Binance)</option>
+          <option value="twelvedata">Twelve Data เท่านั้น</option>
+          <option value="binance">Binance เท่านั้น (crypto, ไม่ต้องมี key)</option>
+        </select>
       </div>
       <div class="field" style="min-width:110px; flex:0 0 auto;">
         <label class="small">Timeframe</label>
@@ -424,13 +432,13 @@
         <button class="primary" id="cvLoadBtn">โหลดกราฟ</button>
       </div>
     </div>
-    <div id="cvMsg" class="cv-msg hidden"></div>
-
     <label class="small" style="margin-top:6px;">กราฟสด TradingView (อ้างอิง)</label>
     <div id="cvTvChart" class="tv-embed"></div>
 
     <label class="small" style="margin-top:14px;">กราฟวิเคราะห์ — AI วาดเส้นแนวรับ/แนวต้านที่นี่</label>
     <div class="cv-tf-row" id="cvTfRow"></div>
+    <div id="cvTfStatus" class="small" style="text-transform:none;font-weight:600;margin:-4px 0 6px;"></div>
+    <div id="cvMsg" class="cv-msg hidden"></div>
     <div id="cvLwChart" class="cv-lw-chart"></div>
     <div class="cv-levels-head">
       <span class="small" style="margin:0;">เส้นที่ AI วาด</span>
@@ -1943,7 +1951,7 @@
     model: "gemini-3.1-pro-preview",
   };
   const CV_LS = { levels: "cv_levels_v1", akey: "cv_gemini_key", model: "cv_model",
-                  sym: "cv_symbol", dsym: "cv_data_symbol", intv: "cv_interval" };
+                  sym: "cv_symbol", dsym: "cv_data_symbol", intv: "cv_interval", dsrc: "cv_data_src" };
 
   // Gemini function-declaration schema (OpenAPI subset, uppercase types)
   const CV_RENDER_TOOL = {
@@ -2007,11 +2015,19 @@
     });
   }
 
+  // Twelve Data wants forex/metal/crypto pairs as BASE/QUOTE (e.g. "EUR/USD"), not "EURUSD"
+  function cvNormalizeDataSymbol(s) {
+    s = (s || "").trim().toUpperCase();
+    if (!s || s.indexOf("/") !== -1 || s.indexOf(":") !== -1) return s;
+    const m = s.match(/^([A-Z]{3})(USDT|USDC|[A-Z]{3})$/);
+    return m ? m[1] + "/" + m[2] : s;
+  }
+
   function cvGuessDataSymbol(tvSym) {
     let s = (tvSym || "").trim();
     const i = s.indexOf(":");
     if (i !== -1) s = s.slice(i + 1);
-    return s.toUpperCase();
+    return cvNormalizeDataSymbol(s);
   }
 
   function cvTdTime(s) {
@@ -2036,6 +2052,27 @@
     const out = [];
     for (const c of rows) { if (!out.length || out[out.length - 1].time !== c.time) out.push(c); }
     return out;
+  }
+
+  // Free, keyless fallback for crypto pairs when Twelve Data fails (rate limit, plan restriction, etc.)
+  const CV_BINANCE_INTERVAL = {
+    "1min": "1m", "5min": "5m", "15min": "15m", "30min": "30m",
+    "1h": "1h", "2h": "2h", "4h": "4h", "1day": "1d", "1week": "1w",
+  };
+  async function cvFetchCandlesBinance(sym, interval) {
+    const bInt = CV_BINANCE_INTERVAL[interval];
+    if (!bInt) throw new Error("Binance ไม่รองรับ timeframe นี้");
+    const s = sym.replace("/", "").toUpperCase();
+    const url = "https://api.binance.com/api/v3/klines?symbol=" + encodeURIComponent(s) +
+      "&interval=" + encodeURIComponent(bInt) + "&limit=350";
+    const res = await fetch(url);
+    const j = await res.json();
+    if (!Array.isArray(j)) throw new Error((j && j.msg) || "Binance: ไม่พบข้อมูลของสัญลักษณ์นี้");
+    if (!j.length) throw new Error("Binance: ไม่พบข้อมูลของสัญลักษณ์นี้");
+    return j.map(k => ({
+      time: Math.floor(k[0] / 1000),
+      open: +k[1], high: +k[2], low: +k[3], close: +k[4],
+    }));
   }
 
   function cvDetectSwings(candles, k) {
@@ -2382,13 +2419,16 @@
   async function cvLoad() {
     const tvSym = cvEl("cvSymbol").value.trim();
     if (!cvEl("cvDataSymbol").value.trim() && tvSym) cvEl("cvDataSymbol").value = cvGuessDataSymbol(tvSym);
+    else cvEl("cvDataSymbol").value = cvNormalizeDataSymbol(cvEl("cvDataSymbol").value);
     const dSym = cvEl("cvDataSymbol").value.trim();
     const interval = cvEl("cvInterval").value;
     const tdKey = (cvEl("cvTdKey").value || "").trim();
+    const dataSrc = cvEl("cvDataSrc").value;
     try {
       localStorage.setItem(CV_LS.sym, tvSym);
       localStorage.setItem(CV_LS.dsym, dSym);
       localStorage.setItem(CV_LS.intv, interval);
+      localStorage.setItem(CV_LS.dsrc, dataSrc);
       if (tdKey) localStorage.setItem("sd_api_key", tdKey);
     } catch (e) {}
 
@@ -2401,14 +2441,36 @@
       }
     }
 
-    if (!dSym) { cvShowMsg("ใส่สัญลักษณ์ข้อมูลราคา (Twelve Data) เช่น AAPL หรือ BTC/USD"); return; }
-    if (!tdKey) { cvShowMsg("ใส่ Twelve Data API key ในส่วน 'ตั้งค่า API key' ก่อน (ใช้ร่วมกับหน้า Stock/Decide)"); return; }
+    if (!dSym) { cvShowMsg("ใส่สัญลักษณ์ข้อมูลราคา เช่น AAPL, BTC/USD, EUR/USD"); return; }
+    if (dataSrc === "twelvedata" && !tdKey) { cvShowMsg("ใส่ Twelve Data API key ในส่วน 'ตั้งค่า API key' ก่อน (ใช้ร่วมกับหน้า Stock/Decide)"); return; }
     if (!cv.series) { cvShowMsg("กราฟวิเคราะห์ยังไม่พร้อม ลองรีเฟรชหน้า (Ctrl+Shift+R)"); return; }
     cvShowMsg("");
     cvEl("cvLoadBtn").disabled = true;
     cvEl("cvLoadBtn").textContent = "กำลังโหลด…";
+    const tfBtns = document.querySelectorAll("#cvTfRow .cv-tf-btn");
+    tfBtns.forEach(b => b.disabled = true);
+    cvEl("cvTfStatus").textContent = "กำลังโหลดกราฟ " + interval + "…";
     try {
-      const candles = await cvFetchCandles(dSym, interval, tdKey);
+      let candles, binanceUsedAsFallback = false;
+      if (dataSrc === "binance") {
+        candles = await cvFetchCandlesBinance(dSym, interval);
+      } else if (dataSrc === "twelvedata") {
+        candles = await cvFetchCandles(dSym, interval, tdKey);
+      } else if (tdKey) {
+        try {
+          candles = await cvFetchCandles(dSym, interval, tdKey);
+        } catch (tdErr) {
+          try {
+            cvEl("cvTfStatus").textContent = "Twelve Data ไม่สำเร็จ กำลังลอง Binance แทน…";
+            candles = await cvFetchCandlesBinance(dSym, interval);
+            binanceUsedAsFallback = true;
+          } catch (bErr) {
+            throw tdErr;
+          }
+        }
+      } else {
+        candles = await cvFetchCandlesBinance(dSym, interval);
+      }
       cv.candles = candles;
       cv.series.setData(candles);
       cv.detectedSwings = cvDetectSwings(candles, 3);
@@ -2425,11 +2487,14 @@
       cvRestoreLevels();
       cvRedrawLevels();
       cvSyncTfActive();
+      cvEl("cvTfStatus").textContent = binanceUsedAsFallback ? "โหลดจาก Binance สำเร็จ (Twelve Data ใช้ไม่ได้ตอนนี้)" : "";
     } catch (err) {
-      cvShowMsg("โหลดข้อมูลราคาไม่สำเร็จ: " + (err.message || err));
+      cvEl("cvTfStatus").textContent = "";
+      cvShowMsg("โหลดข้อมูลราคาไม่สำเร็จ (" + interval + "): " + (err.message || err));
     } finally {
       cvEl("cvLoadBtn").disabled = false;
       cvEl("cvLoadBtn").textContent = "โหลดกราฟ";
+      tfBtns.forEach(b => b.disabled = false);
     }
   }
 
@@ -2442,6 +2507,8 @@
       cvEl("cvDataSymbol").value = localStorage.getItem(CV_LS.dsym) || "";
       const si = localStorage.getItem(CV_LS.intv);
       if (si) cvEl("cvInterval").value = si;
+      const dsrc = localStorage.getItem(CV_LS.dsrc);
+      if (dsrc) cvEl("cvDataSrc").value = dsrc;
       cvEl("cvGeminiKey").value = localStorage.getItem(CV_LS.akey) || "";
       cv.model = localStorage.getItem(CV_LS.model) || "gemini-3.1-pro-preview";
       if (/^gemini-(1\.|2\.0|2\.5-pro)/.test(cv.model)) cv.model = "gemini-3.1-pro-preview";
@@ -2482,6 +2549,10 @@
       cvSyncTfActive();
       try { localStorage.setItem(CV_LS.intv, cvEl("cvInterval").value); } catch (e) {}
       if (cv.candles.length) cvLoad();
+    });
+    cvEl("cvDataSrc").addEventListener("change", () => {
+      try { localStorage.setItem(CV_LS.dsrc, cvEl("cvDataSrc").value); } catch (e) {}
+      if (cv.candles.length || cvEl("cvDataSymbol").value.trim()) cvLoad();
     });
     cvSyncTfActive();
     cvEl("cvChatSend").addEventListener("click", () => cvSend(cvEl("cvChatInput").value));
