@@ -440,15 +440,17 @@
   </div>
 
   <div class="panel">
-    <h3>ถาม AI (Gemini) เรื่องแนวรับ-ต้าน / swing high-low</h3>
+    <h3>ถาม AI (Gemini) — แนวรับ-ต้าน · วิเคราะห์ · คาดการณ์ · ข่าว</h3>
     <div id="cvChatLog" class="cv-chat-log"></div>
     <div class="cv-quick">
       <button class="ghost cv-quick-btn" data-q="ช่วยหาแนวรับและแนวต้านที่สำคัญของกราฟนี้ พร้อมบอกความแข็งแรงของแต่ละเส้น แล้ววาดเส้นให้ด้วย">หาแนวรับ-แนวต้าน</button>
       <button class="ghost cv-quick-btn" data-q="ช่วยหา swing high และ swing low ที่สำคัญล่าสุด แล้วมาร์กให้บนกราฟ">หา swing high/low</button>
       <button class="ghost cv-quick-btn" data-q="สรุปแนวโน้มตอนนี้ (ขาขึ้น/ขาลง/ออกข้าง) และโซนที่ควรจับตา">แนวโน้มตอนนี้</button>
+      <button class="ghost cv-quick-btn" data-q="ช่วยประเมินฉากทัศน์ราคา 1-2 สัปดาห์ข้างหน้าแบบมีเงื่อนไข (ถ้าหลุด/ยืนแนวไหนแล้วไปทางไหน)">คาดการณ์แบบมีเงื่อนไข</button>
+      <button class="ghost cv-quick-btn" data-q="ค้นเว็บ: มีข่าว ปัจจัยพื้นฐาน หรือ catalyst อะไรที่กระทบสินทรัพย์นี้ในช่วง 1-2 สัปดาห์นี้บ้าง สรุปพร้อมแหล่งอ้างอิง">ข่าว/ปัจจัยล่าสุด</button>
     </div>
     <div class="cv-chat-input">
-      <textarea id="cvChatInput" rows="2" placeholder="พิมพ์คำถาม เช่น 'แนวรับถัดไปอยู่ตรงไหน'"></textarea>
+      <textarea id="cvChatInput" rows="2" placeholder="ถามได้ทั้งแนวรับ-ต้าน แนวโน้ม คาดการณ์ ข่าว เช่น 'สัปดาห์นี้มีข่าวอะไร'"></textarea>
       <button class="primary" id="cvChatSend">ส่ง</button>
     </div>
 
@@ -2175,7 +2177,20 @@
 
   function cvBuildSystem() {
     const c = cv.candles;
-    if (!c.length) return "You are a trading chart analyst. Reply in Thai. No price data is loaded yet; ask the user to load a chart first.";
+    const sym = cvEl("cvDataSymbol").value.trim() || "(ยังไม่ได้เลือก)";
+    const common = [
+      "You are a markets analyst assistant for a trader. Reply in THAI, concise and practical.",
+      "Symbol: " + sym + " | Timeframe: " + cvEl("cvInterval").value,
+      "",
+      "You can answer ANY market question: support/resistance, trend, scenario forecasts,",
+      "why a move happened, macro/news, earnings, comparisons. For anything that needs current or",
+      "recent information (news, today's move, latest events, upcoming catalysts) USE Google Search",
+      "and cite what you found. Forecasts must be framed as conditional scenarios (if X then Y), not certainties.",
+      "Everything here is analysis, NOT financial advice.",
+      "When the user asks for price levels, call the render_levels function (support/resistance as",
+      "`levels`, reversal points as `swings`) AND also give a short Thai explanation in the same reply.",
+    ].join("\n");
+    if (!c.length) return common + "\n\n(ยังไม่ได้โหลดข้อมูลราคาลงกราฟ — ถ้าคำถามต้องใช้ราคาย้อนหลัง ให้บอกผู้ใช้กด 'โหลดกราฟ' ก่อน)";
     const last = c[c.length - 1];
     const sw = cv.detectedSwings;
     const recent = c.slice(-20).map(x =>
@@ -2186,16 +2201,11 @@
       sw.highs.map(x => x.price).concat(sw.lows.map(x => x.price))
     ).slice(0, 8).map(x => x.price.toFixed(4) + " ×" + x.touches).join("\n") || "(none)";
     return [
-      "You are a professional price-chart analyst helping a trader.",
-      "Symbol: " + cvEl("cvDataSymbol").value.trim() + " | Timeframe: " + cvEl("cvInterval").value,
+      common,
       "",
-      "Reply in THAI, concise and practical. When you identify price levels you MUST call the render_levels function",
-      "(support/resistance as `levels`, notable reversal points as `swings`). In the SAME reply, also write a short Thai",
-      "text explanation of your reasoning and how to trade around the levels — never return only the function call.",
       "Only use numbers grounded in the data below; do not invent precision.",
-      "This is analysis, not financial advice.",
       "",
-      "=== DATA (oldest first) ===",
+      "=== PRICE DATA (oldest first) ===",
       "Current price (last close): " + last.close,
       "Bars: " + c.length + " from " + cvFmtDate(c[0].time) + " to " + cvFmtDate(last.time),
       "",
@@ -2248,12 +2258,24 @@
     }
   }
 
+  function cvGroundingText(cand) {
+    const gm = cand && cand.groundingMetadata;
+    const chunks = (gm && gm.groundingChunks) || [];
+    const seen = {}, lines = [];
+    chunks.forEach(c => {
+      const w = c.web || c.retrievedContext || {};
+      if (w.uri && !seen[w.uri]) { seen[w.uri] = 1; lines.push("• " + (w.title || w.uri)); }
+    });
+    return lines.length ? "\n\nแหล่งข้อมูล (ค้นเว็บ):\n" + lines.slice(0, 5).join("\n") : "";
+  }
+
   async function cvSend(text) {
     text = (text || "").trim();
     if (!text) return;
     const key = (cvEl("cvGeminiKey").value || "").trim();
     if (!key) { cvShowMsg("ใส่ Google Gemini API key ในส่วน 'ตั้งค่า API key' ก่อน (ขอฟรีที่ aistudio.google.com/apikey)"); return; }
-    if (!cv.candles.length) { cvShowMsg("กด  'โหลดกราฟ' ให้มีข้อมูลราคาก่อนถาม AI"); return; }
+    const drawFocused = /วาด|เส้น|แนวรับ|แนวต้าน|swing|support|resist/i.test(text);
+    if (drawFocused && !cv.candles.length) { cvShowMsg("กด  'โหลดกราฟ' ให้มีข้อมูลราคาก่อนให้ AI วาดเส้น"); return; }
     cvShowMsg("");
 
     cvAddBubble("user", text);
@@ -2264,29 +2286,41 @@
     cvEl("cvChatSend").disabled = true;
 
     try {
-      const body = {
-        system_instruction: { parts: [{ text: cvBuildSystem() }] },
-        contents: cv.messages,
-        tools: [{ function_declarations: [CV_RENDER_TOOL] }],
-        tool_config: { function_calling_config: { mode: "AUTO" } },
-        generationConfig: { maxOutputTokens: 8192, temperature: 0.4 },
-      };
-      const res = await fetch(
-        "https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(cv.model) + ":generateContent",
-        {
-          method: "POST",
-          headers: { "content-type": "application/json", "x-goog-api-key": key },
-          body: JSON.stringify(body),
+      async function callGemini(tools) {
+        const body = {
+          system_instruction: { parts: [{ text: cvBuildSystem() }] },
+          contents: cv.messages,
+          tools: tools,
+          generationConfig: { maxOutputTokens: 8192, temperature: 0.4 },
+        };
+        const res = await fetch(
+          "https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(cv.model) + ":generateContent",
+          { method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": key }, body: JSON.stringify(body) }
+        );
+        const j = await res.json();
+        return { ok: res.ok, status: res.status, j: j };
+      }
+
+      const fnTool = { function_declarations: [CV_RENDER_TOOL] };
+      const searchTool = { google_search: {} };
+      let r = await callGemini(drawFocused ? [fnTool] : [fnTool, searchTool]);
+      if (!r.ok) {
+        const em = String((r.j && r.j.error && r.j.error.message) || "");
+        // some model versions reject search + function together — retry search-only
+        if (!drawFocused && /google_?search|search tool|combin|together|not supported with/i.test(em)) {
+          r = await callGemini([searchTool]);
         }
-      );
-      const j = await res.json();
-      if (!res.ok) throw new Error((j && j.error && j.error.message) || ("HTTP " + res.status));
+      }
+      const j = r.j;
+      if (!r.ok) throw new Error((j && j.error && j.error.message) || ("HTTP " + r.status));
       if (j.promptFeedback && j.promptFeedback.blockReason) throw new Error("ถูกบล็อกโดยตัวกรอง: " + j.promptFeedback.blockReason);
 
       const cand = (j.candidates && j.candidates[0]) || null;
       const parts = (cand && cand.content && Array.isArray(cand.content.parts)) ? cand.content.parts : [];
-      const textOut = parts.filter(p => typeof p.text === "string").map(p => p.text).join("\n").trim();
+      let textOut = parts.filter(p => typeof p.text === "string").map(p => p.text).join("\n").trim();
       const calls = parts.filter(p => p.functionCall && p.functionCall.name === "render_levels");
+      textOut += cvGroundingText(cand);
+      textOut = textOut.trim();
 
       loading.remove();
       if (textOut) cvAddBubble("ai", textOut);
