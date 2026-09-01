@@ -106,8 +106,13 @@
   .grade-btn.active[data-grade="E"] { background: var(--bear-soft); border-color: var(--bear); color: var(--bear); }
 
   /* tradingview link */
-  .tv-link-btn { display: inline-flex; align-items: center; gap: 6px; background: var(--accent-soft); border: 1px solid rgba(79,70,229,0.3); color: var(--accent); padding: 8px 14px; border-radius: 8px; font-size: 12.5px; font-weight: 700; text-decoration: none; margin: 6px 0; }
+  .tv-link-btn { display: inline-flex; align-items: center; gap: 6px; background: var(--accent-soft); border: 1px solid rgba(79,70,229,0.3); color: var(--accent); padding: 8px 14px; border-radius: 8px; font-size: 12.5px; font-weight: 700; text-decoration: none; margin: 6px 0; cursor: pointer; font-family: inherit; }
   .tv-link-btn:hover { background: var(--accent); color: #fff; }
+
+  /* embedded tradingview live chart */
+  .tv-embed { height: 440px; margin: 8px 0; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--surface-alt); }
+  .tv-embed.tv-embed-card { height: 360px; }
+  .tv-embed .empty { padding: 20px; }
 
   /* checkbox row */
   .check-row { display: flex; flex-wrap: wrap; gap: 14px; }
@@ -487,8 +492,15 @@
     </div>
 
     <div class="field">
-      <label class="small">ลิงก์ TradingView (ถ้ามี)</label>
+      <label class="small">ลิงก์ TradingView (สแนปช็อต ถ้ามี)</label>
       <input type="text" id="tfTvLink" placeholder="https://www.tradingview.com/x/xxxxxxxx/">
+    </div>
+
+    <div class="field">
+      <label class="small">TradingView Symbol (ฝังกราฟสด)</label>
+      <input type="text" id="tfTvSymbol" placeholder="เช่น SET:PTT, BINANCE:BTCUSDT, NASDAQ:AAPL, FX:EURUSD">
+      <button type="button" class="ghost" id="tfTvPreviewBtn" style="margin-top:8px;">📈 แสดง / ซ่อนกราฟสด</button>
+      <div id="tfTvChart" class="tv-embed hidden"></div>
     </div>
 
     <div class="field">
@@ -527,6 +539,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://s3.tradingview.com/tv.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
@@ -798,6 +811,46 @@
   const dayModal = document.getElementById("dayModal");
   let dayModalDate = null;
 
+  /* ---------- embedded TradingView live chart ---------- */
+  function tvSymbolFor(src) {
+    let s = ((src && (src.tvSymbol || src.symbol)) || "").trim();
+    if (!s) return "";
+    if (s.indexOf(":") !== -1) return s.toUpperCase();
+    return s.replace(/[\s/]+/g, "").toUpperCase();
+  }
+  function renderTvWidget(containerId, symbol) {
+    const el = document.getElementById(containerId);
+    if (!el) return;
+    el.innerHTML = "";
+    if (!symbol) { el.innerHTML = '<div class="empty">ยังไม่ได้ระบุ symbol สำหรับฝังกราฟ</div>'; return; }
+    if (!window.TradingView || !window.TradingView.widget) {
+      el.innerHTML = '<div class="empty">โหลดสคริปต์ TradingView ไม่สำเร็จ (ตรวจอินเทอร์เน็ต)</div>';
+      return;
+    }
+    const theme = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+    new TradingView.widget({
+      container_id: containerId,
+      autosize: true,
+      symbol: symbol,
+      interval: "D",
+      timezone: "Asia/Bangkok",
+      theme: theme,
+      style: "1",
+      locale: "th",
+      withdateranges: true,
+      allow_symbol_change: true,
+      hide_side_toolbar: false,
+      details: false,
+    });
+  }
+  function toggleTvEmbed(box, symbol) {
+    if (!box) return;
+    if (!box.classList.contains("hidden")) { box.classList.add("hidden"); box.innerHTML = ""; return; }
+    box.classList.remove("hidden");
+    if (!box.id) box.id = "tv_" + Math.random().toString(36).slice(2);
+    renderTvWidget(box.id, symbol);
+  }
+
   function tradeCardHtml(t) {
     const details = [];
     if (t.marketType === "forex") {
@@ -836,7 +889,8 @@
       <div class="trade-card-symbol">${escapeHtml(t.symbol || "—")}</div>
       ${imgBefore ? `<div class="trade-card-detail" style="margin-bottom:6px;"><span>ก่อนเข้าเทรด</span></div><img class="trade-card-image" src="${imgBefore}">` : ""}
       ${imgAfter ? `<div class="trade-card-detail" style="margin:6px 0;"><span>หลังเทรดเสร็จ</span></div><img class="trade-card-image" src="${imgAfter}">` : ""}
-      ${t.tvLink ? `<a class="tv-link-btn" href="${escapeHtml(t.tvLink)}" target="_blank" rel="noopener">📈 เปิดกราฟ TradingView ↗</a>` : ""}
+      ${tvSymbolFor(t) ? `<button type="button" class="tv-link-btn tv-embed-toggle" data-sym="${escapeHtml(tvSymbolFor(t))}">📈 กราฟสด TradingView</button><div class="tv-embed tv-embed-card hidden" data-tv-card></div>` : ""}
+      ${t.tvLink ? `<a class="tv-link-btn" href="${escapeHtml(t.tvLink)}" target="_blank" rel="noopener">🖼️ เปิดสแนปช็อต ↗</a>` : ""}
       ${details.length ? `<div class="trade-card-details">${details.map(([k, v]) => `<div class="trade-card-detail"><span>${k}</span><span class="mono">${escapeHtml(String(v))}</span></div>`).join("")}</div>` : ""}
       ${flags.length ? `<div class="trade-card-tags-row">${flags.map(f => `<span class="flag-badge">${f}</span>`).join("")}</div>` : ""}
       ${posTags.length ? `<div class="trade-card-tags-row">${posTags.map(tag => `<span class="tag-chip positive">${escapeHtml(tag)}</span>`).join("")}</div>` : ""}
@@ -867,6 +921,12 @@
     });
     document.querySelectorAll("#dayModalTrades .trade-card-image").forEach(img => {
       img.addEventListener("click", () => openLightbox(img.src));
+    });
+    document.querySelectorAll("#dayModalTrades .tv-embed-toggle").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const box = btn.closest(".trade-card").querySelector("[data-tv-card]");
+        toggleTvEmbed(box, btn.dataset.sym);
+      });
     });
 
     dayModal.classList.add("open");
@@ -1363,6 +1423,10 @@
     document.getElementById("tfTags").value = t ? (t.tags || []).join(", ") : "";
     document.getElementById("tfNegTags").value = t ? (t.negTags || []).join(", ") : "";
     document.getElementById("tfTvLink").value = t ? (t.tvLink || "") : "";
+    document.getElementById("tfTvSymbol").value = t ? (t.tvSymbol || "") : "";
+    const tfTvChart = document.getElementById("tfTvChart");
+    tfTvChart.classList.add("hidden");
+    tfTvChart.innerHTML = "";
     document.getElementById("tfNotes").value = t ? (t.notes || "") : "";
     currentImageBefore = t ? (t.imageBefore || null) : null;
     currentImageAfter = t ? (t.imageAfter || t.image || null) : null; // t.image = legacy single-image field
@@ -1377,12 +1441,22 @@
   function closeTradeModal() {
     tradeModal.classList.remove("open");
     editingId = null;
+    const tfTvChart = document.getElementById("tfTvChart");
+    tfTvChart.classList.add("hidden");
+    tfTvChart.innerHTML = "";
   }
 
   document.getElementById("addTradeBtn").addEventListener("click", () => openTradeModal(null));
   document.getElementById("tradeModalClose").addEventListener("click", closeTradeModal);
   document.getElementById("tradeCancelBtn").addEventListener("click", closeTradeModal);
   tradeModal.addEventListener("click", (e) => { if (e.target === tradeModal) closeTradeModal(); });
+
+  document.getElementById("tfTvPreviewBtn").addEventListener("click", () => {
+    toggleTvEmbed(document.getElementById("tfTvChart"), tvSymbolFor({
+      tvSymbol: document.getElementById("tfTvSymbol").value,
+      symbol: document.getElementById("tfSymbol").value,
+    }));
+  });
 
   document.getElementById("tradeSaveBtn").addEventListener("click", () => {
     const isEdit = !!editingId;
@@ -1421,6 +1495,7 @@
       imageBefore: currentImageBefore,
       imageAfter: currentImageAfter,
       tvLink: document.getElementById("tfTvLink").value.trim(),
+      tvSymbol: document.getElementById("tfTvSymbol").value.trim(),
       notes: document.getElementById("tfNotes").value.trim(),
       createdAt: editingId ? (trades.find(x => x.id === editingId) || {}).createdAt || Date.now() : Date.now(),
     };
