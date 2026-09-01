@@ -114,6 +114,30 @@
   .tv-embed.tv-embed-card { height: 360px; }
   .tv-embed .empty { padding: 20px; }
 
+  /* chart + AI tab */
+  .cv-controls { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
+  .cv-msg { margin-top: 10px; padding: 9px 12px; border-radius: 8px; font-size: 12.5px; background: var(--bear-soft); color: var(--bear); border: 1px solid var(--bear); }
+  .cv-lw-chart { height: 380px; margin: 6px 0 4px; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--surface); }
+  .cv-levels-head { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; }
+  .cv-levels { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+  .cv-level-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; background: var(--surface-alt); border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; }
+  .cv-level-dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; }
+  .cv-level-item .mono { font-weight: 700; }
+  .cv-level-item .cv-level-note { color: var(--muted); flex: 1; }
+  .cv-level-item button { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 13px; }
+  .cv-level-item button:hover { color: var(--bear); }
+  .cv-chat-log { display: flex; flex-direction: column; gap: 10px; max-height: 380px; overflow-y: auto; padding: 4px; }
+  .cv-bubble { padding: 10px 13px; border-radius: 12px; font-size: 13px; line-height: 1.55; white-space: pre-wrap; max-width: 90%; }
+  .cv-bubble.user { align-self: flex-end; background: var(--accent-soft); color: var(--text); border: 1px solid var(--border); }
+  .cv-bubble.ai { align-self: flex-start; background: var(--surface-alt); border: 1px solid var(--border); }
+  .cv-bubble.ai.loading { color: var(--muted); font-style: italic; }
+  .cv-quick { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0 8px; }
+  .cv-quick-btn { font-size: 12px; padding: 6px 12px; }
+  .cv-chat-input { display: flex; gap: 8px; align-items: flex-end; }
+  .cv-chat-input textarea { flex: 1; }
+  .cv-settings { margin-top: 16px; border-top: 1px solid var(--border); padding-top: 12px; }
+  .cv-settings summary { cursor: pointer; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; }
+
   /* checkbox row */
   .check-row { display: flex; flex-wrap: wrap; gap: 14px; }
   .check-item { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600; color: var(--text); cursor: pointer; }
@@ -298,6 +322,7 @@
   <button class="tab-btn active" data-tab="calendar">ปฏิทิน</button>
   <button class="tab-btn" data-tab="overview">ภาพรวม</button>
   <button class="tab-btn" data-tab="log">บันทึกเทรด</button>
+  <button class="tab-btn" data-tab="chart">กราฟ + AI</button>
 </div>
 
 <!-- CALENDAR TAB -->
@@ -361,6 +386,90 @@
       </div>
     </div>
     <div id="logTableWrap" style="margin-top:12px;"></div>
+  </div>
+</div>
+
+<!-- CHART + AI TAB -->
+<div id="tab-chart" class="hidden">
+  <div class="panel">
+    <div class="cv-controls">
+      <div class="field" style="min-width:170px;">
+        <label class="small">TradingView Symbol</label>
+        <input type="text" id="cvSymbol" placeholder="เช่น NASDAQ:AAPL, BINANCE:BTCUSDT">
+      </div>
+      <div class="field" style="min-width:150px;">
+        <label class="small">สัญลักษณ์ข้อมูลราคา (Twelve Data)</label>
+        <input type="text" id="cvDataSymbol" placeholder="เช่น AAPL, BTC/USD, EUR/USD">
+      </div>
+      <div class="field" style="min-width:110px; flex:0 0 auto;">
+        <label class="small">Timeframe</label>
+        <select id="cvInterval">
+          <option value="1min">1 นาที</option>
+          <option value="5min">5 นาที</option>
+          <option value="15min">15 นาที</option>
+          <option value="30min">30 นาที</option>
+          <option value="1h">1 ชม.</option>
+          <option value="2h">2 ชม.</option>
+          <option value="4h">4 ชม.</option>
+          <option value="1day" selected>1 วัน</option>
+          <option value="1week">1 สัปดาห์</option>
+        </select>
+      </div>
+      <div class="field" style="flex:0 0 auto;">
+        <label class="small">&nbsp;</label>
+        <button class="primary" id="cvLoadBtn">โหลดกราฟ</button>
+      </div>
+    </div>
+    <div id="cvMsg" class="cv-msg hidden"></div>
+
+    <label class="small" style="margin-top:6px;">กราฟสด TradingView (อ้างอิง)</label>
+    <div id="cvTvChart" class="tv-embed"></div>
+
+    <label class="small" style="margin-top:14px;">กราฟวิเคราะห์ — AI วาดเส้นแนวรับ/แนวต้านที่นี่</label>
+    <div id="cvLwChart" class="cv-lw-chart"></div>
+    <div class="cv-levels-head">
+      <span class="small" style="margin:0;">เส้นที่ AI วาด</span>
+      <button class="ghost" id="cvClearLevels" style="padding:4px 10px;font-size:12px;">ล้างเส้นทั้งหมด</button>
+    </div>
+    <div id="cvLevels" class="cv-levels"></div>
+  </div>
+
+  <div class="panel">
+    <h3>ถาม AI (Claude) เรื่องแนวรับ-ต้าน / swing high-low</h3>
+    <div id="cvChatLog" class="cv-chat-log"></div>
+    <div class="cv-quick">
+      <button class="ghost cv-quick-btn" data-q="ช่วยหาแนวรับและแนวต้านที่สำคัญของกราฟนี้ พร้อมบอกความแข็งแรงของแต่ละเส้น แล้ววาดเส้นให้ด้วย">หาแนวรับ-แนวต้าน</button>
+      <button class="ghost cv-quick-btn" data-q="ช่วยหา swing high และ swing low ที่สำคัญล่าสุด แล้วมาร์กให้บนกราฟ">หา swing high/low</button>
+      <button class="ghost cv-quick-btn" data-q="สรุปแนวโน้มตอนนี้ (ขาขึ้น/ขาลง/ออกข้าง) และโซนที่ควรจับตา">แนวโน้มตอนนี้</button>
+    </div>
+    <div class="cv-chat-input">
+      <textarea id="cvChatInput" rows="2" placeholder="พิมพ์คำถาม เช่น 'แนวรับถัดไปอยู่ตรงไหน'"></textarea>
+      <button class="primary" id="cvChatSend">ส่ง</button>
+    </div>
+
+    <details class="cv-settings">
+      <summary>ตั้งค่า API key</summary>
+      <div class="field" style="margin-top:10px;">
+        <label class="small">Anthropic API key (ขึ้นต้น sk-ant-...)</label>
+        <input type="password" id="cvAnthropicKey" placeholder="sk-ant-...">
+      </div>
+      <div class="row">
+        <div class="field" style="min-width:150px;">
+          <label class="small">โมเดล</label>
+          <select id="cvModel">
+            <option value="claude-opus-5">Claude Opus 5 (เก่งสุด แพงสุด)</option>
+            <option value="claude-sonnet-5">Claude Sonnet 5 (สมดุล)</option>
+            <option value="claude-haiku-4-5">Claude Haiku 4.5 (เร็ว ถูก)</option>
+          </select>
+        </div>
+        <div class="field" style="min-width:150px;">
+          <label class="small">Twelve Data API key (ใช้ร่วมกับหน้า Stock/Decide)</label>
+          <input type="password" id="cvTdKey" placeholder="Twelve Data key">
+        </div>
+      </div>
+      <button class="ghost" id="cvSaveKeys">บันทึกการตั้งค่า</button>
+      <p class="small" style="text-transform:none;letter-spacing:0;font-weight:400;margin:8px 0 0;">คีย์ทั้งหมดเก็บไว้ในเบราว์เซอร์เครื่องนี้เท่านั้น (localStorage) ไม่ถูกส่งไปที่อื่นนอกจาก API ของผู้ให้บริการโดยตรง</p>
+    </details>
   </div>
 </div>
 
@@ -540,6 +649,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="https://s3.tradingview.com/tv.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
@@ -653,6 +763,7 @@
   document.getElementById("themeToggle").addEventListener("click", () => {
     const current = root.getAttribute("data-theme");
     applyTheme(current === "dark" ? "light" : "dark");
+    if (typeof cvApplyTheme === "function") cvApplyTheme();
   });
 
   /* ---------- tabs ---------- */
@@ -664,8 +775,10 @@
     document.getElementById("tab-calendar").classList.toggle("hidden", tab !== "calendar");
     document.getElementById("tab-overview").classList.toggle("hidden", tab !== "overview");
     document.getElementById("tab-log").classList.toggle("hidden", tab !== "log");
+    document.getElementById("tab-chart").classList.toggle("hidden", tab !== "chart");
     if (tab === "overview") renderOverview();
     if (tab === "log") renderLog();
+    if (tab === "chart") initChartTab();
   }
 
   /* ---------- calendar ---------- */
@@ -1814,6 +1927,454 @@
         statusEl.classList.add("hidden");
       }
     });
+  }
+
+  /* ================= CHART + AI TAB ================= */
+  const cv = {
+    inited: false, chart: null, series: null,
+    candles: [], priceLines: [], detectedSwings: { highs: [], lows: [] },
+    levels: [], swings: [], messages: [],
+    model: "claude-opus-5",
+  };
+  const CV_LS = { levels: "cv_levels_v1", akey: "cv_anthropic_key", model: "cv_model",
+                  sym: "cv_symbol", dsym: "cv_data_symbol", intv: "cv_interval" };
+
+  const CV_RENDER_TOOL = {
+    name: "render_levels",
+    description: "วาดเส้นแนวรับ/แนวต้าน และมาร์กจุด swing high/low ลงบนกราฟวิเคราะห์ของผู้ใช้ เรียกใช้ทุกครั้งที่ระบุระดับราคาที่สำคัญ",
+    input_schema: {
+      type: "object",
+      properties: {
+        levels: {
+          type: "array",
+          description: "เส้นแนวรับ/แนวต้านแนวนอน",
+          items: {
+            type: "object",
+            properties: {
+              price: { type: "number" },
+              kind: { type: "string", enum: ["support", "resistance"] },
+              strength: { type: "integer", description: "1=อ่อน, 2=ปานกลาง, 3=แข็งแรง" },
+              note: { type: "string", description: "คำอธิบายสั้น ๆ เช่น 'ฐานเดือน ก.ย.'" },
+            },
+            required: ["price", "kind"],
+          },
+        },
+        swings: {
+          type: "array",
+          description: "จุดกลับตัวสำคัญ (swing high / swing low)",
+          items: {
+            type: "object",
+            properties: {
+              price: { type: "number" },
+              kind: { type: "string", enum: ["high", "low"] },
+              note: { type: "string" },
+            },
+            required: ["price", "kind"],
+          },
+        },
+      },
+      required: ["levels"],
+    },
+  };
+
+  function cvEl(id) { return document.getElementById(id); }
+  function cvShowMsg(text) {
+    const m = cvEl("cvMsg");
+    if (!text) { m.classList.add("hidden"); m.textContent = ""; return; }
+    m.textContent = text; m.classList.remove("hidden");
+  }
+  function cvThemeOpts() {
+    const dark = document.documentElement.getAttribute("data-theme") === "dark";
+    return dark
+      ? { bg: "#171923", text: "#9a9db3", grid: "#2a2d3a" }
+      : { bg: "#ffffff", text: "#6b7080", grid: "#e5e7f0" };
+  }
+  function cvApplyTheme() {
+    if (!cv.chart) return;
+    const t = cvThemeOpts();
+    cv.chart.applyOptions({
+      layout: { background: { color: t.bg }, textColor: t.text },
+      grid: { vertLines: { color: t.grid }, horzLines: { color: t.grid } },
+      rightPriceScale: { borderColor: t.grid },
+      timeScale: { borderColor: t.grid },
+    });
+  }
+
+  function cvGuessDataSymbol(tvSym) {
+    let s = (tvSym || "").trim();
+    const i = s.indexOf(":");
+    if (i !== -1) s = s.slice(i + 1);
+    return s.toUpperCase();
+  }
+
+  function cvTdTime(s) {
+    s = String(s).trim();
+    const iso = s.length <= 10 ? s + "T00:00:00Z" : s.replace(" ", "T") + "Z";
+    return Math.floor(Date.parse(iso) / 1000);
+  }
+
+  async function cvFetchCandles(sym, interval, key) {
+    const url = "https://api.twelvedata.com/time_series?symbol=" + encodeURIComponent(sym) +
+      "&interval=" + encodeURIComponent(interval) + "&outputsize=350&order=ASC&apikey=" + encodeURIComponent(key);
+    const res = await fetch(url);
+    const j = await res.json();
+    if (j.status === "error" || (j.code && j.code !== 200)) throw new Error(j.message || "ดึงข้อมูลราคาไม่สำเร็จ");
+    if (!Array.isArray(j.values) || !j.values.length) throw new Error("ไม่พบข้อมูลราคาของสัญลักษณ์นี้");
+    const rows = j.values.map(v => ({
+      time: cvTdTime(v.datetime),
+      open: +v.open, high: +v.high, low: +v.low, close: +v.close,
+    })).filter(c => Number.isFinite(c.time) && Number.isFinite(c.close));
+    rows.sort((a, b) => a.time - b.time);
+    const out = [];
+    for (const c of rows) { if (!out.length || out[out.length - 1].time !== c.time) out.push(c); }
+    return out;
+  }
+
+  function cvDetectSwings(candles, k) {
+    k = k || 3;
+    const highs = [], lows = [];
+    for (let i = k; i < candles.length - k; i++) {
+      let isH = true, isL = true;
+      for (let j = i - k; j <= i + k; j++) {
+        if (j === i) continue;
+        if (candles[j].high >= candles[i].high) isH = false;
+        if (candles[j].low <= candles[i].low) isL = false;
+      }
+      if (isH) highs.push({ time: candles[i].time, price: candles[i].high });
+      if (isL) lows.push({ time: candles[i].time, price: candles[i].low });
+    }
+    return { highs, lows };
+  }
+
+  function cvClusterLevels(prices, tolPct) {
+    tolPct = tolPct || 0.6;
+    const sorted = prices.slice().sort((a, b) => a - b);
+    const clusters = [];
+    for (const p of sorted) {
+      const last = clusters[clusters.length - 1];
+      if (last && Math.abs(p - last.mean) / last.mean * 100 <= tolPct) {
+        last.prices.push(p);
+        last.mean = last.prices.reduce((s, x) => s + x, 0) / last.prices.length;
+      } else clusters.push({ prices: [p], mean: p });
+    }
+    return clusters.map(c => ({ price: c.mean, touches: c.prices.length }))
+      .sort((a, b) => b.touches - a.touches);
+  }
+
+  function cvFmtDate(t) {
+    const d = new Date(t * 1000);
+    return d.toISOString().slice(0, 16).replace("T", " ");
+  }
+
+  function cvRedrawLevels() {
+    if (!cv.series) return;
+    cv.priceLines.forEach(pl => { try { cv.series.removePriceLine(pl); } catch (e) {} });
+    cv.priceLines = [];
+    const LS = (window.LightweightCharts && LightweightCharts.LineStyle) || { Dashed: 2, Dotted: 1 };
+    cv.levels.forEach(lv => {
+      const sup = lv.kind === "support";
+      cv.priceLines.push(cv.series.createPriceLine({
+        price: +lv.price,
+        color: sup ? "#16a34a" : "#dc2626",
+        lineWidth: Math.max(1, Math.min(4, lv.strength || 1)),
+        lineStyle: LS.Dashed,
+        axisLabelVisible: true,
+        title: (sup ? "S" : "R") + (lv.note ? " " + String(lv.note).slice(0, 16) : ""),
+      }));
+    });
+    cv.swings.forEach(sw => {
+      cv.priceLines.push(cv.series.createPriceLine({
+        price: +sw.price,
+        color: sw.kind === "high" ? "#d97706" : "#2563eb",
+        lineWidth: 1,
+        lineStyle: LS.Dotted,
+        axisLabelVisible: true,
+        title: (sw.kind === "high" ? "SwH" : "SwL") + (sw.note ? " " + String(sw.note).slice(0, 14) : ""),
+      }));
+    });
+
+    const box = cvEl("cvLevels");
+    const items = cv.levels.map((lv, i) => ({ t: "level", i, lv }))
+      .concat(cv.swings.map((sw, i) => ({ t: "swing", i, sw })));
+    if (!items.length) { box.innerHTML = '<div class="small" style="margin:0;text-transform:none;letter-spacing:0;font-weight:400;">ยังไม่มีเส้น — ลองถาม AI ด้านล่าง</div>'; return; }
+    box.innerHTML = items.map(it => {
+      if (it.t === "level") {
+        const sup = it.lv.kind === "support";
+        return `<div class="cv-level-item">
+          <span class="cv-level-dot" style="background:${sup ? "#16a34a" : "#dc2626"}"></span>
+          <span class="mono">${escapeHtml(String(it.lv.price))}</span>
+          <span>${sup ? "แนวรับ" : "แนวต้าน"}${it.lv.strength ? " ·" + "★".repeat(Math.min(3, it.lv.strength)) : ""}</span>
+          <span class="cv-level-note">${escapeHtml(it.lv.note || "")}</span>
+          <button data-cvdel="level" data-i="${it.i}" title="ลบเส้นนี้">✕</button>
+        </div>`;
+      }
+      return `<div class="cv-level-item">
+        <span class="cv-level-dot" style="background:${it.sw.kind === "high" ? "#d97706" : "#2563eb"}"></span>
+        <span class="mono">${escapeHtml(String(it.sw.price))}</span>
+        <span>${it.sw.kind === "high" ? "swing high" : "swing low"}</span>
+        <span class="cv-level-note">${escapeHtml(it.sw.note || "")}</span>
+        <button data-cvdel="swing" data-i="${it.i}" title="ลบเส้นนี้">✕</button>
+      </div>`;
+    }).join("");
+    box.querySelectorAll("[data-cvdel]").forEach(b => {
+      b.addEventListener("click", () => {
+        const arr = b.dataset.cvdel === "level" ? cv.levels : cv.swings;
+        arr.splice(+b.dataset.i, 1);
+        cvPersistLevels();
+        cvRedrawLevels();
+      });
+    });
+  }
+
+  function cvPersistLevels() {
+    try {
+      localStorage.setItem(CV_LS.levels, JSON.stringify({
+        symbol: cvEl("cvDataSymbol").value.trim().toUpperCase(),
+        interval: cvEl("cvInterval").value,
+        levels: cv.levels, swings: cv.swings,
+      }));
+    } catch (e) {}
+  }
+  function cvRestoreLevels() {
+    cv.levels = []; cv.swings = [];
+    try {
+      const saved = JSON.parse(localStorage.getItem(CV_LS.levels) || "null");
+      if (saved && saved.symbol === cvEl("cvDataSymbol").value.trim().toUpperCase() &&
+          saved.interval === cvEl("cvInterval").value) {
+        cv.levels = Array.isArray(saved.levels) ? saved.levels : [];
+        cv.swings = Array.isArray(saved.swings) ? saved.swings : [];
+      }
+    } catch (e) {}
+  }
+
+  function cvAddBubble(role, text, cls) {
+    const log = cvEl("cvChatLog");
+    const d = document.createElement("div");
+    d.className = "cv-bubble " + (role === "user" ? "user" : "ai") + (cls ? " " + cls : "");
+    d.textContent = text;
+    log.appendChild(d);
+    log.scrollTop = log.scrollHeight;
+    return d;
+  }
+
+  function cvPushUser(content) {
+    const blocks = typeof content === "string" ? [{ type: "text", text: content }] : content;
+    const last = cv.messages[cv.messages.length - 1];
+    if (last && last.role === "user") {
+      if (typeof last.content === "string") last.content = [{ type: "text", text: last.content }];
+      last.content = last.content.concat(blocks);
+    } else {
+      cv.messages.push({ role: "user", content: blocks });
+    }
+  }
+
+  function cvBuildSystem() {
+    const c = cv.candles;
+    if (!c.length) return "You are a trading chart analyst. Reply in Thai. No price data is loaded yet; ask the user to load a chart first.";
+    const last = c[c.length - 1];
+    const sw = cv.detectedSwings;
+    const recent = c.slice(-20).map(x =>
+      cvFmtDate(x.time) + " O" + x.open + " H" + x.high + " L" + x.low + " C" + x.close).join("\n");
+    const hi = sw.highs.slice(-12).map(x => cvFmtDate(x.time) + ": " + x.price).join("\n") || "(none)";
+    const lo = sw.lows.slice(-12).map(x => cvFmtDate(x.time) + ": " + x.price).join("\n") || "(none)";
+    const clusters = cvClusterLevels(
+      sw.highs.map(x => x.price).concat(sw.lows.map(x => x.price))
+    ).slice(0, 8).map(x => x.price.toFixed(4) + " ×" + x.touches).join("\n") || "(none)";
+    return [
+      "You are a professional price-chart analyst helping a trader.",
+      "Symbol: " + cvEl("cvDataSymbol").value.trim() + " | Timeframe: " + cvEl("cvInterval").value,
+      "",
+      "Reply in THAI, concise and practical. When you identify price levels you MUST call the render_levels tool",
+      "(support/resistance as `levels`, notable reversal points as `swings`) AND also write a short Thai explanation",
+      "of your reasoning and how to trade around the levels. Only use numbers grounded in the data below; do not invent precision.",
+      "This is analysis, not financial advice.",
+      "",
+      "=== DATA (oldest first) ===",
+      "Current price (last close): " + last.close,
+      "Bars: " + c.length + " from " + cvFmtDate(c[0].time) + " to " + cvFmtDate(last.time),
+      "",
+      "Recent candles:\n" + recent,
+      "",
+      "Detected swing highs (date: price):\n" + hi,
+      "",
+      "Detected swing lows (date: price):\n" + lo,
+      "",
+      "Price clusters by touch count:\n" + clusters,
+    ].join("\n");
+  }
+
+  async function cvSend(text) {
+    text = (text || "").trim();
+    if (!text) return;
+    const key = (cvEl("cvAnthropicKey").value || "").trim();
+    if (!key) { cvShowMsg("ใส่ Anthropic API key ในส่วน 'ตั้งค่า API key' ก่อน"); return; }
+    if (!cv.candles.length) { cvShowMsg("กด  'โหลดกราฟ' ให้มีข้อมูลราคาก่อนถาม AI"); return; }
+    cvShowMsg("");
+
+    cvAddBubble("user", text);
+    cvEl("cvChatInput").value = "";
+    const snapshot = JSON.stringify(cv.messages);
+    cvPushUser(text);
+    const loading = cvAddBubble("ai", "กำลังคิด…", "loading");
+    cvEl("cvChatSend").disabled = true;
+
+    try {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-api-key": key,
+          "anthropic-version": "2023-06-01",
+          "anthropic-dangerous-direct-browser-access": "true",
+        },
+        body: JSON.stringify({
+          model: cv.model,
+          max_tokens: 4000,
+          system: cvBuildSystem(),
+          tools: [CV_RENDER_TOOL],
+          messages: cv.messages,
+        }),
+      });
+      const j = await res.json();
+      if (!res.ok) throw new Error((j && j.error && j.error.message) || ("HTTP " + res.status));
+
+      const blocks = Array.isArray(j.content) ? j.content : [];
+      const textOut = blocks.filter(b => b.type === "text").map(b => b.text).join("\n").trim();
+      const toolUses = blocks.filter(b => b.type === "tool_use" && b.name === "render_levels");
+
+      loading.remove();
+      if (textOut) cvAddBubble("ai", textOut);
+      else if (!toolUses.length) cvAddBubble("ai", "(ไม่มีคำตอบ)");
+
+      cv.messages.push({ role: "assistant", content: blocks });
+
+      if (toolUses.length) {
+        let gotLevels = false;
+        toolUses.forEach(tu => {
+          const inp = tu.input || {};
+          if (Array.isArray(inp.levels)) { cv.levels = inp.levels; gotLevels = true; }
+          if (Array.isArray(inp.swings)) cv.swings = inp.swings;
+        });
+        cvPushUser(toolUses.map(tu => ({
+          type: "tool_result", tool_use_id: tu.id, content: "วาดลงบนกราฟเรียบร้อย",
+        })));
+        if (gotLevels || cv.swings.length) {
+          cvPersistLevels();
+          cvRedrawLevels();
+          if (!textOut) cvAddBubble("ai", "วาดเส้นให้บนกราฟแล้ว " + cv.levels.length + " แนว / swing " + cv.swings.length + " จุด");
+        }
+      }
+    } catch (err) {
+      loading.remove();
+      cv.messages = JSON.parse(snapshot);
+      cvAddBubble("ai", "เรียก AI ไม่สำเร็จ: " + (err.message || err), "loading");
+    } finally {
+      cvEl("cvChatSend").disabled = false;
+    }
+  }
+
+  async function cvLoad() {
+    const tvSym = cvEl("cvSymbol").value.trim();
+    if (!cvEl("cvDataSymbol").value.trim() && tvSym) cvEl("cvDataSymbol").value = cvGuessDataSymbol(tvSym);
+    const dSym = cvEl("cvDataSymbol").value.trim();
+    const interval = cvEl("cvInterval").value;
+    const tdKey = (cvEl("cvTdKey").value || "").trim();
+    try {
+      localStorage.setItem(CV_LS.sym, tvSym);
+      localStorage.setItem(CV_LS.dsym, dSym);
+      localStorage.setItem(CV_LS.intv, interval);
+      if (tdKey) localStorage.setItem("sd_api_key", tdKey);
+    } catch (e) {}
+
+    if (tvSym) renderTvWidget("cvTvChart", tvSym.toUpperCase());
+
+    if (!dSym) { cvShowMsg("ใส่สัญลักษณ์ข้อมูลราคา (Twelve Data) เช่น AAPL หรือ BTC/USD"); return; }
+    if (!tdKey) { cvShowMsg("ใส่ Twelve Data API key ในส่วน 'ตั้งค่า API key' ก่อน (ใช้ร่วมกับหน้า Stock/Decide)"); return; }
+    cvShowMsg("");
+    cvEl("cvLoadBtn").disabled = true;
+    cvEl("cvLoadBtn").textContent = "กำลังโหลด…";
+    try {
+      const candles = await cvFetchCandles(dSym, interval, tdKey);
+      cv.candles = candles;
+      cv.series.setData(candles);
+      cv.detectedSwings = cvDetectSwings(candles, 3);
+      const mk = [];
+      cv.detectedSwings.highs.slice(-10).forEach(h => mk.push({
+        time: h.time, position: "aboveBar", color: "#d97706", shape: "arrowDown", text: "H",
+      }));
+      cv.detectedSwings.lows.slice(-10).forEach(l => mk.push({
+        time: l.time, position: "belowBar", color: "#2563eb", shape: "arrowUp", text: "L",
+      }));
+      mk.sort((a, b) => a.time - b.time);
+      cv.series.setMarkers(mk);
+      cv.chart.timeScale().fitContent();
+      cvRestoreLevels();
+      cvRedrawLevels();
+    } catch (err) {
+      cvShowMsg("โหลดข้อมูลราคาไม่สำเร็จ: " + (err.message || err));
+    } finally {
+      cvEl("cvLoadBtn").disabled = false;
+      cvEl("cvLoadBtn").textContent = "โหลดกราฟ";
+    }
+  }
+
+  function initChartTab() {
+    if (cv.inited) { cvApplyTheme(); if (cv.chart) cv.chart.timeScale().fitContent(); return; }
+    cv.inited = true;
+
+    try {
+      cvEl("cvSymbol").value = localStorage.getItem(CV_LS.sym) || "";
+      cvEl("cvDataSymbol").value = localStorage.getItem(CV_LS.dsym) || "";
+      const si = localStorage.getItem(CV_LS.intv);
+      if (si) cvEl("cvInterval").value = si;
+      cvEl("cvAnthropicKey").value = localStorage.getItem(CV_LS.akey) || "";
+      cv.model = localStorage.getItem(CV_LS.model) || "claude-opus-5";
+      cvEl("cvModel").value = cv.model;
+      cvEl("cvTdKey").value = localStorage.getItem("sd_api_key") || "";
+    } catch (e) {}
+
+    if (!window.LightweightCharts) {
+      cvShowMsg("โหลดไลบรารีกราฟ (lightweight-charts) ไม่สำเร็จ — ตรวจอินเทอร์เน็ตแล้วรีเฟรช");
+    } else {
+      const t = cvThemeOpts();
+      cv.chart = LightweightCharts.createChart(cvEl("cvLwChart"), {
+        autoSize: true,
+        layout: { background: { color: t.bg }, textColor: t.text },
+        grid: { vertLines: { color: t.grid }, horzLines: { color: t.grid } },
+        rightPriceScale: { borderColor: t.grid },
+        timeScale: { borderColor: t.grid, timeVisible: true, secondsVisible: false },
+        crosshair: { mode: 0 },
+      });
+      cv.series = cv.chart.addCandlestickSeries({
+        upColor: "#16a34a", downColor: "#dc2626", borderVisible: false,
+        wickUpColor: "#16a34a", wickDownColor: "#dc2626",
+      });
+    }
+
+    cvEl("cvLoadBtn").addEventListener("click", cvLoad);
+    cvEl("cvChatSend").addEventListener("click", () => cvSend(cvEl("cvChatInput").value));
+    cvEl("cvChatInput").addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); cvSend(cvEl("cvChatInput").value); }
+    });
+    document.querySelectorAll(".cv-quick-btn").forEach(b => {
+      b.addEventListener("click", () => cvSend(b.dataset.q));
+    });
+    cvEl("cvClearLevels").addEventListener("click", () => {
+      cv.levels = []; cv.swings = [];
+      cvPersistLevels(); cvRedrawLevels();
+    });
+    cvEl("cvSaveKeys").addEventListener("click", () => {
+      try {
+        localStorage.setItem(CV_LS.akey, cvEl("cvAnthropicKey").value.trim());
+        localStorage.setItem(CV_LS.model, cvEl("cvModel").value);
+        localStorage.setItem("sd_api_key", cvEl("cvTdKey").value.trim());
+      } catch (e) {}
+      cv.model = cvEl("cvModel").value;
+      cvShowMsg(""); successToast("บันทึกการตั้งค่าแล้ว");
+    });
+    cvEl("cvModel").addEventListener("change", () => { cv.model = cvEl("cvModel").value; });
+
+    if (cvEl("cvDataSymbol").value.trim() || cvEl("cvSymbol").value.trim()) cvLoad();
   }
 
   /* ---------- init ---------- */
