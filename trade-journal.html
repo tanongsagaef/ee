@@ -632,6 +632,8 @@
     <div class="field">
       <label class="small">ความเห็นหลังเทรด (Trade Review)</label>
       <textarea id="tfNotes" rows="3" placeholder="สิ่งที่เรียนรู้ สิ่งที่ควรทำต่างไปครั้งหน้า ฯลฯ"></textarea>
+      <button type="button" class="ghost" id="tfAiReviewBtn" style="margin-top:8px;">🤖 ให้ AI วิจารณ์เทรดนี้</button>
+      <div id="tfAiReviewStatus" class="small" style="text-transform:none;font-weight:400;margin-top:6px;"></div>
     </div>
 
     <div class="modal-footer">
@@ -1587,6 +1589,91 @@
       symbol: document.getElementById("tfSymbol").value,
     }));
   });
+
+  async function tfAiReviewTrade() {
+    const btn = document.getElementById("tfAiReviewBtn");
+    const status = document.getElementById("tfAiReviewStatus");
+    const symbol = document.getElementById("tfSymbol").value.trim();
+    const entry = document.getElementById("tfEntry").value;
+    const exit = document.getElementById("tfExit").value;
+    const pnl = document.getElementById("tfPnl").value;
+    if (!symbol) { status.textContent = "ใส่สัญลักษณ์ก่อน"; return; }
+    const geminiKey = (localStorage.getItem(CV_LS.akey) || "").trim();
+    if (!geminiKey) { status.textContent = "ยังไม่ได้ตั้งค่า Gemini API key (ตั้งในแท็บ 'กราฟวิเคราะห์' ก่อน)"; return; }
+
+    btn.disabled = true; btn.textContent = "กำลังวิเคราะห์…"; status.textContent = "";
+    try {
+      const dSym = cvNormalizeDataSymbol(symbol.replace(/^[a-z]+:/i, ""));
+      const tdKey = (localStorage.getItem("sd_api_key") || "").trim();
+      const dataSrc = localStorage.getItem(CV_LS.dsrc) || "auto";
+      let candles = [];
+      try {
+        if (dataSrc === "binance") candles = await cvFetchCandlesBinance(dSym, "1h");
+        else if (dataSrc === "twelvedata") candles = await cvFetchCandles(dSym, "1h", tdKey);
+        else if (tdKey) { try { candles = await cvFetchCandles(dSym, "1h", tdKey); } catch (e) { candles = await cvFetchCandlesBinance(dSym, "1h"); } }
+        else candles = await cvFetchCandlesBinance(dSym, "1h");
+      } catch (e) { candles = []; } // price data is a nice-to-have — still review on trade facts alone if it fails
+
+      const swings = candles.length ? cvDetectSwings(candles, 3) : { highs: [], lows: [] };
+      const nearLows = swings.lows.slice(-5).map(l => l.price).join(", ");
+      const nearHighs = swings.highs.slice(-5).map(h => h.price).join(", ");
+
+      const promptLines = [
+        "คุณเป็นโค้ชเทรดมืออาชีพ ช่วยวิจารณ์เทรดนี้แบบกระชับ ภาษาไทย 3-5 ประโยค:",
+        "Symbol: " + symbol,
+        "ทิศทาง: " + (currentSide === "long" ? "Long/Buy" : "Short/Sell"),
+        "ราคาเข้า: " + (entry || "ไม่ระบุ"),
+        exit ? "ราคาออก: " + exit : "",
+        pnl !== "" ? "กำไร/ขาดทุน: " + pnl : "(ยังไม่ปิดเทรด)",
+        candles.length ? "แนวรับล่าสุดที่ตรวจพบจากราคาปัจจุบัน: " + (nearLows || "ไม่พบ") : "",
+        candles.length ? "แนวต้านล่าสุดที่ตรวจพบจากราคาปัจจุบัน: " + (nearHighs || "ไม่พบ") : "",
+        candles.length ? "หมายเหตุ: แนวรับ-ต้านข้างต้นคำนวณจากราคาล่าสุด ไม่ใช่ ณ เวลาเข้าเทรดจริง ใช้ประกอบการวิจารณ์เชิงหลักการเท่านั้น" : "",
+        "ให้ตอบครอบคลุม: 1) จุดเข้า/ออกสมเหตุสมผลไหม 2) การจัดการความเสี่ยงเป็นอย่างไร 3) บทเรียนที่ควรจำไปใช้ครั้งหน้า",
+      ].filter(Boolean).join("\n");
+
+      async function callReview(model) {
+        const res = await fetch(
+          "https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent",
+          {
+            method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": geminiKey },
+            body: JSON.stringify({
+              contents: [{ role: "user", parts: [{ text: promptLines }] }],
+              generationConfig: { maxOutputTokens: 1024, temperature: 0.4 },
+            }),
+          }
+        );
+        const j = await res.json();
+        return { ok: res.ok, j: j };
+      }
+
+      let model = localStorage.getItem(CV_LS.model) || cv.model;
+      let r = await callReview(model);
+      if (!r.ok) {
+        const em = String((r.j && r.j.error && r.j.error.message) || "");
+        if (/exceeded your current quota|quota|RESOURCE_EXHAUSTED/i.test(em) && !/flash/i.test(model)) {
+          status.textContent = "โมเดลปัจจุบันเกินโควต้า กำลังลองรุ่น Flash แทน…";
+          await cvLoadModels(geminiKey, true);
+          r = await callReview(cv.model);
+        }
+      }
+      if (!r.ok) throw new Error((r.j && r.j.error && r.j.error.message) || "เรียก AI ไม่สำเร็จ");
+
+      const cand = r.j.candidates && r.j.candidates[0];
+      const text = ((cand && cand.content && cand.content.parts) || [])
+        .filter(p => typeof p.text === "string").map(p => p.text).join("\n").trim();
+      if (!text) throw new Error("AI ไม่ได้ตอบข้อความกลับมา");
+
+      const notesEl = document.getElementById("tfNotes");
+      const stamp = "🤖 AI วิจารณ์ (" + todayKey() + "):\n" + text;
+      notesEl.value = notesEl.value.trim() ? notesEl.value.trim() + "\n\n" + stamp : stamp;
+      status.textContent = "เพิ่มคำวิจารณ์ลงช่องโน้ตแล้ว — กด \"บันทึก\" เพื่อเก็บไว้";
+    } catch (err) {
+      status.textContent = "วิจารณ์ไม่สำเร็จ: " + (err.message || err);
+    } finally {
+      btn.disabled = false; btn.textContent = "🤖 ให้ AI วิจารณ์เทรดนี้";
+    }
+  }
+  document.getElementById("tfAiReviewBtn").addEventListener("click", tfAiReviewTrade);
 
   document.getElementById("tradeSaveBtn").addEventListener("click", () => {
     const isEdit = !!editingId;
