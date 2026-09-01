@@ -455,12 +455,11 @@
       </div>
       <div class="row">
         <div class="field" style="min-width:150px;">
-          <label class="small">โมเดล (ทุกตัวมี free tier)</label>
+          <label class="small">โมเดล</label>
           <select id="cvModel">
-            <option value="gemini-2.5-pro">Gemini 2.5 Pro (เก่งสุด · โควตาฟรีน้อย)</option>
-            <option value="gemini-2.5-flash">Gemini 2.5 Flash (เก่ง · โควตาฟรีเยอะ)</option>
-            <option value="gemini-2.0-flash">Gemini 2.0 Flash (เร็วสุด)</option>
+            <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro (preview)</option>
           </select>
+          <button type="button" class="ghost" id="cvLoadModelsBtn" style="margin-top:6px;font-size:12px;padding:5px 10px;">โหลดรายชื่อโมเดลจากคีย์</button>
         </div>
         <div class="field" style="min-width:150px;">
           <label class="small">Twelve Data API key (ใช้ร่วมกับหน้า Stock/Decide)</label>
@@ -1934,7 +1933,7 @@
     inited: false, chart: null, series: null,
     candles: [], priceLines: [], detectedSwings: { highs: [], lows: [] },
     levels: [], swings: [], messages: [],
-    model: "gemini-2.5-pro",
+    model: "gemini-3.1-pro-preview",
   };
   const CV_LS = { levels: "cv_levels_v1", akey: "cv_gemini_key", model: "cv_model",
                   sym: "cv_symbol", dsym: "cv_data_symbol", intv: "cv_interval" };
@@ -2204,6 +2203,40 @@
     ].join("\n");
   }
 
+  async function cvLoadModels(key) {
+    key = (key || cvEl("cvGeminiKey").value || "").trim();
+    if (!key) { cvShowMsg("ใส่ Gemini API key ก่อน แล้วค่อยโหลดรายชื่อโมเดล"); return; }
+    const btn = cvEl("cvLoadModelsBtn");
+    if (btn) { btn.disabled = true; btn.textContent = "กำลังโหลด…"; }
+    try {
+      const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000", {
+        headers: { "x-goog-api-key": key },
+      });
+      const j = await res.json();
+      if (!res.ok) throw new Error((j && j.error && j.error.message) || ("HTTP " + res.status));
+      const models = (j.models || [])
+        .filter(m => (m.supportedGenerationMethods || []).indexOf("generateContent") !== -1)
+        .map(m => ({ id: String(m.name || "").replace(/^models\//, ""), label: m.displayName || "" }))
+        .filter(m => /^gemini-/.test(m.id) &&
+          !/embedding|aqa|imagen|image-generation|-tts|native-audio|-live|-thinking-|-vision/.test(m.id));
+      if (!models.length) { cvShowMsg("คีย์นี้ไม่มีโมเดล generateContent ให้ใช้"); return; }
+      models.sort((a, b) => b.id.localeCompare(a.id, undefined, { numeric: true }));
+      const cur = cvEl("cvModel").value;
+      cvEl("cvModel").innerHTML = models.map(m =>
+        `<option value="${escapeHtml(m.id)}">${escapeHtml(m.label || m.id)} — ${escapeHtml(m.id)}</option>`).join("");
+      const want = models.some(m => m.id === cur) ? cur
+        : (models.find(m => /pro/.test(m.id)) || models[0]).id;
+      cvEl("cvModel").value = want;
+      cv.model = want;
+      try { localStorage.setItem(CV_LS.model, want); } catch (e) {}
+      cvShowMsg("");
+    } catch (err) {
+      cvShowMsg("โหลดรายชื่อโมเดลไม่สำเร็จ: " + (err.message || err));
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = "โหลดรายชื่อโมเดลจากคีย์"; }
+    }
+  }
+
   async function cvSend(text) {
     text = (text || "").trim();
     if (!text) return;
@@ -2227,9 +2260,6 @@
         tool_config: { function_calling_config: { mode: "AUTO" } },
         generationConfig: { maxOutputTokens: 8192, temperature: 0.4 },
       };
-      if (cv.model.indexOf("gemini-2.5") === 0) {
-        body.generationConfig.thinkingConfig = { thinkingBudget: 2048 };
-      }
       const res = await fetch(
         "https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(cv.model) + ":generateContent",
         {
@@ -2336,8 +2366,12 @@
       const si = localStorage.getItem(CV_LS.intv);
       if (si) cvEl("cvInterval").value = si;
       cvEl("cvGeminiKey").value = localStorage.getItem(CV_LS.akey) || "";
-      cv.model = localStorage.getItem(CV_LS.model) || "gemini-2.5-pro";
-      if (![...cvEl("cvModel").options].some(o => o.value === cv.model)) cv.model = "gemini-2.5-pro";
+      cv.model = localStorage.getItem(CV_LS.model) || "gemini-3.1-pro-preview";
+      if (![...cvEl("cvModel").options].some(o => o.value === cv.model)) {
+        const o = document.createElement("option");
+        o.value = cv.model; o.textContent = cv.model;
+        cvEl("cvModel").appendChild(o);
+      }
       cvEl("cvModel").value = cv.model;
       cvEl("cvTdKey").value = localStorage.getItem("sd_api_key") || "";
     } catch (e) {}
@@ -2380,9 +2414,16 @@
       } catch (e) {}
       cv.model = cvEl("cvModel").value;
       cvShowMsg(""); successToast("บันทึกการตั้งค่าแล้ว");
+      cvLoadModels();
     });
     cvEl("cvModel").addEventListener("change", () => { cv.model = cvEl("cvModel").value; });
+    cvEl("cvLoadModelsBtn").addEventListener("click", () => cvLoadModels());
+    cvEl("cvGeminiKey").addEventListener("change", () => {
+      const k = cvEl("cvGeminiKey").value.trim();
+      if (k) cvLoadModels(k);
+    });
 
+    if (cvEl("cvGeminiKey").value.trim()) cvLoadModels(cvEl("cvGeminiKey").value.trim());
     if (cvEl("cvDataSymbol").value.trim() || cvEl("cvSymbol").value.trim()) cvLoad();
   }
 
