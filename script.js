@@ -1374,31 +1374,63 @@ document.getElementById("saveContentBtn").addEventListener("click", async () => 
    Google Drive "anyone with the link" file, not private to your account. */
 let syncApplyingRemote = false;
 let syncUnsub = null;
+let syncLastError = null;    // last Firestore push/pull failure, or null when healthy
+let syncMediaFailed = false; // an image/PDF upload failed — text still syncs, media retries next push
+
+/* Reflect the real sync state in the header widget instead of always claiming
+   "ซิงค์แล้ว". Called after every push and on listener errors. */
+function renderSyncStatus() {
+  const el = document.getElementById("syncStatus");
+  if (!el) return;
+  const user = window.FirebaseSync && FirebaseSync.getUser && FirebaseSync.getUser();
+  if (!user) { el.hidden = true; return; }
+  el.hidden = false;
+  if (syncLastError) {
+    el.style.color = "var(--danger)";
+    el.textContent = "ซิงค์ล้มเหลว: " + (syncLastError.code || syncLastError.message || "ไม่ทราบสาเหตุ");
+  } else if (syncMediaFailed) {
+    el.style.color = "var(--danger)";
+    el.textContent = "ซิงค์ข้อความแล้ว · อัปโหลดรูป/PDF ไม่สำเร็จ (ตรวจ Firebase Storage)";
+  } else {
+    el.style.color = "var(--text-muted)";
+    el.textContent = "ซิงค์แล้ว · " + (user.displayName || user.email || "");
+  }
+}
 
 async function ensureMediaUploaded(uid) {
   const storage = window.FirebaseSync && FirebaseSync.getStorage();
   if (!storage) return;
-  let changed = false;
+  let changed = false, failed = 0;
+  // Each upload is attempted independently so one bad file (or a Storage outage
+  // partway through) doesn't stop the rest. If any failed we throw at the end so
+  // pushCloudSync() can still sync the text and flag the media problem.
+  const upload = async (fn) => {
+    try { await fn(); changed = true; }
+    catch (err) { console.error("media upload failed", err); failed++; }
+  };
   for (const ch of chapters) {
     for (const sec of (ch.sections || [])) {
       if (typeof sec.image === "string" && sec.image.startsWith("data:")) {
-        const ref = storage.ref().child(`users/${uid}/elliottwave/${ch.id}/${sec.id}/image.jpg`);
-        await ref.putString(sec.image, "data_url");
-        sec.image = await ref.getDownloadURL();
-        changed = true;
+        await upload(async () => {
+          const ref = storage.ref().child(`users/${uid}/elliottwave/${ch.id}/${sec.id}/image.jpg`);
+          await ref.putString(sec.image, "data_url");
+          sec.image = await ref.getDownloadURL();
+        });
       }
       if (sec.pdf instanceof Blob) {
-        const ref = storage.ref().child(`users/${uid}/elliottwave/${ch.id}/${sec.id}/document.pdf`);
-        await ref.put(sec.pdf);
-        sec.pdf = await ref.getDownloadURL();
-        changed = true;
+        await upload(async () => {
+          const ref = storage.ref().child(`users/${uid}/elliottwave/${ch.id}/${sec.id}/document.pdf`);
+          await ref.put(sec.pdf);
+          sec.pdf = await ref.getDownloadURL();
+        });
       }
       for (const sub of (sec.subsections || [])) {
         if (typeof sub.image === "string" && sub.image.startsWith("data:")) {
-          const ref = storage.ref().child(`users/${uid}/elliottwave/${ch.id}/${sec.id}/${sub.id}/image.jpg`);
-          await ref.putString(sub.image, "data_url");
-          sub.image = await ref.getDownloadURL();
-          changed = true;
+          await upload(async () => {
+            const ref = storage.ref().child(`users/${uid}/elliottwave/${ch.id}/${sec.id}/${sub.id}/image.jpg`);
+            await ref.putString(sub.image, "data_url");
+            sub.image = await ref.getDownloadURL();
+          });
         }
       }
     }
@@ -1406,20 +1438,88 @@ async function ensureMediaUploaded(uid) {
   if (changed) {
     try { await dbSetChapters(chapters); } catch (err) { console.error(err); } // persist the swapped-in URLs locally too
   }
+  if (failed) throw new Error(failed + " media file(s) failed to upload");
+}
+
+/* Strip media that isn't in Storage yet (Blob PDFs, data: images) from the
+   payload so a Storage outage can't block the text push — Firestore rejects
+   Blobs and caps docs near 1MB, so inline base64 would fail the write anyway.
+   The local-only media stays in memory/IndexedDB and is re-merged by
+   mergeRemoteChapters(); it re-uploads on the next push once Storage works. */
+function chaptersForCloud() {
+  return chapters.map(ch => ({
+    ...ch,
+    sections: (ch.sections || []).map(sec => {
+      const out = { ...sec };
+      if (out.pdf && typeof out.pdf !== "string") { delete out.pdf; delete out.pdfName; }
+      if (typeof out.image === "string" && out.image.startsWith("data:")) delete out.image;
+      out.subsections = (sec.subsections || []).map(sub => {
+        const s = { ...sub };
+        if (typeof s.image === "string" && s.image.startsWith("data:")) delete s.image;
+        return s;
+      });
+      return out;
+    }),
+  }));
+}
+
+/* Apply a remote chapters set without losing local-only content: remote wins on
+   text/structure, but media not yet uploaded from this device and chapters the
+   remote hasn't seen yet are preserved. */
+function mergeRemoteChapters(remote) {
+  const remoteList = Array.isArray(remote) ? remote : [];
+  const remoteIds = new Set(remoteList.map(c => c.id));
+  const localById = new Map(chapters.map(ch => [ch.id, ch]));
+  const merged = remoteList.map(rch => {
+    const lch = localById.get(rch.id);
+    if (!lch) return rch;
+    const lSec = new Map((lch.sections || []).map(s => [s.id, s]));
+    return {
+      ...rch,
+      sections: (rch.sections || []).map(rsec => {
+        const lsec = lSec.get(rsec.id);
+        if (!lsec) return rsec;
+        const out = { ...rsec };
+        if (!out.pdf && lsec.pdf && typeof lsec.pdf !== "string") { out.pdf = lsec.pdf; out.pdfName = lsec.pdfName; }
+        if (!out.image && typeof lsec.image === "string" && lsec.image.startsWith("data:")) out.image = lsec.image;
+        const lSub = new Map((lsec.subsections || []).map(s => [s.id, s]));
+        out.subsections = (rsec.subsections || []).map(rsub => {
+          const lsub = lSub.get(rsub.id);
+          if (lsub && !rsub.image && typeof lsub.image === "string" && lsub.image.startsWith("data:")) return { ...rsub, image: lsub.image };
+          return rsub;
+        });
+        return out;
+      }),
+    };
+  });
+  for (const lch of chapters) if (!remoteIds.has(lch.id)) merged.push(lch);
+  return merged;
 }
 
 async function pushCloudSync() {
   if (syncApplyingRemote) return;
   if (!window.FirebaseSync || !FirebaseSync.getUser()) return;
   const uid = FirebaseSync.getUser().uid;
+
+  // Best-effort: a Storage failure must not block the text push.
+  syncMediaFailed = false;
   try {
     await ensureMediaUploaded(uid);
-    const payload = JSON.parse(JSON.stringify(chapters)); // Blobs are gone by now; this also drops undefined fields Firestore rejects
+  } catch (err) {
+    console.error("media upload failed — pushing text only", err);
+    syncMediaFailed = true;
+  }
+
+  try {
+    const payload = JSON.parse(JSON.stringify(chaptersForCloud())); // also drops undefined fields Firestore rejects
     await FirebaseSync.getDb().collection("users").doc(uid).collection("sync").doc("elliottWave")
       .set({ chapters: payload, updatedAt: Date.now() });
+    syncLastError = null;
   } catch (err) {
     console.error("sync push failed", err);
+    syncLastError = err;
   }
+  renderSyncStatus();
 }
 
 async function startCloudSync(uid) {
@@ -1427,29 +1527,31 @@ async function startCloudSync(uid) {
   try {
     const snap = await ref.get();
     if (snap.exists) {
-      const remote = snap.data() || {};
-      const existingIds = new Set(chapters.map(c => c.id));
-      const newFromRemote = (remote.chapters || []).filter(c => c.id && !existingIds.has(c.id));
-      chapters = chapters.concat(newFromRemote);
+      chapters = mergeRemoteChapters((snap.data() || {}).chapters);
       syncApplyingRemote = true;
       await saveData(); // local save only — push is suppressed by the flag
       syncApplyingRemote = false;
     }
+    syncLastError = null;
     await pushCloudSync(); // uploads any local-only media + pushes the merged set for real
   } catch (err) {
     console.error("initial sync failed", err);
+    syncLastError = err;
   }
+  renderSyncStatus();
   renderContent();
 
   if (syncUnsub) syncUnsub();
   syncUnsub = ref.onSnapshot(async (snap) => {
     if (!snap.exists) return;
     syncApplyingRemote = true;
-    chapters = snap.data().chapters || [];
+    chapters = mergeRemoteChapters(snap.data().chapters);
     await saveData();
     syncApplyingRemote = false;
+    syncLastError = null;
+    renderSyncStatus();
     renderContent();
-  }, (err) => console.error("sync listener error", err));
+  }, (err) => { console.error("sync listener error", err); syncLastError = err; renderSyncStatus(); });
 }
 
 function setupCloudSync() {
@@ -1485,9 +1587,11 @@ function setupCloudSync() {
       statusEl.hidden = false;
       statusEl.textContent = "กำลังซิงค์...";
       await startCloudSync(user.uid);
-      statusEl.textContent = "ซิงค์แล้ว · " + (user.displayName || user.email || "");
+      renderSyncStatus();
     } else {
       if (syncUnsub) { syncUnsub(); syncUnsub = null; }
+      syncLastError = null;
+      syncMediaFailed = false;
       signInBtn.hidden = false;
       signOutBtn.hidden = true;
       avatarEl.hidden = true;
