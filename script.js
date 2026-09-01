@@ -1389,8 +1389,10 @@ function renderSyncStatus() {
     el.style.color = "var(--danger)";
     el.textContent = "ซิงค์ล้มเหลว: " + (syncLastError.code || syncLastError.message || "ไม่ทราบสาเหตุ");
   } else if (syncMediaFailed) {
-    el.style.color = "var(--danger)";
-    el.textContent = "ซิงค์ข้อความแล้ว · อัปโหลดรูป/PDF ไม่สำเร็จ (ตรวจ Firebase Storage)";
+    // Expected when Firebase Storage isn't set up (Spark plan) — text still syncs,
+    // images/PDFs stay on the device they were added. Kept muted, not alarming.
+    el.style.color = "var(--text-muted)";
+    el.textContent = "ซิงค์ข้อความแล้ว · รูป/PDF เก็บเฉพาะเครื่องนี้";
   } else {
     el.style.color = "var(--text-muted)";
     el.textContent = "ซิงค์แล้ว · " + (user.displayName || user.email || "");
