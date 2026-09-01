@@ -131,6 +131,10 @@
   .cv-bubble.user { align-self: flex-end; background: var(--accent-soft); color: var(--text); border: 1px solid var(--border); }
   .cv-bubble.ai { align-self: flex-start; background: var(--surface-alt); border: 1px solid var(--border); }
   .cv-bubble.ai.loading { color: var(--muted); font-style: italic; }
+  .cv-tf-row { display: flex; gap: 4px; flex-wrap: wrap; margin: 6px 0 8px; }
+  .cv-tf-btn { font-size: 11.5px; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface-alt); color: var(--muted); cursor: pointer; font-family: inherit; font-weight: 600; }
+  .cv-tf-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .cv-tf-btn.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
   .cv-quick { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0 8px; }
   .cv-quick-btn { font-size: 12px; padding: 6px 12px; }
   .cv-chat-input { display: flex; gap: 8px; align-items: flex-end; }
@@ -426,6 +430,7 @@
     <div id="cvTvChart" class="tv-embed"></div>
 
     <label class="small" style="margin-top:14px;">กราฟวิเคราะห์ — AI วาดเส้นแนวรับ/แนวต้านที่นี่</label>
+    <div class="cv-tf-row" id="cvTfRow"></div>
     <div id="cvLwChart" class="cv-lw-chart"></div>
     <div class="cv-levels-head">
       <span class="small" style="margin:0;">เส้นที่ AI วาด</span>
@@ -2321,6 +2326,19 @@
     }
   }
 
+  function cvSyncTfActive() {
+    const v = cvEl("cvInterval").value;
+    document.querySelectorAll("#cvTfRow .cv-tf-btn").forEach(b =>
+      b.classList.toggle("active", b.dataset.tf === v));
+  }
+  function cvSetTf(tf) {
+    if (cvEl("cvInterval").value === tf && cv.candles.length) return;
+    cvEl("cvInterval").value = tf;
+    cvSyncTfActive();
+    try { localStorage.setItem(CV_LS.intv, tf); } catch (e) {}
+    if (cv.candles.length || cvEl("cvDataSymbol").value.trim()) cvLoad();
+  }
+
   async function cvLoad() {
     const tvSym = cvEl("cvSymbol").value.trim();
     if (!cvEl("cvDataSymbol").value.trim() && tvSym) cvEl("cvDataSymbol").value = cvGuessDataSymbol(tvSym);
@@ -2358,6 +2376,7 @@
       cv.chart.timeScale().fitContent();
       cvRestoreLevels();
       cvRedrawLevels();
+      cvSyncTfActive();
     } catch (err) {
       cvShowMsg("โหลดข้อมูลราคาไม่สำเร็จ: " + (err.message || err));
     } finally {
@@ -2406,6 +2425,17 @@
     }
 
     cvEl("cvLoadBtn").addEventListener("click", cvLoad);
+    const tfRow = cvEl("cvTfRow");
+    tfRow.innerHTML = [...cvEl("cvInterval").options].map(o =>
+      `<button type="button" class="cv-tf-btn" data-tf="${escapeHtml(o.value)}">${escapeHtml(o.textContent)}</button>`).join("");
+    tfRow.querySelectorAll(".cv-tf-btn").forEach(b =>
+      b.addEventListener("click", () => cvSetTf(b.dataset.tf)));
+    cvEl("cvInterval").addEventListener("change", () => {
+      cvSyncTfActive();
+      try { localStorage.setItem(CV_LS.intv, cvEl("cvInterval").value); } catch (e) {}
+      if (cv.candles.length) cvLoad();
+    });
+    cvSyncTfActive();
     cvEl("cvChatSend").addEventListener("click", () => cvSend(cvEl("cvChatInput").value));
     cvEl("cvChatInput").addEventListener("keydown", (e) => {
       if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); cvSend(cvEl("cvChatInput").value); }
