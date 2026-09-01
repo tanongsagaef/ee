@@ -17,6 +17,12 @@
   <div class="topbar-actions">
     <a href="stock-decision-terminal.html" class="btn btn-secondary" style="text-decoration:none;">STOCK/DECIDE</a>
     <a href="trade-journal.html" class="btn btn-secondary" style="text-decoration:none;">TRADE JOURNAL</a>
+    <div class="topbar-actions" id="syncWidget" style="gap:6px;">
+      <button class="btn btn-secondary" id="syncSignInBtn" title="ลงชื่อเข้าใช้ด้วย Google เพื่อซิงค์ข้อมูลข้ามอุปกรณ์แบบเรียลไทม์">☁ ซิงค์ข้ามอุปกรณ์</button>
+      <img id="syncAvatar" hidden style="width:26px;height:26px;border-radius:50%;vertical-align:middle;">
+      <span id="syncStatus" hidden style="font-size:11.5px;color:var(--text-muted);white-space:nowrap;"></span>
+      <button class="btn btn-secondary" id="syncSignOutBtn" hidden title="ออกจากระบบ (หยุดซิงค์บนเครื่องนี้)">ออกจากระบบ</button>
+    </div>
     <button id="exportBtn" class="btn btn-secondary" title="ส่งออกข้อมูลทั้งหมด (Elliott Wave + Trade Journal + Stock/Decide) เป็นไฟล์เดียว">ส่งออกข้อมูลทั้งหมด</button>
     <button id="importBtn" class="btn btn-secondary" title="นำเข้าไฟล์สำรองรวม — จะเพิ่มต่อท้ายข้อมูลเดิมของทั้ง 3 ระบบ ไม่ทับของเดิม">นำเข้าข้อมูลทั้งหมด</button>
     <input type="file" id="importInput" accept="application/json" hidden>
@@ -101,6 +107,11 @@
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
+<script src="firebase-sync.js"></script>
 <script src="script.js"></script>
 </body>
 </html>

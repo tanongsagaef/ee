@@ -59,6 +59,7 @@ async function saveData() {
     console.error(err);
     alert("บันทึกข้อมูลไม่สำเร็จ (พื้นที่จัดเก็บในเบราว์เซอร์อาจเต็ม) ลองลบเนื้อหาเก่าบางส่วน หรือใช้รูป/PDF ที่มีขนาดเล็กลง");
   }
+  pushCloudSync(); // fire-and-forget; no-op when signed out or applying a remote update
 }
 
 /* ---------- State ---------- */
@@ -286,12 +287,15 @@ function renderChapterContent() {
     if (sec.text) html += `<div class="section-text">${renderBodyText(sec.text, secQuery)}</div>`;
     if (sec.image) html += `<img class="section-image" src="${sec.image}" alt="${escapeHtml(sec.title || "")}">`;
     if (sec.pdf) {
-      const url = URL.createObjectURL(sec.pdf);
-      sectionObjectUrls.push(url);
-      const sizeMb = (sec.pdf.size / 1024 / 1024).toFixed(2);
+      // sec.pdf is a Blob until it's been uploaded to cloud storage for sync,
+      // after which it becomes a plain download-URL string — both render the same
+      const isBlob = sec.pdf instanceof Blob;
+      const url = isBlob ? URL.createObjectURL(sec.pdf) : sec.pdf;
+      if (isBlob) sectionObjectUrls.push(url);
+      const sizeLabel = isBlob ? ` · ${(sec.pdf.size / 1024 / 1024).toFixed(2)} MB` : "";
       html += `<div class="pdf-embed"><iframe src="${url}" title="${escapeAttr(sec.pdfName || "PDF")}"></iframe></div>
         <div class="pdf-meta">
-          <span>${escapeHtml(sec.pdfName || "เอกสาร PDF")} · ${sizeMb} MB</span>
+          <span>${escapeHtml(sec.pdfName || "เอกสาร PDF")}${sizeLabel}</span>
           <a href="${url}" download="${escapeAttr(sec.pdfName || "document.pdf")}">ดาวน์โหลด</a>
         </div>`;
     }
@@ -742,7 +746,8 @@ async function collectAllData() {
     const sections = [];
     for (const sec of ch.sections) {
       const copy = { ...sec };
-      if (sec.pdf) copy.pdf = await blobToBase64(sec.pdf);
+      if (sec.pdf instanceof Blob) copy.pdf = await blobToBase64(sec.pdf);
+      // else sec.pdf is already a cloud-storage URL string (synced) — export as-is
       sections.push(copy);
     }
     exportChapters.push({ id: ch.id, title: ch.title, desc: ch.desc, sections });
@@ -1350,10 +1355,152 @@ document.getElementById("saveContentBtn").addEventListener("click", async () => 
   closeModal();
 });
 
+/* ---------- cloud sync (Google sign-in, cross-device realtime) ----------
+   Off by default — the app works fully offline/local-only until the user
+   signs in. Every local save also pushes to Firestore when signed in, and
+   a realtime listener pulls in changes made from any other signed-in
+   device. `syncApplyingRemote` breaks the write→snapshot→write feedback
+   loop: while applying a remote update we skip pushing it right back.
+
+   Images/PDFs can't go into Firestore directly (1MB/doc limit, and Blobs
+   aren't JSON-serializable) — ensureMediaUploaded() uploads any base64
+   image / Blob PDF to Firebase Storage first and swaps in the resulting
+   download URL, both in `chapters` and in what gets pushed. Rendering
+   (renderChapterContent) already treats sec.pdf as either a Blob (local,
+   not yet synced) or a URL string (already uploaded) — see there.
+
+   Note: Firebase Storage download URLs are link-shareable by design (the
+   token in the URL grants access on its own) — same trust model as a
+   Google Drive "anyone with the link" file, not private to your account. */
+let syncApplyingRemote = false;
+let syncUnsub = null;
+
+async function ensureMediaUploaded(uid) {
+  const storage = window.FirebaseSync && FirebaseSync.getStorage();
+  if (!storage) return;
+  let changed = false;
+  for (const ch of chapters) {
+    for (const sec of (ch.sections || [])) {
+      if (typeof sec.image === "string" && sec.image.startsWith("data:")) {
+        const ref = storage.ref().child(`users/${uid}/elliottwave/${ch.id}/${sec.id}/image.jpg`);
+        await ref.putString(sec.image, "data_url");
+        sec.image = await ref.getDownloadURL();
+        changed = true;
+      }
+      if (sec.pdf instanceof Blob) {
+        const ref = storage.ref().child(`users/${uid}/elliottwave/${ch.id}/${sec.id}/document.pdf`);
+        await ref.put(sec.pdf);
+        sec.pdf = await ref.getDownloadURL();
+        changed = true;
+      }
+      for (const sub of (sec.subsections || [])) {
+        if (typeof sub.image === "string" && sub.image.startsWith("data:")) {
+          const ref = storage.ref().child(`users/${uid}/elliottwave/${ch.id}/${sec.id}/${sub.id}/image.jpg`);
+          await ref.putString(sub.image, "data_url");
+          sub.image = await ref.getDownloadURL();
+          changed = true;
+        }
+      }
+    }
+  }
+  if (changed) {
+    try { await dbSetChapters(chapters); } catch (err) { console.error(err); } // persist the swapped-in URLs locally too
+  }
+}
+
+async function pushCloudSync() {
+  if (syncApplyingRemote) return;
+  if (!window.FirebaseSync || !FirebaseSync.getUser()) return;
+  const uid = FirebaseSync.getUser().uid;
+  try {
+    await ensureMediaUploaded(uid);
+    const payload = JSON.parse(JSON.stringify(chapters)); // Blobs are gone by now; this also drops undefined fields Firestore rejects
+    await FirebaseSync.getDb().collection("users").doc(uid).collection("sync").doc("elliottWave")
+      .set({ chapters: payload, updatedAt: Date.now() });
+  } catch (err) {
+    console.error("sync push failed", err);
+  }
+}
+
+async function startCloudSync(uid) {
+  const ref = FirebaseSync.getDb().collection("users").doc(uid).collection("sync").doc("elliottWave");
+  try {
+    const snap = await ref.get();
+    if (snap.exists) {
+      const remote = snap.data() || {};
+      const existingIds = new Set(chapters.map(c => c.id));
+      const newFromRemote = (remote.chapters || []).filter(c => c.id && !existingIds.has(c.id));
+      chapters = chapters.concat(newFromRemote);
+      syncApplyingRemote = true;
+      await saveData(); // local save only — push is suppressed by the flag
+      syncApplyingRemote = false;
+    }
+    await pushCloudSync(); // uploads any local-only media + pushes the merged set for real
+  } catch (err) {
+    console.error("initial sync failed", err);
+  }
+  renderContent();
+
+  if (syncUnsub) syncUnsub();
+  syncUnsub = ref.onSnapshot(async (snap) => {
+    if (!snap.exists) return;
+    syncApplyingRemote = true;
+    chapters = snap.data().chapters || [];
+    await saveData();
+    syncApplyingRemote = false;
+    renderContent();
+  }, (err) => console.error("sync listener error", err));
+}
+
+function setupCloudSync() {
+  if (!window.FirebaseSync || !FirebaseSync.enabled) return;
+  const signInBtn = document.getElementById("syncSignInBtn");
+  const signOutBtn = document.getElementById("syncSignOutBtn");
+  const statusEl = document.getElementById("syncStatus");
+  const avatarEl = document.getElementById("syncAvatar");
+  if (!signInBtn) return; // widget not present on this page
+
+  signInBtn.addEventListener("click", async () => {
+    signInBtn.disabled = true;
+    try {
+      await FirebaseSync.signIn();
+    } catch (err) {
+      console.error(err);
+      alert("เข้าสู่ระบบไม่สำเร็จ: " + (err.message || ""));
+    } finally {
+      signInBtn.disabled = false;
+    }
+  });
+  signOutBtn.addEventListener("click", async () => {
+    if (syncUnsub) { syncUnsub(); syncUnsub = null; }
+    await FirebaseSync.signOut();
+  });
+
+  FirebaseSync.onAuthChange(async (user) => {
+    if (user) {
+      signInBtn.hidden = true;
+      signOutBtn.hidden = false;
+      avatarEl.hidden = false;
+      avatarEl.src = user.photoURL || "";
+      statusEl.hidden = false;
+      statusEl.textContent = "กำลังซิงค์...";
+      await startCloudSync(user.uid);
+      statusEl.textContent = "ซิงค์แล้ว · " + (user.displayName || user.email || "");
+    } else {
+      if (syncUnsub) { syncUnsub(); syncUnsub = null; }
+      signInBtn.hidden = false;
+      signOutBtn.hidden = true;
+      avatarEl.hidden = true;
+      statusEl.hidden = true;
+    }
+  });
+}
+
 /* ---------- Init ---------- */
 (async function init() {
   chapters = await loadData();
   activeView = "home";
   activeChapterId = null;
   renderContent();
+  setupCloudSync();
 })();

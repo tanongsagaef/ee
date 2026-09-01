@@ -14,12 +14,13 @@
     appId: "1:897961234322:web:5fb3b67d580a01c9983b4b",
   };
 
-  let auth = null, db = null, provider = null, ready = false;
+  let auth = null, db = null, storage = null, provider = null, ready = false;
   try {
     if (typeof firebase === "undefined") throw new Error("Firebase SDK did not load");
     firebase.initializeApp(firebaseConfig);
     auth = firebase.auth();
     db = firebase.firestore();
+    if (firebase.storage) storage = firebase.storage(); // only Elliott Wave loads the Storage SDK
     provider = new firebase.auth.GoogleAuthProvider();
     ready = true;
   } catch (err) {
@@ -56,5 +57,6 @@
     },
     getUser: function () { return currentUser; },
     getDb: function () { return db; },
+    getStorage: function () { return storage; },
   };
 })();
