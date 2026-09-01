@@ -158,6 +158,12 @@
     <input type="password" id="apiKeyInput" placeholder="Twelve Data API key" style="width:220px" />
     <input type="password" id="finnhubKeyInput" placeholder="Finnhub API key (ข่าว/ข้อมูลเพิ่มเติม — ไม่บังคับ)" style="width:260px" />
     <button class="ghost" id="saveKeyBtn">บันทึก key</button>
+    <div class="row" id="syncWidget" style="gap:6px;">
+      <button class="ghost" id="syncSignInBtn" title="ลงชื่อเข้าใช้ด้วย Google เพื่อซิงค์ข้อมูลข้ามอุปกรณ์แบบเรียลไทม์">☁ ซิงค์ข้ามอุปกรณ์</button>
+      <img id="syncAvatar" class="hidden" style="width:26px;height:26px;border-radius:50%;vertical-align:middle;">
+      <span id="syncStatus" class="hidden" style="font-size:11.5px;color:var(--muted);white-space:nowrap;"></span>
+      <button class="ghost hidden" id="syncSignOutBtn" title="ออกจากระบบ (หยุดซิงค์บนเครื่องนี้)">ออกจากระบบ</button>
+    </div>
     <button class="ghost" id="exportBtn" title="ส่งออกข้อมูลทั้งหมด (Elliott Wave + Trade Journal + Stock/Decide) เป็นไฟล์เดียว">⬇ ส่งออกข้อมูลทั้งหมด</button>
     <button class="ghost" id="importBtn" title="นำเข้าไฟล์สำรองรวม — จะเพิ่มต่อท้ายข้อมูลเดิมของทั้ง 3 ระบบ ไม่ทับของเดิม">⬆ นำเข้าข้อมูลทั้งหมด</button>
     <input type="file" id="importInput" accept="application/json" hidden>
@@ -476,6 +482,10 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="firebase-sync.js"></script>
 <script>
 (function () {
   "use strict";
@@ -520,6 +530,7 @@
   document.getElementById("finnhubKeyInput").value = state.finnhubKey;
   updateNoKeyNotice();
   renderQuotaBar();
+  setupCloudSync();
 
   // ---------- API quota tracking (นับฝั่ง client เอง — เก็บค่าประมาณ ไม่ใช่ตัวเลขทางการจากผู้ให้บริการ) ----------
   function pruneMinuteLog(log) {
@@ -979,8 +990,8 @@
   }
 
   // ---------- persistence ----------
-  function saveWatchlist() { localStorage.setItem("sd_watchlist", JSON.stringify(state.watchlist)); }
-  function saveLog() { localStorage.setItem("sd_log", JSON.stringify(state.log)); }
+  function saveWatchlist() { localStorage.setItem("sd_watchlist", JSON.stringify(state.watchlist)); pushCloudSync(); }
+  function saveLog() { localStorage.setItem("sd_log", JSON.stringify(state.log)); pushCloudSync(); }
 
   // ---------- cross-app backup (Elliott Wave + Trade Journal + Stock/Decide) ----------
   // All three pages share one origin, so localStorage/IndexedDB are visible from any
@@ -1169,6 +1180,120 @@
       Swal.fire({ icon: "error", title: "นำเข้าข้อมูลไม่สำเร็จ", text: "ไฟล์อาจเสียหายหรือไม่ใช่ไฟล์สำรองที่ถูกต้อง" });
     }
   });
+
+  /* ---------- cloud sync (Google sign-in, cross-device realtime) ----------
+     Off by default — the app works fully offline/local-only until the user
+     signs in. Every local save also pushes to Firestore when signed in, and
+     a realtime listener pulls in changes made from any other signed-in
+     device. `syncApplyingRemote` breaks the write→snapshot→write feedback
+     loop: while applying a remote update we skip pushing it right back.
+     API keys are intentionally NOT synced — each device keeps its own. */
+  let syncApplyingRemote = false;
+  let syncUnsub = null;
+
+  function pushCloudSync() {
+    if (syncApplyingRemote) return;
+    if (!window.FirebaseSync || !FirebaseSync.getUser()) return;
+    const db = FirebaseSync.getDb();
+    const uid = FirebaseSync.getUser().uid;
+    db.collection("users").doc(uid).collection("sync").doc("stockDecide")
+      .set({ watchlist: state.watchlist, log: state.log, watchlistScores: state.watchlistScores, updatedAt: Date.now() })
+      .catch(function (err) { console.error("sync push failed", err); });
+  }
+
+  function mergeById(localList, remoteList) {
+    const map = {};
+    (remoteList || []).forEach(function (item) { if (item && item.id) map[item.id] = item; });
+    (localList || []).forEach(function (item) { if (item && item.id) map[item.id] = item; }); // local wins on collision
+    return Object.values(map);
+  }
+
+  async function startCloudSync(uid) {
+    const db = FirebaseSync.getDb();
+    const ref = db.collection("users").doc(uid).collection("sync").doc("stockDecide");
+    try {
+      const snap = await ref.get();
+      if (snap.exists) {
+        const remote = snap.data() || {};
+        state.watchlist = Array.from(new Set((remote.watchlist || []).concat(state.watchlist)));
+        state.log = mergeById(state.log, remote.log);
+        state.watchlistScores = Object.assign({}, remote.watchlistScores || {}, state.watchlistScores);
+        syncApplyingRemote = true;
+        saveWatchlist();
+        saveLog();
+        saveWatchlistScores();
+        syncApplyingRemote = false;
+        await ref.set({ watchlist: state.watchlist, log: state.log, watchlistScores: state.watchlistScores, updatedAt: Date.now() });
+      } else {
+        await ref.set({ watchlist: state.watchlist, log: state.log, watchlistScores: state.watchlistScores, updatedAt: Date.now() });
+      }
+    } catch (err) {
+      console.error("initial sync failed", err);
+    }
+    renderWatchlist();
+    renderLog();
+    renderTickerStrip();
+
+    if (syncUnsub) syncUnsub();
+    syncUnsub = ref.onSnapshot(function (snap) {
+      if (!snap.exists) return;
+      const data = snap.data();
+      syncApplyingRemote = true;
+      state.watchlist = data.watchlist || [];
+      state.log = data.log || [];
+      state.watchlistScores = data.watchlistScores || {};
+      saveWatchlist();
+      saveLog();
+      saveWatchlistScores();
+      syncApplyingRemote = false;
+      renderWatchlist();
+      renderLog();
+      renderTickerStrip();
+    }, function (err) { console.error("sync listener error", err); });
+  }
+
+  function setupCloudSync() {
+    if (!window.FirebaseSync || !FirebaseSync.enabled) return;
+    const signInBtn = document.getElementById("syncSignInBtn");
+    const signOutBtn = document.getElementById("syncSignOutBtn");
+    const statusEl = document.getElementById("syncStatus");
+    const avatarEl = document.getElementById("syncAvatar");
+
+    signInBtn.addEventListener("click", async function () {
+      signInBtn.disabled = true;
+      try {
+        await FirebaseSync.signIn();
+      } catch (err) {
+        console.error(err);
+        Swal.fire({ icon: "error", title: "เข้าสู่ระบบไม่สำเร็จ", text: err.message || "" });
+      } finally {
+        signInBtn.disabled = false;
+      }
+    });
+    signOutBtn.addEventListener("click", async function () {
+      if (syncUnsub) { syncUnsub(); syncUnsub = null; }
+      await FirebaseSync.signOut();
+    });
+
+    FirebaseSync.onAuthChange(async function (user) {
+      if (user) {
+        signInBtn.classList.add("hidden");
+        signOutBtn.classList.remove("hidden");
+        avatarEl.classList.remove("hidden");
+        avatarEl.src = user.photoURL || "";
+        statusEl.classList.remove("hidden");
+        statusEl.textContent = "กำลังซิงค์...";
+        await startCloudSync(user.uid);
+        statusEl.textContent = "ซิงค์แล้ว · " + (user.displayName || user.email || "");
+      } else {
+        if (syncUnsub) { syncUnsub(); syncUnsub = null; }
+        signInBtn.classList.remove("hidden");
+        signOutBtn.classList.add("hidden");
+        avatarEl.classList.add("hidden");
+        statusEl.classList.add("hidden");
+      }
+    });
+  }
 
   function updateNoKeyNotice() {
     document.getElementById("noKeyNotice").style.display = state.apiKey ? "none" : "block";
@@ -1403,7 +1528,7 @@
     }
   });
 
-  function saveWatchlistScores() { localStorage.setItem("sd_watchlist_scores", JSON.stringify(state.watchlistScores)); }
+  function saveWatchlistScores() { localStorage.setItem("sd_watchlist_scores", JSON.stringify(state.watchlistScores)); pushCloudSync(); }
 
   function watchlistUpdatedLabel() {
     const times = Object.values(state.watchlistScores).map(function (s) { return s.updatedAt || 0; });

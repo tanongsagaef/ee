@@ -272,6 +272,12 @@
   <div class="row">
     <a href="index.html" class="back-link">← ทบทวน Elliott Wave</a>
     <a href="stock-decision-terminal.html" class="back-link">STOCK/DECIDE</a>
+    <div class="row" id="syncWidget" style="gap:6px;">
+      <button class="ghost" id="syncSignInBtn" title="ลงชื่อเข้าใช้ด้วย Google เพื่อซิงค์ข้อมูลข้ามอุปกรณ์แบบเรียลไทม์">☁ ซิงค์ข้ามอุปกรณ์</button>
+      <img id="syncAvatar" class="hidden" style="width:26px;height:26px;border-radius:50%;vertical-align:middle;">
+      <span id="syncStatus" class="hidden" style="font-size:11.5px;color:var(--muted);white-space:nowrap;"></span>
+      <button class="ghost hidden" id="syncSignOutBtn" title="ออกจากระบบ (หยุดซิงค์บนเครื่องนี้)">ออกจากระบบ</button>
+    </div>
     <button class="ghost" id="exportBtn" title="ส่งออกข้อมูลทั้งหมด (Elliott Wave + Trade Journal + Stock/Decide) เป็นไฟล์เดียว">⬇ ส่งออกข้อมูลทั้งหมด</button>
     <button class="ghost" id="importBtn" title="นำเข้าไฟล์สำรองรวม — จะเพิ่มต่อท้ายข้อมูลเดิมของทั้ง 3 ระบบ ไม่ทับของเดิม">⬆ นำเข้าข้อมูลทั้งหมด</button>
     <input type="file" id="importInput" accept="application/json" hidden>
@@ -521,6 +527,10 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="firebase-sync.js"></script>
 <script>
 (function () {
   "use strict";
@@ -537,14 +547,20 @@
       return Array.isArray(parsed) ? parsed : [];
     } catch (e) { return []; }
   }
-  function saveTrades() { localStorage.setItem(LS_KEY, JSON.stringify(trades)); }
+  function saveTrades() {
+    localStorage.setItem(LS_KEY, JSON.stringify(trades));
+    pushCloudSync();
+  }
 
   const CAPITAL_KEY = "tj_capital";
   function loadCapital() {
     const v = localStorage.getItem(CAPITAL_KEY);
     return v !== null && !isNaN(Number(v)) ? Number(v) : 0;
   }
-  function saveCapital() { localStorage.setItem(CAPITAL_KEY, String(capital)); }
+  function saveCapital() {
+    localStorage.setItem(CAPITAL_KEY, String(capital));
+    pushCloudSync();
+  }
 
   let trades = loadTrades();
   let capital = loadCapital();
@@ -1622,9 +1638,113 @@
     }
   });
 
+  /* ---------- cloud sync (Google sign-in, cross-device realtime) ----------
+     Off by default — the app works fully offline/local-only until the user
+     signs in. Every local save also pushes to Firestore when signed in, and
+     a realtime listener pulls in changes made from any other signed-in
+     device. `syncApplyingRemote` breaks the write→snapshot→write feedback
+     loop: while applying a remote update we skip pushing it right back. */
+  let syncApplyingRemote = false;
+  let syncUnsub = null;
+
+  function pushCloudSync() {
+    if (syncApplyingRemote) return;
+    if (!window.FirebaseSync || !FirebaseSync.getUser()) return;
+    const db = FirebaseSync.getDb();
+    const uid = FirebaseSync.getUser().uid;
+    db.collection("users").doc(uid).collection("sync").doc("tradeJournal")
+      .set({ trades, capital, updatedAt: Date.now() })
+      .catch(err => console.error("sync push failed", err));
+  }
+
+  async function startCloudSync(uid) {
+    const db = FirebaseSync.getDb();
+    const ref = db.collection("users").doc(uid).collection("sync").doc("tradeJournal");
+    try {
+      const snap = await ref.get();
+      if (snap.exists) {
+        const remote = snap.data() || {};
+        const map = {};
+        (remote.trades || []).forEach(t => { map[t.id] = t; });
+        trades.forEach(t => { map[t.id] = t; }); // local wins if the same id exists on both sides
+        trades = Object.values(map);
+        if (remote.capital != null && capital === 0) capital = remote.capital;
+        syncApplyingRemote = true;
+        saveTrades();
+        saveCapital();
+        syncApplyingRemote = false;
+        await ref.set({ trades, capital, updatedAt: Date.now() });
+      } else {
+        await ref.set({ trades, capital, updatedAt: Date.now() });
+      }
+    } catch (err) {
+      console.error("initial sync failed", err);
+    }
+    renderCalendar();
+    renderLog();
+
+    if (syncUnsub) syncUnsub();
+    syncUnsub = ref.onSnapshot(snap => {
+      if (!snap.exists) return;
+      const data = snap.data();
+      syncApplyingRemote = true;
+      trades = data.trades || [];
+      if (data.capital != null) capital = data.capital;
+      saveTrades();
+      saveCapital();
+      syncApplyingRemote = false;
+      renderCalendar();
+      renderLog();
+    }, err => console.error("sync listener error", err));
+  }
+
+  function setupCloudSync() {
+    if (!window.FirebaseSync || !FirebaseSync.enabled) return;
+    const signInBtn = document.getElementById("syncSignInBtn");
+    const signOutBtn = document.getElementById("syncSignOutBtn");
+    const statusEl = document.getElementById("syncStatus");
+    const avatarEl = document.getElementById("syncAvatar");
+
+    signInBtn.addEventListener("click", async () => {
+      signInBtn.disabled = true;
+      try {
+        await FirebaseSync.signIn();
+      } catch (err) {
+        console.error(err);
+        Swal.fire({ icon: "error", title: "เข้าสู่ระบบไม่สำเร็จ", text: err.message || "" });
+      } finally {
+        signInBtn.disabled = false;
+      }
+    });
+    signOutBtn.addEventListener("click", async () => {
+      if (syncUnsub) { syncUnsub(); syncUnsub = null; }
+      await FirebaseSync.signOut();
+    });
+
+    FirebaseSync.onAuthChange(async (user) => {
+      if (user) {
+        signInBtn.classList.add("hidden");
+        signOutBtn.classList.remove("hidden");
+        avatarEl.classList.remove("hidden");
+        avatarEl.src = user.photoURL || "";
+        statusEl.classList.remove("hidden");
+        statusEl.textContent = "กำลังซิงค์...";
+        await startCloudSync(user.uid);
+        statusEl.textContent = "ซิงค์แล้ว · " + (user.displayName || user.email || "");
+      } else {
+        if (syncUnsub) { syncUnsub(); syncUnsub = null; }
+        signInBtn.classList.remove("hidden");
+        signOutBtn.classList.add("hidden");
+        avatarEl.classList.add("hidden");
+        statusEl.classList.add("hidden");
+      }
+    });
+  }
+
   /* ---------- init ---------- */
   toggleMarketFields();
   updateSideToggle();
+  setupCloudSync();
   renderCalendar();
 })();
 </script>
