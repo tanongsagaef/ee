@@ -466,7 +466,10 @@
       <summary>ตั้งค่า API key</summary>
       <div class="field" style="margin-top:10px;">
         <label class="small">Google Gemini API key (ฟรี — ขอที่ aistudio.google.com/apikey)</label>
-        <input type="password" id="cvGeminiKey" placeholder="AIza...">
+        <div style="display:flex;gap:6px;">
+          <input type="password" id="cvGeminiKey" placeholder="AIza..." autocomplete="off" style="flex:1;">
+          <button type="button" class="ghost" id="cvGeminiKeyToggle" style="flex:0 0 auto;padding:4px 10px;font-size:12px;">แสดง</button>
+        </div>
       </div>
       <div class="row">
         <div class="field" style="min-width:150px;">
@@ -478,7 +481,7 @@
         </div>
         <div class="field" style="min-width:150px;">
           <label class="small">Twelve Data API key (ใช้ร่วมกับหน้า Stock/Decide)</label>
-          <input type="password" id="cvTdKey" placeholder="Twelve Data key">
+          <input type="password" id="cvTdKey" placeholder="Twelve Data key" autocomplete="off">
         </div>
       </div>
       <button class="ghost" id="cvSaveKeys">บันทึกการตั้งค่า</button>
@@ -2569,6 +2572,12 @@
     cvEl("cvClearLevels").addEventListener("click", () => {
       cv.levels = []; cv.swings = [];
       cvPersistLevels(); cvRedrawLevels();
+    });
+    cvEl("cvGeminiKeyToggle").addEventListener("click", () => {
+      const inp = cvEl("cvGeminiKey");
+      const show = inp.type === "password";
+      inp.type = show ? "text" : "password";
+      cvEl("cvGeminiKeyToggle").textContent = show ? "ซ่อน" : "แสดง";
     });
     cvEl("cvSaveKeys").addEventListener("click", () => {
       try {
