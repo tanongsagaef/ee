@@ -935,7 +935,7 @@
     if (s.indexOf(":") !== -1) return s.toUpperCase();
     return s.replace(/[\s/]+/g, "").toUpperCase();
   }
-  function renderTvWidget(containerId, symbol) {
+  function renderTvWidget(containerId, symbol, interval, timezone) {
     const el = document.getElementById(containerId);
     if (!el) return;
     el.innerHTML = "";
@@ -949,8 +949,8 @@
       container_id: containerId,
       autosize: true,
       symbol: symbol,
-      interval: "D",
-      timezone: "Asia/Bangkok",
+      interval: interval || "D",
+      timezone: timezone || "Asia/Bangkok",
       theme: theme,
       style: "1",
       locale: "th",
@@ -2019,8 +2019,9 @@
   }
 
   async function cvFetchCandles(sym, interval, key) {
+    // timezone=UTC so datetimes are real UTC — cvTdTime appends 'Z'
     const url = "https://api.twelvedata.com/time_series?symbol=" + encodeURIComponent(sym) +
-      "&interval=" + encodeURIComponent(interval) + "&outputsize=350&order=ASC&apikey=" + encodeURIComponent(key);
+      "&interval=" + encodeURIComponent(interval) + "&outputsize=350&order=ASC&timezone=UTC&apikey=" + encodeURIComponent(key);
     const res = await fetch(url);
     const j = await res.json();
     if (j.status === "error" || (j.code && j.code !== 200)) throw new Error(j.message || "ดึงข้อมูลราคาไม่สำเร็จ");
@@ -2338,6 +2339,11 @@
     try { localStorage.setItem(CV_LS.intv, tf); } catch (e) {}
     if (cv.candles.length || cvEl("cvDataSymbol").value.trim()) cvLoad();
   }
+  // app interval -> TradingView widget interval code
+  const CV_TV_INTERVAL = {
+    "1min": "1", "5min": "5", "15min": "15", "30min": "30",
+    "1h": "60", "2h": "120", "4h": "240", "1day": "D", "1week": "W",
+  };
 
   async function cvLoad() {
     const tvSym = cvEl("cvSymbol").value.trim();
@@ -2352,10 +2358,18 @@
       if (tdKey) localStorage.setItem("sd_api_key", tdKey);
     } catch (e) {}
 
-    if (tvSym) renderTvWidget("cvTvChart", tvSym.toUpperCase());
+    const tvInt = CV_TV_INTERVAL[interval] || "D";
+    if (tvSym) {
+      const su = tvSym.toUpperCase();
+      if (cv._tvSym !== su || cv._tvInt !== tvInt) {
+        renderTvWidget("cvTvChart", su, tvInt, "Etc/UTC");
+        cv._tvSym = su; cv._tvInt = tvInt;
+      }
+    }
 
     if (!dSym) { cvShowMsg("ใส่สัญลักษณ์ข้อมูลราคา (Twelve Data) เช่น AAPL หรือ BTC/USD"); return; }
     if (!tdKey) { cvShowMsg("ใส่ Twelve Data API key ในส่วน 'ตั้งค่า API key' ก่อน (ใช้ร่วมกับหน้า Stock/Decide)"); return; }
+    if (!cv.series) { cvShowMsg("กราฟวิเคราะห์ยังไม่พร้อม ลองรีเฟรชหน้า (Ctrl+Shift+R)"); return; }
     cvShowMsg("");
     cvEl("cvLoadBtn").disabled = true;
     cvEl("cvLoadBtn").textContent = "กำลังโหลด…";
