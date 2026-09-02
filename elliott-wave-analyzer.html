@@ -187,7 +187,7 @@
           <option value="15m">15m</option><option value="1h" selected>1h</option>
           <option value="4h">4h</option><option value="1d">1D</option><option value="1w">1W</option>
         </select>
-        <input id="limIn" type="number" min="30" max="1000" step="10" value="200" style="width:74px;" title="จำนวนแท่ง">
+        <input id="limIn" type="number" min="30" max="1000" step="10" value="200" style="width:74px;" title="แท่งเริ่มต้น (เลื่อนดูอดีตได้ไม่จำกัด)">
         <button class="btn solid" id="loadBtn">โหลดกราฟ</button>
         <label class="chk"><input type="checkbox" id="liveChk"> สด</label>
         <span class="muted-note" id="loadMsg"></span>
@@ -197,11 +197,16 @@
           <button data-m="impulse" class="active">อิมพัลส์ 0-1-2-3-4-5</button>
           <button data-m="corrective">คลื่นแก้ตัว 0-A-B-C</button>
         </span>
+        <button class="btn" id="drawBtn">✏️ วางจุดคลื่น</button>
         <label class="chk"><input type="checkbox" id="snapChk" checked> สแนปเข้าราคา</label>
         <button class="btn" id="undoBtn">↶ ถอยจุด</button>
         <button class="btn" id="clearBtn">นับใหม่</button>
+        <button class="btn" id="zoomInBtn" title="ซูมเข้า">＋</button>
+        <button class="btn" id="zoomOutBtn" title="ซูมออก">－</button>
+        <button class="btn" id="fitBtn" title="กลับไปแท่งล่าสุด">⟲ ล่าสุด</button>
         <button class="btn" id="importBtn">นำเข้าข้อมูล</button>
       </div>
+      <div class="status" id="toolHint"></div>
       <div class="importbox" id="importBox" hidden>
         <textarea id="importTa" placeholder="วางราคาปิดบรรทัดละค่า หรือ &quot;วันที่,ราคา&quot; ต่อบรรทัด (อย่างน้อย 12 ค่า)"></textarea>
         <div style="margin-top:6px;display:flex;gap:8px;">
@@ -294,11 +299,34 @@
   let barLimit = 200;
   let live = false;
   let ws = null;
-  let points = [];                // [{ i, v }]  wave pivots, in placed order
+  let points = [];                // [{ i, v }]  wave pivots; i = absolute index into series/candles
   let snap = true;
   let scales = null;
   let dragIdx = null;
   let scenarios = [];
+
+  let view = { i0: 0, n: 120 };   // visible window: first bar index + bar count
+  let tool = "pan";               // "pan" (drag = scroll history) | "draw" (tap = place pivot)
+  let press = null;               // active background press: { x0, y0, i00, moved }
+  let loadingOlder = false, noMoreHistory = false;
+
+  let rafPend = false;
+  function scheduleDraw() {
+    if (rafPend) return;
+    rafPend = true;
+    requestAnimationFrame(() => { rafPend = false; draw(); });
+  }
+  function clampView() {
+    const N = series.length;
+    view.n = clamp(Math.round(view.n) || 120, Math.min(20, N), Math.max(1, N));
+    view.i0 = clamp(Math.round(view.i0) || 0, 0, Math.max(0, N - view.n));
+  }
+  function fitView(n) {
+    const N = series.length;
+    view.n = clamp(n || view.n || 120, Math.min(20, N), Math.max(1, N));
+    view.i0 = Math.max(0, N - view.n);
+  }
+  const seriesAt = (i) => series[clamp(i, 0, series.length - 1)];
 
   const need = () => (mode === "impulse" ? 6 : 4);
   const labels = () => (mode === "impulse" ? ["0", "1", "2", "3", "4", "5"] : ["0", "A", "B", "C"]);
@@ -356,11 +384,12 @@
       if (last && last.t === bar.t) {
         candles[candles.length - 1] = bar;
       } else if (!last || bar.t > last.t) {
+        const atEnd = view.i0 + view.n >= candles.length - 1;
         candles.push(bar);
-        while (candles.length > barLimit) { candles.shift(); points.forEach(p => { p.i = Math.max(0, p.i - 1); }); }
+        if (atEnd) view.i0 = Math.max(0, candles.length - view.n);
       }
       series = candles.map(c => c.c);
-      draw(); renderAnalysis();
+      scheduleDraw(); renderAnalysis();
     };
     sock.onclose = () => { if (ws === sock && live) setTimeout(() => { if (live) openWS(); }, 3000); };
   }
@@ -368,9 +397,11 @@
 
   let loadSeq = 0;
   async function doLoad() {
+    noMoreHistory = false;
     if (src === "sim") {
       closeWS();
       series = genSeries(); candles = null; points = [];
+      fitView(120);
       $("loadMsg").textContent = "กราฟจำลอง";
       update();
       return;
@@ -383,6 +414,7 @@
       candles = c;
       series = c.map(x => x.c);
       points = [];
+      fitView(120);
       $("loadMsg").textContent = symbol.toUpperCase() + " " + interval + " · " + c.length + " แท่ง · ล่าสุด " + fmt(c[c.length - 1].c);
       update();
       if (live) openWS();
@@ -390,6 +422,63 @@
       if (seq !== loadSeq) return;
       $("loadMsg").textContent = "โหลดไม่สำเร็จ: " + err.message + " — ใช้กราฟเดิม";
     }
+  }
+
+  /* pull an older page of klines and prepend it (endless history scroll) */
+  async function loadOlder() {
+    if (src !== "binance" || loadingOlder || noMoreHistory || !candles || !candles.length) return;
+    loadingOlder = true;
+    const prev = $("loadMsg").textContent;
+    $("loadMsg").textContent = "กำลังโหลดอดีต…";
+    try {
+      const sym = symbol.toUpperCase().replace(/[^A-Z0-9]/g, "");
+      const url = `https://data-api.binance.vision/api/v3/klines?symbol=${sym}&interval=${interval}&limit=1000&endTime=${candles[0].t - 1}`;
+      const r = await fetch(url);
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const raw = await r.json();
+      const older = (Array.isArray(raw) ? raw : [])
+        .map(k => ({ t: k[0], o: +k[1], h: +k[2], l: +k[3], c: +k[4] }))
+        .filter(o => o.t < candles[0].t);
+      if (!older.length) { noMoreHistory = true; $("loadMsg").textContent = "ถึงจุดเริ่มข้อมูลแล้ว"; return; }
+      candles = older.concat(candles);
+      series = candles.map(c => c.c);
+      points.forEach(p => { p.i += older.length; });
+      view.i0 += older.length;
+      if (press) press.i00 += older.length;
+      $("loadMsg").textContent = prev;
+      draw();
+    } catch (e) {
+      $("loadMsg").textContent = "โหลดอดีตไม่สำเร็จ";
+    } finally {
+      loadingOlder = false;
+    }
+  }
+
+  /* ---------- chart tools ---------- */
+  function setTool(t) {
+    tool = t;
+    svg.style.cursor = t === "draw" ? "crosshair" : "grab";
+    const b = $("drawBtn");
+    b.classList.toggle("solid", t === "draw");
+    b.textContent = t === "draw" ? "● กำลังวางจุด" : "✏️ วางจุดคลื่น";
+    $("toolHint").textContent = t === "draw"
+      ? `วางจุด: แตะบนกราฟไล่ ${labels().join(" → ")}  ·  ลากพื้นที่ว่าง = เลื่อนกราฟ · ลากจุด = ปรับ`
+      : "เลื่อนกราฟ: ลากซ้าย/ขวาดูอดีต · ล้อเมาส์ = ซูม · ปุ่ม “วางจุดคลื่น” เพื่อเริ่มนับ";
+  }
+  function enterDraw() {
+    if (points.length >= need()) points = [];
+    setTool("draw");
+    update();
+  }
+  function zoom(factor, anchorFrac) {
+    const N = series.length;
+    const f = anchorFrac == null ? 0.5 : anchorFrac;
+    const anchorBar = view.i0 + f * (view.n - 1);
+    const n = clamp(Math.round(view.n * factor), Math.min(20, N), N);
+    view.n = n;
+    view.i0 = clamp(Math.round(anchorBar - f * (n - 1)), 0, Math.max(0, N - n));
+    scheduleDraw();
+    saveDraftSoon();
   }
 
   /* ---------- chart ---------- */
@@ -401,17 +490,24 @@
     const w = Math.max(320, rect.width), h = Math.max(300, rect.height);
     svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
     const N = series.length;
+    clampView();
     const hasC = candles && candles.length === N;
+    const a = view.i0, b = Math.min(N - 1, view.i0 + view.n - 1);   // visible bar range
+    const iw = w - PAD.l - PAD.r, ih = h - PAD.t - PAD.b;
+
+    // vertical scale auto-fits the visible window only
     let dvals = [];
-    if (hasC) { for (const c of candles) { dvals.push(c.h, c.l); } }
-    else { dvals = series.slice(); }
-    const vals = dvals.concat(points.map(p => p.v));
-    let lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
+    for (let i = a; i <= b; i++) {
+      if (hasC) { dvals.push(candles[i].h, candles[i].l); } else { dvals.push(series[i]); }
+    }
+    points.forEach(p => { if (p.i >= a && p.i <= b) dvals.push(p.v); });
+    let lo = Math.min.apply(null, dvals), hi = Math.max.apply(null, dvals);
+    if (!isFinite(lo) || !isFinite(hi) || lo === hi) { lo = (lo || 0) - 1; hi = (hi || 0) + 1; }
     const pad = (hi - lo) * 0.06 || 1;
     lo -= pad; hi += pad;
 
-    const xFor = (i) => PAD.l + (i / (N - 1)) * (w - PAD.l - PAD.r);
-    const yFor = (v) => PAD.t + (1 - (v - lo) / (hi - lo)) * (h - PAD.t - PAD.b);
+    const xFor = (i) => PAD.l + ((i - view.i0) / (view.n - 1)) * iw;
+    const yFor = (v) => PAD.t + (1 - (v - lo) / (hi - lo)) * ih;
 
     let grid = "";
     for (let t = 0; t <= 4; t++) {
@@ -422,9 +518,9 @@
 
     let priceLayer;
     if (hasC) {
-      const bw = Math.max(1, (w - PAD.l - PAD.r) / N * 0.62);
+      const bw = Math.max(1, iw / view.n * 0.62);
       let cs = "";
-      for (let i = 0; i < N; i++) {
+      for (let i = a; i <= b; i++) {
         const c = candles[i], x = xFor(i);
         const col = c.c >= c.o ? "var(--bull)" : "var(--bear)";
         const yO = yFor(c.o), yC = yFor(c.c);
@@ -434,8 +530,8 @@
       priceLayer = `<g opacity="0.92">${cs}</g>`;
     } else {
       let d = "";
-      for (let i = 0; i < N; i++) d += (i ? "L" : "M") + xFor(i).toFixed(1) + " " + yFor(series[i]).toFixed(1) + " ";
-      const area = d + `L${xFor(N - 1).toFixed(1)} ${yFor(lo).toFixed(1)} L${xFor(0).toFixed(1)} ${yFor(lo).toFixed(1)} Z`;
+      for (let i = a; i <= b; i++) d += (i === a ? "M" : "L") + xFor(i).toFixed(1) + " " + yFor(series[i]).toFixed(1) + " ";
+      const area = d + `L${xFor(b).toFixed(1)} ${yFor(lo).toFixed(1)} L${xFor(a).toFixed(1)} ${yFor(lo).toFixed(1)} Z`;
       priceLayer = `<path class="area" d="${area}"/><path class="ser" d="${d}"/>`;
     }
 
@@ -443,16 +539,18 @@
     points.forEach((p, idx) => {
       const x = xFor(p.i), y = yFor(p.v);
       wl += (idx ? "L" : "M") + x.toFixed(1) + " " + y.toFixed(1) + " ";
-      wm += `<g class="mk" data-idx="${idx}">` +
-            `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="6"/>` +
-            `<text x="${x.toFixed(1)}" y="${(y - 12).toFixed(1)}" text-anchor="middle">${labels()[idx]}</text></g>`;
+      if (x >= PAD.l - 60 && x <= w + 60) {
+        wm += `<g class="mk" data-idx="${idx}">` +
+              `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="6"/>` +
+              `<text x="${x.toFixed(1)}" y="${(y - 12).toFixed(1)}" text-anchor="middle">${labels()[idx]}</text></g>`;
+      }
     });
 
     let xlab = "";
     if (hasC) {
       const fd = (ms) => new Date(ms).toLocaleDateString("th-TH", { day: "2-digit", month: "short" });
-      xlab = `<text class="axis" x="${PAD.l}" y="${(h - 8).toFixed(1)}">${fd(candles[0].t)}</text>` +
-             `<text class="axis" x="${(w - PAD.r).toFixed(1)}" y="${(h - 8).toFixed(1)}" text-anchor="end">${fd(candles[N - 1].t)}</text>`;
+      xlab = `<text class="axis" x="${PAD.l}" y="${(h - 8).toFixed(1)}">${fd(candles[a].t)}</text>` +
+             `<text class="axis" x="${(w - PAD.r).toFixed(1)}" y="${(h - 8).toFixed(1)}" text-anchor="end">${fd(candles[b].t)}</text>`;
     }
 
     svg.innerHTML =
@@ -460,8 +558,8 @@
       (points.length ? `<path class="wave" d="${wl}"/>` : "") + wm + xlab;
 
     scales = {
-      iFromX: (x) => clamp(Math.round((x - PAD.l) / (w - PAD.l - PAD.r) * (N - 1)), 0, N - 1),
-      vFromY: (y) => lo + (1 - (y - PAD.t) / (h - PAD.t - PAD.b)) * (hi - lo),
+      iFromX: (x) => clamp(Math.round(view.i0 + (x - PAD.l) / iw * (view.n - 1)), 0, N - 1),
+      vFromY: (y) => lo + (1 - (y - PAD.t) / ih) * (hi - lo),
     };
   }
 
@@ -470,28 +568,58 @@
     return { x: e.clientX - r.left, y: e.clientY - r.top };
   }
 
+  const chartW = () => Math.max(320, svg.getBoundingClientRect().width);
+
   svg.addEventListener("pointerdown", (e) => {
     const mk = e.target.closest(".mk");
     if (mk) { dragIdx = +mk.dataset.idx; svg.setPointerCapture(e.pointerId); return; }
-    if (points.length >= need()) return;
     const { x, y } = svgXY(e);
-    const i = scales.iFromX(x);
-    points.push({ i, v: snap ? series[i] : +scales.vFromY(y).toFixed(2) });
-    update();
+    press = { x0: x, y0: y, i00: view.i0, moved: false };
+    svg.setPointerCapture(e.pointerId);
   });
   svg.addEventListener("pointermove", (e) => {
-    if (dragIdx == null) return;
     const { x, y } = svgXY(e);
-    const i = scales.iFromX(x);
-    points[dragIdx] = { i, v: snap ? series[i] : +scales.vFromY(y).toFixed(2) };
-    update();
+    if (dragIdx != null) {
+      const i = scales.iFromX(x);
+      points[dragIdx] = { i, v: snap ? seriesAt(i) : +scales.vFromY(y).toFixed(2) };
+      update();
+      return;
+    }
+    if (!press) return;
+    const dx = x - press.x0;
+    if (!press.moved && Math.hypot(dx, y - press.y0) > 5) press.moved = true;
+    if (press.moved) {
+      const barPx = (chartW() - PAD.l - PAD.r) / Math.max(1, view.n - 1);
+      let i0 = Math.round(press.i00 - dx / barPx);
+      if (i0 < 0 && src === "binance" && !noMoreHistory && !loadingOlder) loadOlder();
+      view.i0 = clamp(i0, 0, Math.max(0, series.length - view.n));
+      scheduleDraw();
+    }
   });
-  const endDrag = () => { dragIdx = null; };
-  svg.addEventListener("pointerup", endDrag);
-  svg.addEventListener("pointercancel", endDrag);
+  function endPress() {
+    if (dragIdx != null) { dragIdx = null; return; }
+    if (press && !press.moved && tool === "draw" && points.length < need()) {
+      const i = scales.iFromX(press.x0);
+      points.push({ i, v: snap ? seriesAt(i) : +scales.vFromY(press.y0).toFixed(2) });
+      if (points.length >= need()) setTool("pan");
+      update();
+    } else if (press && press.moved) {
+      saveDraftSoon();
+    }
+    press = null;
+  }
+  svg.addEventListener("pointerup", endPress);
+  svg.addEventListener("pointercancel", () => { dragIdx = null; press = null; });
 
-  if (window.ResizeObserver) new ResizeObserver(() => draw()).observe(svg);
-  window.addEventListener("resize", draw);
+  svg.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const { x } = svgXY(e);
+    const frac = clamp((x - PAD.l) / (chartW() - PAD.l - PAD.r), 0, 1);
+    zoom(e.deltaY > 0 ? 1.18 : 0.85, frac);
+  }, { passive: false });
+
+  if (window.ResizeObserver) new ResizeObserver(() => scheduleDraw()).observe(svg);
+  window.addEventListener("resize", scheduleDraw);
 
   /* ---------- analysis: impulse ---------- */
   function analyzeImpulse(P) {
@@ -687,28 +815,48 @@
     renderAnalysis();
     saveDraft();
   }
+  let saveT = 0;
+  function saveDraftSoon() { clearTimeout(saveT); saveT = setTimeout(saveDraft, 400); }
 
   /* ---------- draft persistence ---------- */
+  const DRAFT_CAND_CAP = 2000;
   function saveDraft() {
     try {
-      localStorage.setItem(DRAFT_KEY, JSON.stringify({ mode, series, candles, points, snap, src, symbol, interval, barLimit }));
+      const payload = { mode, points, snap, src, symbol, interval, barLimit, view };
+      if (candles) {
+        let cs = candles, pts = points, v = view;
+        if (candles.length > DRAFT_CAND_CAP) {
+          const off = candles.length - DRAFT_CAND_CAP;
+          cs = candles.slice(off);
+          pts = points.map(p => ({ i: p.i - off, v: p.v })).filter(p => p.i >= 0);
+          v = { i0: Math.max(0, view.i0 - off), n: view.n };
+        }
+        payload.candles = cs; payload.points = pts; payload.view = v;
+      } else {
+        payload.series = series;
+      }
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(payload));
     } catch (e) {}
   }
   function loadDraft() {
     try {
       const d = JSON.parse(localStorage.getItem(DRAFT_KEY) || "null");
-      if (d && Array.isArray(d.series) && d.series.length > 10) {
-        mode = d.mode === "corrective" ? "corrective" : "impulse";
-        series = d.series;
-        candles = Array.isArray(d.candles) && d.candles.length === d.series.length ? d.candles : null;
-        points = Array.isArray(d.points) ? d.points.filter(p => p && typeof p.i === "number" && typeof p.v === "number") : [];
-        snap = d.snap !== false;
-        src = d.src === "sim" ? "sim" : "binance";
-        if (d.symbol) symbol = String(d.symbol).toUpperCase();
-        if (d.interval) interval = d.interval;
-        if (d.barLimit) barLimit = clamp(d.barLimit | 0, 30, 1000);
-        return true;
-      }
+      if (!d) return false;
+      if (Array.isArray(d.candles) && d.candles.length > 10) {
+        candles = d.candles; series = candles.map(c => c.c);
+      } else if (Array.isArray(d.series) && d.series.length > 10) {
+        candles = null; series = d.series;
+      } else return false;
+      mode = d.mode === "corrective" ? "corrective" : "impulse";
+      points = Array.isArray(d.points) ? d.points.filter(p => p && typeof p.i === "number" && typeof p.v === "number") : [];
+      snap = d.snap !== false;
+      src = d.src === "sim" ? "sim" : "binance";
+      if (d.symbol) symbol = String(d.symbol).toUpperCase();
+      if (d.interval) interval = d.interval;
+      if (d.barLimit) barLimit = clamp(d.barLimit | 0, 30, 1000);
+      if (d.view && typeof d.view.i0 === "number") view = { i0: d.view.i0, n: d.view.n || 120 };
+      else fitView(120);
+      return true;
     } catch (e) {}
     return false;
   }
@@ -748,15 +896,21 @@
       const s = scenarios[+el.dataset.load];
       if (!s) return;
       live = false; $("liveChk").checked = false; closeWS();
+      noMoreHistory = false;
       mode = s.mode === "corrective" ? "corrective" : "impulse";
-      series = s.series.slice();
-      candles = Array.isArray(s.candles) && s.candles.length === s.series.length ? s.candles.slice() : null;
+      if (Array.isArray(s.candles) && s.candles.length > 5) {
+        candles = s.candles.slice(); series = candles.map(c => c.c); src = "binance";
+      } else {
+        candles = null; series = (s.series || []).slice(); src = "sim";
+      }
       points = s.points.map(p => ({ i: p.i, v: p.v }));
-      src = candles ? "binance" : "sim";
+      if (s.view && typeof s.view.i0 === "number") view = { i0: s.view.i0, n: s.view.n || 120 };
+      else fitView(120);
       if (s.symbol) { symbol = s.symbol; $("symIn").value = s.symbol; }
       if (s.interval) { interval = s.interval; $("tfSel").value = s.interval; }
       [...$("srcSeg").children].forEach(b => b.classList.toggle("active", b.dataset.s === src));
       [...$("modeSeg").children].forEach(b => b.classList.toggle("active", b.dataset.m === mode));
+      setTool("pan");
       update();
     } else {
       scenarios.splice(+el.dataset.del, 1);
@@ -767,14 +921,23 @@
     if (points.length < need()) { alert("วางจุดให้ครบก่อนบันทึก scenario"); return; }
     const name = $("scName").value.trim() || new Date().toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" });
     const top = lastAnalysis && lastAnalysis.cands[0] ? { label: lastAnalysis.cands[0].label, conf: lastAnalysis.cands[0].conf } : null;
+    const CAP = 800;
+    let cs = candles, pts = points.map(p => ({ i: p.i, v: p.v })), v = { i0: view.i0, n: view.n };
+    if (candles && candles.length > CAP) {
+      const off = candles.length - CAP;
+      cs = candles.slice(off);
+      pts = pts.map(p => ({ i: p.i - off, v: p.v }));
+      v = { i0: Math.max(0, view.i0 - off), n: view.n };
+    }
     scenarios.unshift({
       id: Date.now(), name, myGuess: $("scGuess").value.trim(),
       mode,
       symbol: src === "binance" ? symbol : null,
       interval: src === "binance" ? interval : null,
-      series: series.slice(),
-      candles: candles ? candles.slice() : null,
-      points: points.map(p => ({ i: p.i, v: p.v })),
+      series: candles ? null : series.slice(),
+      candles: cs ? cs.slice() : null,
+      points: pts,
+      view: v,
       top, createdAt: Date.now(),
     });
     $("scName").value = ""; $("scGuess").value = "";
@@ -787,11 +950,15 @@
     mode = b.dataset.m;
     [...$("modeSeg").children].forEach(x => x.classList.toggle("active", x === b));
     points = [];
-    update();
+    enterDraw();
   });
+  $("drawBtn").addEventListener("click", () => { tool === "draw" ? setTool("pan") : enterDraw(); });
   $("snapChk").addEventListener("change", (e) => { snap = e.target.checked; saveDraft(); });
   $("undoBtn").addEventListener("click", () => { points.pop(); update(); });
-  $("clearBtn").addEventListener("click", () => { points = []; update(); });
+  $("clearBtn").addEventListener("click", () => { points = []; enterDraw(); });
+  $("zoomInBtn").addEventListener("click", () => zoom(0.7));
+  $("zoomOutBtn").addEventListener("click", () => zoom(1.4));
+  $("fitBtn").addEventListener("click", () => { fitView(120); scheduleDraw(); saveDraftSoon(); });
 
   $("srcSeg").addEventListener("click", (e) => {
     const b = e.target.closest("button"); if (!b || b.dataset.s === src) return;
@@ -824,8 +991,10 @@
     }).filter(v => !isNaN(v));
     if (nums.length < 12) { alert("ต้องมีอย่างน้อย 12 ค่า"); return; }
     src = "sim"; live = false; $("liveChk").checked = false; closeWS();
+    noMoreHistory = false;
     [...$("srcSeg").children].forEach(x => x.classList.toggle("active", x.dataset.s === "sim"));
     series = nums; candles = null; points = [];
+    fitView(120);
     $("importBox").hidden = true;
     $("loadMsg").textContent = "นำเข้า " + nums.length + " ค่า";
     update();
@@ -876,13 +1045,16 @@
   if (!loadDraft()) {
     src = "binance"; symbol = "BTCUSDT"; interval = "1h"; barLimit = 200;
     series = genSeries(1); candles = null; points = [];
+    fitView(120);
   }
+  clampView();
   $("snapChk").checked = snap;
   $("symIn").value = symbol;
   $("tfSel").value = interval;
   $("limIn").value = barLimit;
   [...$("srcSeg").children].forEach(b => b.classList.toggle("active", b.dataset.s === src));
   [...$("modeSeg").children].forEach(b => b.classList.toggle("active", b.dataset.m === mode));
+  setTool("pan");
   loadScenarios();
   renderScenarios();
   requestAnimationFrame(() => {
