@@ -99,6 +99,8 @@
   svg.chart .ser { fill: none; stroke: var(--muted); stroke-width: 1.5; opacity: .55; }
   svg.chart .wave { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-linejoin: round; }
   svg.chart .zz { fill: none; stroke: var(--warn); stroke-width: 1.4; stroke-dasharray: 4 3; opacity: .85; }
+  svg.chart .chan { fill: none; stroke: var(--accent); stroke-width: 1; opacity: .55; }
+  svg.chart .chan-l { fill: var(--accent); font: 9px ui-monospace, monospace; opacity: .8; }
   svg.chart .zzdot { fill: var(--warn); opacity: .9; }
   svg.chart .subdot { fill: var(--bull); }
   svg.chart .mk circle { fill: var(--surface); stroke: var(--accent); stroke-width: 2.5; cursor: grab; }
@@ -228,6 +230,7 @@
         <input type="range" id="scanSens" min="1" max="12" value="4" title="ความไว: น้อย=จับ swing ใหญ่" style="width:96px;vertical-align:middle;">
         <button class="btn" id="proposeBtn" title="สแกนทั้งกราฟแล้วเสนอ count">🧩 เสนอ count</button>
         <button class="btn" id="degreeBtn" title="ตรวจว่าแต่ละคลื่นย่อยครบตามทฤษฎีไหม">🔬 ตรวจซับเวฟ</button>
+        <button class="btn" id="chanBtn" title="เส้นแชนเนล 0-2 / 2-4 / 1-3 / B-D">📏 แชนเนล</button>
       </div>
       <div class="status" id="toolHint"></div>
       <div class="toolbar" id="subHint" hidden>
@@ -395,6 +398,7 @@
   let subA4Overlap = false;       // wave-4 of A overlaps wave-1 of A → must be Flat
   let scanOn = false;             // Phase 4: auto zigzag/swing overlay
   let scanSens = 4;               // 1..12 sensitivity slider
+  let chanOn = false;             // channel trendline overlay (0-2 / 2-4 / 1-3 / B-D ...)
   let subScan = null;             // transient sub-wave pivots over wave A: [{i,v}]
   let proposals = [];             // Phase 4.3: auto-proposed counts
   let degreeScan = null;          // Phase 4.4: per-leg finer pivots [{pivots:[{i,v}],count,exp,ok}]
@@ -722,6 +726,27 @@
         subLayer += `<path class="zz" style="stroke:${col};stroke-dasharray:none;opacity:.55" d="${path}"/>${dots}`;
       });
     }
+    if (chanOn && points.length >= need()) {
+      const p = points, xr0 = view.i0, xr1 = view.i0 + view.n - 1;
+      const seg = (i1, i2, name) => {
+        const x1 = p[i1].i, y1 = p[i1].v, x2 = p[i2].i, y2 = p[i2].v;
+        const m = (y2 - y1) / ((x2 - x1) || 1);
+        const yL = y1 + m * (xr0 - x1), yR = y1 + m * (xr1 - x1);
+        return `<path class="chan" d="M${xFor(xr0).toFixed(1)} ${yFor(yL).toFixed(1)} L${xFor(xr1).toFixed(1)} ${yFor(yR).toFixed(1)}"/>` +
+          `<text class="chan-l" x="${(xFor(xr1) - 4).toFixed(1)}" y="${(yFor(yR) - 3).toFixed(1)}" text-anchor="end">${name}</text>`;
+      };
+      const par = (i1, i2, thru, name) => {   // line parallel to i1-i2 through point `thru`
+        const x1 = p[i1].i, y1 = p[i1].v, x2 = p[i2].i, y2 = p[i2].v;
+        const m = (y2 - y1) / ((x2 - x1) || 1), bx = p[thru].i, by = p[thru].v;
+        const yL = by + m * (xr0 - bx), yR = by + m * (xr1 - bx);
+        return `<path class="chan" style="opacity:.35" d="M${xFor(xr0).toFixed(1)} ${yFor(yL).toFixed(1)} L${xFor(xr1).toFixed(1)} ${yFor(yR).toFixed(1)}"/>` +
+          `<text class="chan-l" x="${(xFor(xr1) - 4).toFixed(1)}" y="${(yFor(yR) - 3).toFixed(1)}" text-anchor="end">${name}</text>`;
+      };
+      if (mode === "impulse") subLayer += seg(0, 2, "0-2") + seg(2, 4, "2-4") + seg(1, 3, "1-3") + par(2, 4, 3, "2-4∥");
+      else if (mode === "corrective") subLayer += seg(0, 2, "0-B") + par(0, 2, 1, "∥A");
+      else if (mode === "triangle") subLayer += seg(2, 4, "B-D") + seg(1, 3, "A-C") + seg(3, 5, "C-E");
+      else if (mode === "combination") subLayer += seg(0, 2, "0-Y") + par(0, 2, 1, "∥");
+    }
 
     svg.innerHTML =
       `<g>${grid}</g>` + priceLayer + zzLayer +
@@ -1006,6 +1031,61 @@
       fib: { w3ofW1: 0.618, w5ofW3: 0.618 },
       endingNote: "อยู่คลื่น 5 หรือ C หลังจบ ราคาย้อนทั้ง diagonal เร็ว ๆ ไปที่จุดเริ่ม",
       leadingNote: "อยู่คลื่น 1 หรือ A เริ่มเทรนด์ใหม่",
+    },
+    channeling: {
+      wave2: {
+        line: "0-2",
+        rules: [
+          "ลากเส้น 0 -> จุดต่ำสุดคลื่น 2 · ราคาไม่เบรก = คลื่น 2 จบจริง",
+          "เบรกเส้น 0-2 ก่อนคลื่น 3 ยาวถึง 61.8% ของคลื่น 1 (หรือย่อครั้งที่ 2 ดิ่งใต้จุดสูงคลื่น 1) = คลื่น 2 ยังไม่จบ (เป็นแค่ a ของ 2 ที่ซับซ้อน)",
+          "Running Double Three ในคลื่น 2: ห้ามส่วนใดของคลื่น 3 จริงวิ่งย้อนเบรกเส้น 0-2 · ถ้าเบรกและไม่แรงพอเป็นคลื่น 3 + ไม่มี alternation 2/4 = ไม่ใช่คลื่นกระตุ้น",
+        ],
+      },
+      wave4: {
+        line: "2-4",
+        rules: [
+          "เส้น 2-4 = เทรนด์ไลน์สำคัญที่สุด · ห้ามคลื่น 3 หรือ 5 เบรก (ยกเว้น Terminal Impulse)",
+          "คลื่น 5 จบ -> ราคาต้องวกลงเบรกเส้น 2-4 เร็ว (เวลา <= เวลาสร้างคลื่น 5) และย้อนเกือบทั้งคลื่น 5",
+          "เส้น 2-4 ถูกเบรกแรงก่อนราคาผ่านจุดสูงคลื่น 3 = Wave 5 Failure (ย้อนทั้งชุด 1-5 เร็วกว่าเวลาสร้าง · จะผ่านจุดสูงคลื่น 5 ที่ fail ได้ต้องใช้เวลา >= 2 เท่า)",
+        ],
+      },
+      waveB: {
+        line: "0-B",
+        rules: [
+          "หาจุดจบคลื่น b เหมือนคลื่น 2 · คลื่น c มักไม่เกิน 161.8% ของคลื่น a",
+          "b เป็น triangle: ลากเส้น 0-B ผ่านคลื่น c ของ triangle (ไม่ใช่ e) · e อาจเบรกหลอกแล้ววกกลับ ไม่เกินจุดจบ c",
+          "Zigzag แล้วเบรกเส้น 0-B เร็วเกินไป แต่ไม่เกินจุดจบ b แล้ววกกลับ = กำลังพัฒนาเป็น Triangle",
+          "ใน triangle คลื่นย่อยวิ่งตัดเทรนด์ไลน์ไปมาสบาย ๆ = สัญญาณเตือน triangle",
+        ],
+      },
+      triangle: {
+        base: "B-D",
+        rules: [
+          "เส้น B-D = เส้นฐานหลัก · ราคาเบรก B-D = ยืนยันจบ triangle",
+          "เส้นฝั่งตรงข้าม: A-C (บ่อยสุด) / C-E (บ่อย) / A-E (ยาก)",
+        ],
+      },
+      extension: {
+        w1: "แชนเนลบีบเข้าหากัน (convergence) คล้าย terminal · คลื่น 5 มักอยู่ใต้เส้นบน ไม่แตะ (เว้นคลื่น 2 ใหญ่มาก)",
+        w3: "เส้นบน-ล่างขนานหรือเกือบขนาน · ความต่างของคลื่น 2/4 กำหนดว่าขนานพอดี / เปิดเล็กน้อย / เปิดกว้าง",
+        w5: "แชนเนลขยายออกเหมือนโทรโข่ง (megaphone) - กลับด้านของคลื่น 1 ยืด",
+        double: "หายากมาก · คลื่น 5 มักเบรกเหนือเส้น 1-3 (คลื่น 3 > 161.8% ของ 1 และคลื่น 5 > 161.8% ของ 3)",
+      },
+      flat: [
+        "แชนเนล Flat = ขนานแนวนอน ใช้ High/Low ของคลื่น a ตั้งต้น",
+        "ลากเส้น 0-b แล้วเส้นขนานจากจุดจบคลื่น a = โซนแนวรับคลื่น c (ใช้แม้ b วิ่งเกิน a มากใน running)",
+        "Elongated Flat: c ยาวผิดปกติ = เตือนว่าอาจกำลังเป็น Triangle",
+      ],
+      complex: [
+        "Zigzag: ราคายืนเหนือ/เบรกเส้นล่าง · ถ้าแตะทั้งเส้นบน-ล่างพอดี = ยังไม่จบ เป็น Double/Triple Zigzag (ขาถัดไป = X ย้อนไม่เกิน 61.8%)",
+        "Double/Triple Zigzag: ตีแชนเนลด้วยเส้นขนาน B-B ครอบทั้งชุด = เกณฑ์แยกจากคลื่นกระตุ้น",
+        "Double/Triple Flat: ลากแชนเนลผ่านคลื่น b ของแต่ละ Flat (เส้น b-b-b) น่าเชื่อถือกว่าเส้นผ่านจุดจบ a",
+        "Double/Triple Combination: วิ่งในกรอบขนานจนถึงคลื่นสุดท้าย (มัก Triangle) เกิดเบรกหลอก 1-2 ครั้ง",
+      ],
+      internalFib: [
+        "คลื่น 1 ยืด: คลื่น 3 ไม่เกิน 61.8% ของคลื่น 1",
+        "ถ้าคลื่น 3 = 61.8% ของคลื่น 1 -> คลื่น 5 มัก 38.2% ของคลื่น 3",
+      ],
     },
   };
   function deepClone(o) { return JSON.parse(JSON.stringify(o)); }
@@ -1333,6 +1413,35 @@
   const normMode = (m) => VALID_MODES.includes(m) ? m : "impulse";
   function syncModeUI() { $("subHint").hidden = mode !== "corrective"; }
 
+  const lineYAt = (x1, y1, x2, y2, x) => y1 + (y2 - y1) * (x - x1) / ((x2 - x1) || 1);
+  function channelChecks(md, pts) {
+    if (pts.length < need()) return [];
+    const C = THEORY.channeling, P = pts.map(p => p.v), I = pts.map(p => p.i), out = [];
+    if (md === "impulse") {
+      const dir = Math.sign(P[5] - P[0]) || 1;
+      const y02at4 = lineYAt(I[0], P[0], I[2], P[2], I[4]);
+      out.push({ name: "คลื่น 4 อยู่ฝั่งเทรนด์ของเส้น 0-2", pass: dir * (P[4] - y02at4) > 0, detail: C.wave2.rules[1] });
+      const y24at5 = lineYAt(I[2], P[2], I[4], P[4], I[5]);
+      out.push({ name: "คลื่น 5 ไม่ทะลุเส้น 2-4 (ยกเว้น Terminal)", pass: dir * (P[5] - y24at5) > 0, detail: C.wave4.rules[0] });
+      const y13at5 = lineYAt(I[1], P[1], I[3], P[3], I[5]);
+      const breaks13 = dir * (P[5] - y13at5) > 0;
+      const s02 = (P[2] - P[0]) / ((I[2] - I[0]) || 1), s24 = (P[4] - P[2]) / ((I[4] - I[2]) || 1);
+      const shape = Math.abs(s24) < Math.abs(s02) * 0.8 ? "บีบเข้า → คลื่น 1 ยืด / Terminal"
+        : Math.abs(s24) > Math.abs(s02) * 1.3 ? "โทรโข่ง → คลื่น 5 ยืด"
+        : "ขนาน → คลื่น 3 ยืด";
+      out.push({ name: `รูปแชนเนล: ${shape}${breaks13 ? " · คลื่น 5 เบรกเส้น 1-3 → double extension?" : ""}`, pass: null });
+    } else if (md === "corrective") {
+      const aDir = Math.sign(P[1] - P[0]) || 1;
+      const y0bAtC = lineYAt(I[0], P[0], I[2], P[2], I[3]);
+      out.push({ name: `คลื่น c เทียบเส้น 0-b: ${aDir * (P[3] - y0bAtC) > 0 ? "เบรกออก (zigzag เต็ม / กำลังเป็น triangle)" : "ยังไม่เบรก"}`, pass: null, detail: C.waveB.rules[2] });
+    } else if (md === "triangle") {
+      const dir = Math.sign(P[1] - P[0]) || 1;
+      const yBDatE = lineYAt(I[2], P[2], I[4], P[4], I[5]);
+      out.push({ name: `คลื่น E เทียบเส้นฐาน B-D`, pass: null, detail: dir * (P[5] - yBDatE) > 0 ? "เบรก B-D → ยืนยันจบ triangle" : "ยังไม่เบรก B-D (ยังไม่จบ)" });
+    }
+    return out;
+  }
+
   let lastAnalysis = null;
   function renderAnalysis() {
     syncModeUI();
@@ -1358,7 +1467,9 @@
       ? `เรียงตาม confidence · ปรับจาก ${calibration._total} การนับที่ตรวจแล้ว`
       : `เรียงตาม confidence · calibrate เมื่อครบ ${MIN_CALIB} การนับที่ตรวจผล`;
     $("rulesList").innerHTML = a.rules.map(ruleRow).join("");
-    $("guidesList").innerHTML = a.guides.map(ruleRow).join("");
+    const chan = channelChecks(mode, points);
+    const guides = chan.length ? a.guides.concat([{ name: "— แชนเนล —", pass: null }], chan) : a.guides;
+    $("guidesList").innerHTML = guides.map(ruleRow).join("");
     $("measBody").innerHTML = a.meas.map(m => `<tr><td>${esc(m[0])}</td><td class="mono">${esc(m[1])}</td></tr>`).join("");
     $("candList").innerHTML = a.cands.map(candRow).join("");
   }
@@ -1501,7 +1612,7 @@
   const DRAFT_CAND_CAP = 2000;
   function saveDraft() {
     try {
-      const payload = { mode, points, snap, src, symbol, interval, barLimit, view, subALegs, subA4Overlap, scanOn, scanSens };
+      const payload = { mode, points, snap, src, symbol, interval, barLimit, view, subALegs, subA4Overlap, scanOn, scanSens, chanOn };
       if (candles) {
         let cs = candles, pts = points, v = view;
         if (candles.length > DRAFT_CAND_CAP) {
@@ -1538,6 +1649,7 @@
       subALegs = d.subALegs === 3 || d.subALegs === 5 ? d.subALegs : 0;
       subA4Overlap = !!d.subA4Overlap;
       scanOn = !!d.scanOn;
+      chanOn = !!d.chanOn;
       scanSens = clamp(d.scanSens | 0 || 4, 1, 12);
       return true;
     } catch (e) {}
@@ -2031,6 +2143,11 @@
   });
   $("proposeBtn").addEventListener("click", proposeCounts);
   $("degreeBtn").addEventListener("click", checkAllSubwaves);
+  $("chanBtn").addEventListener("click", () => {
+    chanOn = !chanOn;
+    $("chanBtn").classList.toggle("solid", chanOn);
+    scheduleDraw(); saveDraft();
+  });
   $("proposeList").addEventListener("click", (e) => {
     const b = e.target.closest("[data-prop]");
     if (b) applyProposal(+b.dataset.prop);
@@ -2142,6 +2259,7 @@
   $("subA4Overlap").checked = subA4Overlap;
   $("scanSens").value = String(scanSens);
   $("scanBtn").classList.toggle("solid", scanOn);
+  $("chanBtn").classList.toggle("solid", chanOn);
   [...$("srcSeg").children].forEach(b => b.classList.toggle("active", b.dataset.s === src));
   [...$("modeSeg").children].forEach(b => b.classList.toggle("active", b.dataset.m === mode));
   setTool("pan");
