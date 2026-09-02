@@ -278,6 +278,26 @@
         <div class="muted-note" id="statMyGuess" style="margin-top:8px;"></div>
       </div>
     </div>
+
+    <div class="panel">
+      <h2>ทฤษฎี (Theory Pack) <span class="sub" id="theoryBadge">ค่าเริ่มต้น</span></h2>
+      <div class="tr-filters">
+        <button class="btn" id="theoryEditBtn">แก้ไข JSON</button>
+        <button class="btn" id="theoryExportBtn">⭳ Export</button>
+        <button class="btn" id="theoryImportBtn">⭱ Import</button>
+        <button class="btn" id="theoryResetBtn">รีเซ็ตค่าเริ่มต้น</button>
+        <input type="file" id="theoryFile" accept="application/json" hidden>
+      </div>
+      <div class="muted-note">ระบบใช้ชุดกฎนี้วิเคราะห์คลื่นแก้ตัว/อิมพัลส์ · แก้แล้วจำไว้ในเครื่อง + ซิงค์</div>
+      <div id="theoryEditor" hidden style="margin-top:10px;">
+        <textarea id="theoryJson" spellcheck="false" style="width:100%;min-height:220px;background:var(--surface-alt);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:8px 10px;font:11px ui-monospace,monospace;resize:vertical;"></textarea>
+        <div style="margin-top:6px;display:flex;gap:8px;">
+          <button class="btn solid" id="theorySaveBtn">บันทึก</button>
+          <button class="btn" id="theoryCancelBtn">ยกเลิก</button>
+          <span class="muted-note" id="theoryMsg"></span>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div class="col">
@@ -748,149 +768,266 @@
     return { rules, guides, cands, meas };
   }
 
-  /* ---------- analysis: corrective A-B-C (theory-driven, from CLAUDE.md) ---------- */
-  const CORRECTION_RULES = [
-    { family: "Zigzag", subtype: "Zigzag มาตรฐาน (5-3-5)",
-      bMin: 0.382, bMax: 0.618, cMin: 0.9, cMax: 1.2, bBeyondStart: false, cBeyondEndA: true, subA: 5,
-      descTh: "คลื่นแก้ตัวชัน 5-3-5 · B ตื้น (<61.8%) · C ยาวใกล้เคียง A",
-      noteTh: "เป้ากลับตัวชัด เทรดตามทิศ C ได้ · จบแล้วเทรนด์เดิมไปต่อ" },
-    { family: "Zigzag", subtype: "Zigzag — C สั้น (Truncated)",
-      bMin: 0.382, bMax: 0.618, cMin: 0.5, cMax: 0.9, bBeyondStart: false, cBeyondEndA: false, subA: 5,
-      descTh: "โครงเดียวกับ zigzag แต่ C ไม่ถึง 0.9× ของ A — โมเมนตัมกลับตัวอ่อน",
-      noteTh: "ระวัง correction ยังไม่จบ อาจต่อเป็น double zigzag" },
-    { family: "Zigzag", subtype: "Zigzag — C ยืด (Extended)",
-      bMin: 0.236, bMax: 0.618, cMin: 1.5, cMax: 2.3, bBeyondStart: false, cBeyondEndA: true, subA: 5,
-      descTh: "B ตื้น · C ยืด 1.5–2.3× ของ A",
-      noteTh: "C มักวิ่งถึง A×1.618 วัดจากจุด B" },
-    { family: "Zigzag", subtype: "Double Zigzag (W-X-Y)",
-      bMin: 0.236, bMax: 0.7, cMin: 2.3, cMax: 6, bBeyondStart: false, cBeyondEndA: true, subA: 5,
-      descTh: "C ยาวผิดปกติ >2.3× — น่าจะเป็นซิกแซ็กซ้อนสองชุด (W-X-Y) คั่นด้วยคลื่น X",
-      noteTh: "นับใหม่เป็น W-X-Y แต่ละชุดจะได้อัตราส่วนปกติ" },
-    { family: "Flat", subtype: "Regular Flat (3-3-5)",
-      bMin: 0.8, bMax: 1.05, cMin: 0.9, cMax: 1.15, bBeyondStart: false, cBeyondEndA: true, subA: 3,
-      descTh: "A ≈ B ≈ C · B ย่อเกือบเต็ม A แต่ไม่ทะลุจุดเริ่ม · C จบใกล้ปลาย A",
-      noteTh: "เทรนด์เดิมยังแข็ง มักไปต่อหลังจบ C" },
-    { family: "Flat", subtype: "Expanded Flat (พบบ่อยสุด/อันตรายสุด)",
-      bMin: 1.0, bMax: 1.5, cMin: 1.0, cMax: 1.618, bBeyondStart: true, cBeyondEndA: true, subA: 3,
-      descTh: "B ทะลุจุดเริ่ม A และ C ทะลุปลาย A — เบรกหลอกทั้งสองทาง",
-      noteTh: "ห้ามไล่เบรก B · รอ C จบราว A×1.272–1.618 แล้วสวนกลับเทรนด์เดิม" },
-    { family: "Flat", subtype: "Running Flat (เทรนด์เดิมแข็งมาก)",
-      bMin: 1.0, bMax: 1.5, cMin: 0.5, cMax: 1.0, bBeyondStart: true, cBeyondEndA: false, subA: 3,
-      descTh: "B ทะลุจุดเริ่ม A แต่ C ไม่ถึงปลาย A",
-      noteTh: "สัญญาณเทรนด์เดิมแรงมาก — พร้อมไปต่อทันทีหลัง C จบ" },
-  ];
-  const inRange = (x, lo, hi) => x >= lo && x <= hi;
-  const nearRange = (x, lo, hi) => { const m = (hi - lo) * 0.35 + 1e-9; return x >= lo - m && x <= hi + m; };
+  /* ================= THEORY PACK (editable / importable / remembered) ================= */
+  const DEFAULT_THEORY = {
+    version: 3,
+    zigzag: {
+      structure: "5-3-5", subA: 5,
+      rules: [
+        "คลื่น a รีเทรซ < 61.8% ของ impulse ก่อนหน้า",
+        "คลื่น b รีเทรซ <= 61.8% ของคลื่น a",
+        "คลื่น c ยาวกว่าคลื่น b เสมอ หรือทำ new low ต่ำกว่าจุดจบคลื่น a",
+      ],
+      subtypes: [
+        { id: "zz-normal", name: "Zigzag - Normal", bRetrOfA: [0, 0.618], cVsA: [0.618, 1.618], newLow: true,
+          effect: "correction จบ เทรนด์เดิมไปต่อ",
+          desc: "5-3-5 มาตรฐาน b ตื้น c 61.8-161.8% ของ a", note: "เป้า c วัดจาก a เสมอ" },
+        { id: "zz-truncated", name: "Zigzag - Truncated", bRetrOfA: [0, 0.618], cVsA: [0.382, 0.618], newLow: false,
+          effect: "หลังจบ ราคาย้อนขึ้น >= 81% ของทั้งชุด a-b-c", retraceOf: "abc", retraceMin: 0.81,
+          desc: "c สั้น 38.2-61.8% ของ a", note: "มักเป็นส่วนหนึ่งของ Triangle" },
+        { id: "zz-elongated", name: "Zigzag - Elongated", bRetrOfA: [0, 0.618], cVsA: [1.618, 4.0], newLow: true,
+          bStruct: "Running Flat / Irregular Failure Flat",
+          effect: "หลังจบ ราคาย้อน >= 61.8% ของคลื่น c", retraceOf: "c", retraceMin: 0.618,
+          warn: "ถ้า b ไม่ใช่ running / irregular-failure flat จะกลายเป็น impulse ขาลง",
+          desc: "c ยืด > 161.8% ของ a", note: "b ต้องเป็น running / irregular failure flat" },
+      ],
+      notes: ["b ย่อยเป็น flat / zigzag / triangle ได้ (alternation)", "เป้า c ตระกูล zigzag วัดจาก a เสมอ"],
+    },
+    flat: {
+      structure: "3-3-5", subA: 3,
+      gate: { bRetrOfAMin: 0.618, cRetrOfAMin: 0.382, cVsBMin: 0.333 },
+      gateText: ["b รีเทรซ >= 61.8% ของ a", "c รีเทรซ >= 38.2% ของ a", "Degree 1/3: c >= 1/3 ของ b"],
+      subtypes: [
+        { id: "fl-irregular", name: "Flat - Irregular", group: "strong b", bRetrOfA: [1.01, 1.236], newHigh: true, newLow: true, cVsA: [0, 1.618],
+          effect: "impulse ถัดไปแรง", desc: "b New High 101-123.6% c New Low เป้า c ~ 61.8% ของ a (external)" },
+        { id: "fl-irr-failure", name: "Flat - Irregular Failure", group: "strong b", bRetrOfA: [1.236, 1.382], newHigh: true, newLow: false,
+          effect: "แรงขายอ่อนมาก impulse ถัดไปแรง", desc: "b New High 123.6-138.2% c ห้ามทำ New Low" },
+        { id: "fl-running", name: "Flat - Running", group: "strong b", bRetrOfA: [1.382, 1.618], newHigh: true, newLow: false,
+          effect: "นำไปสู่ Extended Wave", desc: "b New High 138.2-161.8% c ห้ามทำ New Low มักจบเหนือจุดเริ่ม a" },
+        { id: "fl-common-ceqb", name: "Flat - Common (c=b)", group: "normal b", bRetrOfA: [0.81, 1.0], newHigh: false, newLow: false, cVsB: [0.85, 1.0],
+          effect: "เทรนด์เดิมไปต่อปกติ", desc: "b 81-100% c จบ ~ ปลาย a (ไม่ทำ New Low)" },
+        { id: "fl-common-cgtb", name: "Flat - Common (c>b)", group: "normal b", bRetrOfA: [0.81, 1.0], newHigh: false, newLow: true, cVsB: [1.01, 1.382],
+          effect: "เทรนด์เดิมไปต่อ", desc: "b 81-100% c 101-138.2% ของ b (ทำ New Low)" },
+        { id: "fl-elongated", name: "Flat - Elongated", group: "ทุกกลุ่ม", cVsB: [1.382, 6], newLow: true,
+          effect: "time target: เวลา a + เวลา b = เวลา c", desc: "c ยาว > 138.2% ของ b" },
+        { id: "fl-c-failure", name: "Flat - c-Failure", group: "normal b", bRetrOfA: [0.81, 1.0], newLow: false, cReachesEndA: false,
+          effect: "c อ่อน", desc: "b แข็งพอควร แต่ c สั้น ไม่ถึงปลาย a" },
+        { id: "fl-b-failure", name: "Flat - b-Failure", group: "weak b", bRetrOfA: [0.618, 0.80], cVsB: [0.85, 1.382],
+          effect: "ต่อเนื่องอ่อน (ลูกผสม flat/zigzag)", desc: "b 61.8-80% c เท่าหรือเกิน b เล็กน้อย" },
+        { id: "fl-double-failure", name: "Flat - Double Failure", group: "weak b", bRetrOfA: [0.618, 0.80], newLow: false, cReachesEndA: false,
+          effect: "อ่อนทั้ง b และ c", desc: "b รีเทรซสั้น c ไม่ถึงปลาย a" },
+      ],
+      notes: [
+        "Alternation: คลื่น 2 เป็น zigzag แล้วคลื่น 4 มัก flat",
+        "New High <= 123.6% ของ a ให้ระวังเป็น b ของ irregular flat ไม่ใช่คลื่น 5",
+        "ขา iv หลุดฐานขา ii หรือ overlap ขา i = Terminal Impulse (ปลายเทรนด์)",
+        "Bullish Divergence ปลายคลื่น c (ขา v) = จุดเข้า / Bearish Divergence แยกคลื่น 5 กับ b ไม่ได้",
+        "c ต้องนับครบ 5 ขาถึงยืนยันจบ",
+      ],
+    },
+    triangle: {
+      structure: "3-3-3-3-3", points: 6,
+      fib: { cOfA: 0.618, dOfB: 0.618, eOfC: 0.618 },
+      types: {
+        contracting: { note: "พบบ่อยสุด สะสมพลัง", rules: ["ขาสลับหดลง: C<A, D<B, E<C", "B ไม่ทะลุจุดเริ่ม A", "E จบใน/เลยเส้น A-C เล็กน้อย"] },
+        expanding: { note: "พบยาก ความผันผวน", rules: ["ขาสลับขยาย: C>A, D>B, E>C", "B ทะลุจุดเริ่ม A", "E ยาวสุด ทะลุจุดจบ C"] },
+      },
+      subtypes: [
+        { id: "tri-standard", name: "Standard Triangle", note: "contracting พื้นฐาน" },
+        { id: "tri-barrier", name: "Barrier Triangle", note: "ปลาย B กับ D แนวราคาเดียวกัน" },
+        { id: "tri-running", name: "Running Triangle", note: "B ยาวกว่า A / E ไม่ลงลึก" },
+        { id: "tri-expanding", name: "Expanding Triangle", note: "ทุกขาขยายออก" },
+      ],
+      effect: "หลัง E จบ เบรกออกเร็ว เป้า = ความสูงของ Triangle (thrust) / Apex ~ เวลาชุดคลื่นถัดไปจบ",
+      notes: ["ตำแหน่งคลื่น 4 หรือ B เท่านั้น", "แต่ละขาเป็น zigzag", "เบรกไปทางเทรนด์เดิม"],
+    },
+    combination: {
+      points: 4,
+      rules: ["zigzag ในชุด <= 1 อัน (ถ้า 2 = double zigzag)", "triangle <= 1 และเป็นชุดสุดท้ายเท่านั้น", "combination วิ่งออกข้าง", "ไม่เกิน 3 ชุด (W-X-Y-X-Z)"],
+      xRetrace: [0.382, 0.70],
+      yVsW: [0.618, 1.618],
+      subtypes: [
+        { id: "cmb-double-three", name: "Double Three (W-X-Y)", sideways: true, note: "คลื่นแก้ตัว 2 ชุดต่อกัน วิ่งออกข้าง" },
+        { id: "cmb-triple-three", name: "Triple Three (W-X-Y-X-Z)", sideways: true, note: "3 ชุด" },
+        { id: "cmb-double-zigzag", name: "Double Zigzag (W-X-Y)", sideways: false, xRetrace: [0.618, 0.80],
+          effect: "หลังจบ ราคาย้อน >= 61.8% ของ Y", note: "W และ Y เป็น zigzag ทั้งคู่ X ลึกได้ วิ่งเป็นเทรนด์" },
+      ],
+      notes: ["พบบ่อยที่คลื่น 4 และ B หายากที่คลื่น 2", "X ตัวที่ 2 มักลึกกว่าตัวแรก"],
+    },
+    impulse: {
+      hardRules: [
+        "คลื่น 2 ไม่รีเทรซเกิน 100% ของคลื่น 1",
+        "คลื่น 3 ไม่สั้นที่สุดในบรรดา 1 / 3 / 5",
+        "คลื่น 4 ไม่ทับเขตราคาคลื่น 1 (ยกเว้น diagonal)",
+        "คลื่น 3 ทะลุจุดจบคลื่น 1 เสมอ",
+      ],
+      guide: {
+        w2Retrace: [0.382, 0.786], w2Typical: [0.5, 0.618],
+        w4Retrace: [0.236, 0.5], w4Typical: [0.236, 0.382],
+        w3Ext: 1.618, w3ExtStrong: 2.618, w5Targets: [1.0, 0.618, 1.618],
+      },
+      notes: [
+        "Extension: 1 ใน 3 คลื่น (บ่อยสุด = คลื่น 3) ถ้า 3 ยืด 1 กับ 5 มักเท่ากัน",
+        "คลื่น 2 มักชัน (zigzag) คลื่น 4 มักออกข้าง (flat/triangle) - กฎการสลับ",
+        "เป้าคลื่น 3 = 1.618x คลื่น 1 / เป้าคลื่น 5 = คลื่น 1 หรือ 0.618x(1->3)",
+        "Truncation คลื่น 5 (ไม่ผ่านจุดสูงคลื่น 3) = กลับตัวแรง",
+        "Channel: เส้น 2-4 ขนานผ่าน 3 คลื่น 5 มักจบที่/เลยเส้นบน",
+      ],
+    },
+    diagonal: {
+      rules: [
+        "คลื่น 4 ทับเขตราคาคลื่น 1 เสมอ (ตัวชี้ขาด)",
+        "คลื่น 3 ไม่สั้นที่สุด / คลื่น 2 ไม่ทะลุจุดเริ่มคลื่น 1",
+        "Contracting: ขาสั้นลง L1>L3>L5, L2>L4 / Expanding: ขายาวขึ้น",
+      ],
+      fib: { w3ofW1: 0.618, w5ofW3: 0.618 },
+      endingNote: "อยู่คลื่น 5 หรือ C หลังจบ ราคาย้อนทั้ง diagonal เร็ว ๆ ไปที่จุดเริ่ม",
+      leadingNote: "อยู่คลื่น 1 หรือ A เริ่มเทรนด์ใหม่",
+    },
+  };
+  function deepClone(o) { return JSON.parse(JSON.stringify(o)); }
+  let THEORY = deepClone(DEFAULT_THEORY);
+  const inRange = (x, lo, hi) => (lo == null || x >= lo) && (hi == null || x <= hi);
+  const nearRange = (x, lo, hi) => {
+    const a = lo == null ? hi : lo, b = hi == null ? lo : hi;
+    const m = Math.abs((b - a) || 1) * 0.35 + 1e-9;
+    return (lo == null || x >= lo - m) && (hi == null || x <= hi + m);
+  };
 
+  /* ---------- analysis: corrective A-B-C — Zigzag + Flat, driven by THEORY ---------- */
   function analyzeCorrective(P) {
     const dirA = Math.sign(P[1] - P[0]) || 1;
     const LA = Math.abs(P[1] - P[0]), LB = Math.abs(P[2] - P[1]), LC = Math.abs(P[3] - P[2]);
-    const bRetr = LA ? LB / LA : 0;
-    const cExt = LA ? LC / LA : 0;
-    const bBeyondStart = dirA * (P[2] - P[0]) < 0;
-    const cBeyondEndA = dirA * (P[3] - P[1]) > 0;
+    const bRetrOfA = LA ? LB / LA : 0;
+    const cRetrOfA = LA ? LC / LA : 0;
+    const cVsB = LB ? LC / LB : 0;
+    const cVsA = cRetrOfA;
+    const newHigh = dirA * (P[2] - P[0]) < 0;
+    const newLow = dirA * (P[3] - P[1]) > 0;
     const cDirOk = dirA * (P[3] - P[2]) > 0;
-    const legs = subALegs;            // 0 = unknown / 3 / 5
-    const overlap = subA4Overlap;
+    const cReachesEndA = dirA * (P[3] - P[1]) >= -0.06 * (LA || 1);
+    const legs = subALegs, overlap = subA4Overlap;
 
-    const zone = bRetr < 0.618 ? "Zigzag" : bRetr < 0.9 ? "ambiguous" : "Flat";
-    const zoneTxt = zone === "Zigzag" ? "→ ตระกูล Zigzag (5-3-5)"
-      : zone === "Flat" ? "→ ตระกูล Flat (3-3-5)"
-      : "→ ก้ำกึ่ง (61.8–90%) ต้องดู sub-wave ของ A";
+    const zone = bRetrOfA < 0.618 ? "Zigzag" : bRetrOfA < 0.80 ? "ambiguous" : "Flat";
+    const zoneTxt = zone === "Zigzag" ? "ตระกูล Zigzag (b < 61.8%)"
+      : zone === "Flat" ? "ตระกูล Flat (b >= 80%)"
+      : "ก้ำกึ่ง 61.8-80% (Weak-b Flat / Zigzag) - ต้องดูจำนวนขาของ A";
 
-    function scoreRule(r) {
+    function scoreSub(fam, s) {
       const chk = [];
       let hard = true, soft = 0, softMax = 0;
+      const famSubA = fam === "zigzag" ? THEORY.zigzag.subA : THEORY.flat.subA;
 
-      const bOk = r.bBeyondStart === bBeyondStart;
-      chk.push({ t: `B ${r.bBeyondStart ? "ทะลุ" : "ไม่ทะลุ"}จุดเริ่ม A`, pass: bOk });
-      if (!bOk) hard = false;
-
-      const cOk = r.cBeyondEndA === cBeyondEndA;
-      chk.push({ t: `C ${r.cBeyondEndA ? "ทะลุ" : "ไม่ทะลุ"}ปลาย A`, pass: cOk });
-      if (!cOk) hard = false;
-
-      chk.push({ t: "C ต่อทิศทางเดียวกับ A", pass: cDirOk });
+      chk.push({ t: "c ต่อทิศทางเดียวกับ a", pass: cDirOk });
       if (!cDirOk) hard = false;
 
-      softMax += 2;
-      const bIn = inRange(bRetr, r.bMin, r.bMax);
-      chk.push({ t: `B ย่อ A = ${(bRetr * 100).toFixed(0)}% (ทฤษฎี ${Math.round(r.bMin * 100)}–${Math.round(r.bMax * 100)}%)`, pass: bIn });
-      soft += bIn ? 2 : (nearRange(bRetr, r.bMin, r.bMax) ? 1 : 0);
+      if (fam === "flat") {
+        const g = THEORY.flat.gate;
+        const gb = bRetrOfA >= g.bRetrOfAMin, gc = cRetrOfA >= g.cRetrOfAMin, gd = cVsB >= g.cVsBMin;
+        chk.push({ t: `b รีเทรซ >= 61.8% ของ a (ได้ ${(bRetrOfA * 100).toFixed(0)}%)`, pass: gb });
+        chk.push({ t: `c รีเทรซ >= 38.2% ของ a (ได้ ${(cRetrOfA * 100).toFixed(0)}%)`, pass: gc });
+        chk.push({ t: `Degree 1/3: c >= 1/3 ของ b (ได้ ${cVsB.toFixed(2)}x)`, pass: gd });
+        if (!(gb && gc && gd)) hard = false;
+      }
 
-      softMax += 2;
-      const cIn = inRange(cExt, r.cMin, r.cMax);
-      chk.push({ t: `C เทียบ A = ${cExt.toFixed(2)}× (ทฤษฎี ${r.cMin}–${r.cMax}×)`, pass: cIn });
-      soft += cIn ? 2 : (nearRange(cExt, r.cMin, r.cMax) ? 1 : 0);
+      if (s.newHigh != null) {
+        const ok = newHigh === s.newHigh;
+        chk.push({ t: `b ${s.newHigh ? "ทำ New High (ทะลุจุดเริ่ม a)" : "ไม่ทำ New High"}`, pass: ok });
+        if (!ok) hard = false;
+      }
+      if (s.newLow != null) {
+        const ok = newLow === s.newLow;
+        chk.push({ t: `c ${s.newLow ? "ทำ New Low (ทะลุปลาย a)" : "ห้ามทำ New Low"}`, pass: ok });
+        if (!ok) hard = false;
+      }
+      if (s.cReachesEndA != null) {
+        const ok = cReachesEndA === s.cReachesEndA;
+        chk.push({ t: `c ${s.cReachesEndA ? "ถึงปลาย a" : "ไม่ถึงปลาย a"}`, pass: ok });
+        if (!ok) hard = false;
+      }
+
+      const rangeChk = (val, rng, label) => {
+        if (!rng) return;
+        softMax += 2;
+        const yes = inRange(val, rng[0], rng[1]);
+        chk.push({ t: `${label} = ${val.toFixed(2)} (ทฤษฎี ${rng[0] == null ? 0 : rng[0]}-${rng[1] == null ? "inf" : rng[1]})`, pass: yes });
+        soft += yes ? 2 : (nearRange(val, rng[0], rng[1]) ? 1 : 0);
+      };
+      rangeChk(bRetrOfA, s.bRetrOfA, "b/a");
+      rangeChk(cVsA, s.cVsA, "c/a");
+      rangeChk(cVsB, s.cVsB, "c/b");
 
       softMax += 3;
       if (legs === 3 || legs === 5) {
-        const subOk = legs === r.subA;
-        chk.push({ t: `A นับได้ ${legs} ขา → ต้องเป็น ${legs === 5 ? "motive (ตระกูล Zigzag)" : "corrective (ตระกูล Flat)"}`, pass: subOk });
-        soft += subOk ? 3 : 0;
-        if (!subOk) hard = false;                 // sub-wave count is decisive
+        const ok = legs === famSubA;
+        chk.push({ t: `A นับได้ ${legs} ขา -> ต้องเป็น ${legs === 5 ? "motive (Zigzag)" : "corrective (Flat)"}`, pass: ok });
+        soft += ok ? 3 : 0;
+        if (!ok) hard = false;
       } else {
-        chk.push({ t: "ยังไม่ระบุจำนวนขาของ A (ตัวชี้ขาดที่แม่นสุด)", pass: null });
+        chk.push({ t: "ยังไม่ระบุจำนวนขาของ A (ตัวชี้ขาด)", pass: null });
         soft += 1.3;
       }
-
-      if (overlap && r.subA === 5) {
-        chk.push({ t: "ขาที่ 4 ของ A ทับขาที่ 1 → A เป็น motive ไม่ได้ → ต้องเป็น Flat", pass: false });
+      if (overlap && fam === "zigzag") {
+        chk.push({ t: "ขา 4 ของ A ทับขา 1 -> เป็น motive ไม่ได้ -> ต้อง Flat", pass: false });
         hard = false;
       }
+      if (s.bStruct) chk.push({ t: `ต้องยืนยัน: คลื่น b เป็น ${s.bStruct}`, pass: null });
 
       const ratio = softMax ? soft / softMax : 0;
-      const conf = hard ? clamp(Math.round(36 + ratio * 61), 8, 97) : clamp(Math.round(ratio * 28), 4, 30);
-      return { r, chk, hard, conf };
+      const conf = hard ? clamp(Math.round(34 + ratio * 63), 8, 97) : clamp(Math.round(ratio * 28), 4, 30);
+      return { fam, s, chk, hard, conf };
     }
 
-    const scored = CORRECTION_RULES.map(scoreRule).sort((a, b) => b.conf - a.conf);
+    const scored = [
+      ...THEORY.zigzag.subtypes.map(s => scoreSub("zigzag", s)),
+      ...THEORY.flat.subtypes.map(s => scoreSub("flat", s)),
+    ].sort((a, b) => b.conf - a.conf);
     const best = scored[0];
 
-    const cands = scored.map(s => ({
-      label: s.r.subtype,
-      conf: s.conf,
+    const cands = scored.map(x => ({
+      label: x.s.name,
+      conf: x.conf,
       notes: [
-        s.r.descTh,
-        "โน้ตเทรด: " + s.r.noteTh,
-        ...(s.hard ? [] : ["ไม่เข้าเกณฑ์: " + s.chk.filter(c => c.pass === false).map(c => c.t).join(" · ")]),
-      ],
+        x.s.desc || "",
+        x.s.effect ? "effect หลังจบ: " + x.s.effect : "",
+        x.s.warn ? "!! " + x.s.warn : "",
+        ...(x.hard ? [] : ["ไม่เข้าเกณฑ์: " + x.chk.filter(c => c.pass === false).map(c => c.t).join(" / ")]),
+      ].filter(Boolean),
     }));
     cands.push({
       label: "ที่จริงเป็นอิมพัลส์ (นับผิดโหมด)",
       conf: clamp(legs === 5 ? 30 : cDirOk ? 12 : 22, 5, 40),
-      notes: ["ถ้า A เป็น 5 ขาและ C ก็ 5 ขาต่อเนื่องกัน → ลองสลับไปโหมดอิมพัลส์"],
+      notes: ["ถ้า A เป็น 5 ขาและ C ก็ 5 ขาต่อเนื่องกัน ลองสลับไปโหมดอิมพัลส์"],
     });
 
     const verdict = best.hard
-      ? { name: `✓ เข้าเกณฑ์ทฤษฎีของ “${best.r.subtype}”`, pass: true }
-      : { name: `✗ ยังไม่มีรูปแบบไหนเข้าเกณฑ์เต็ม — ใกล้สุดคือ “${best.r.subtype}” (${best.conf}%)`, pass: false };
+      ? { name: `เข้าเกณฑ์ทฤษฎีของ "${best.s.name}"`, pass: true }
+      : { name: `ยังไม่มีรูปแบบไหนเข้าเกณฑ์เต็ม - ใกล้สุดคือ "${best.s.name}" (${best.conf}%)`, pass: false };
 
     const rules = [
-      { name: `ตัวแยกหลัก — B ย่อกลับ ${(bRetr * 100).toFixed(0)}% ของ A`, pass: null, detail: zoneTxt },
+      { name: `ตัวแยกหลัก - b รีเทรซ ${(bRetrOfA * 100).toFixed(0)}% ของ a`, pass: null, detail: zoneTxt },
       verdict,
       ...best.chk.map(c => ({ name: c.t, pass: c.pass })),
     ];
 
     const guides = [
-      { name: "sub-wave: A = 5 ขา → Zigzag · A = 3 ขา → Flat (เลือกด้านบนกราฟเพื่อให้ผลชัดขึ้น)", pass: null },
-      { name: "ถ้าขาที่ 4 ของ A ทับขาที่ 1 = เป็น Flat เท่านั้น", pass: null },
-      { name: zone === "ambiguous"
-          ? "อยู่โซนก้ำกึ่ง — ผลจะยังไม่ฟันธงจนกว่าจะระบุจำนวนขาของ A"
-          : `B อยู่ในโซน ${zone} ตามทฤษฎี`, pass: zone !== "ambiguous" ? true : null },
+      { name: "A = 5 ขา -> Zigzag / A = 3 ขา -> Flat (เลือกด้านบนกราฟ)", pass: null },
+      { name: "ขา 4 ของ A ทับขา 1 = เป็น Flat เท่านั้น", pass: null },
+      ...THEORY.zigzag.notes.map(n => ({ name: n, pass: null })),
+      ...THEORY.flat.notes.map(n => ({ name: n, pass: null })),
     ];
 
-    const cT1 = P[2] + dirA * LA, cT2 = P[2] + dirA * LA * 1.272, cT3 = P[2] + dirA * LA * 1.618;
-    const nearestT = [["A×1.0", cT1], ["A×1.272", cT2], ["A×1.618", cT3]]
-      .map(x => [x[0], x[1], Math.abs(P[3] - x[1])]).sort((a, b) => a[2] - b[2])[0];
+    const tgt = (k) => P[2] + dirA * LA * k;
+    const targets = [["a x0.618", tgt(0.618)], ["a x1.0", tgt(1.0)], ["a x1.272", tgt(1.272)], ["a x1.618", tgt(1.618)]];
+    const nearestT = targets.map(x => [x[0], x[1], Math.abs(P[3] - x[1])]).sort((a, b) => a[2] - b[2])[0];
     const meas = [
-      ["ความยาว A / B / C", `${LA.toFixed(1)} / ${LB.toFixed(1)} / ${LC.toFixed(1)}`],
-      ["B ย่อ A", `${(bRetr * 100).toFixed(1)}%`],
-      ["C เทียบ A", `${cExt.toFixed(2)}×`],
-      ["B ทะลุจุดเริ่ม A", bBeyondStart ? "ใช่" : "ไม่"],
-      ["C ทะลุปลาย A", cBeyondEndA ? "ใช่" : "ไม่"],
-      ["เป้า C (Fib จากจุด B)", `${fmt(cT1)} · ${fmt(cT2)} · ${fmt(cT3)}`],
-      ["C ปัจจุบัน", `${fmt(P[3])} — ใกล้ ${nearestT[0]} สุด`],
+      ["ความยาว a / b / c", `${LA.toFixed(1)} / ${LB.toFixed(1)} / ${LC.toFixed(1)}`],
+      ["b รีเทรซ a", `${(bRetrOfA * 100).toFixed(1)}%`],
+      ["c เทียบ a", `${cVsA.toFixed(2)}x`],
+      ["c เทียบ b", `${cVsB.toFixed(2)}x  (Degree 1/3 ต้อง >= 0.33)`],
+      ["b New High / c New Low", `${newHigh ? "ใช่" : "ไม่"} / ${newLow ? "ใช่" : "ไม่"}`],
+      ["เป้า c (Fib จากจุด B)", targets.map(x => fmt(x[1])).join(" / ")],
+      ["c ปัจจุบัน", `${fmt(P[3])} - ใกล้ ${nearestT[0]} สุด`],
     ];
 
     return { rules, guides, cands, meas };
@@ -1088,6 +1225,73 @@
     writeSummary();
     refreshPatFilter();
     renderCounts();
+  }
+
+  /* ---------- theory pack persistence ---------- */
+  function mergeTheory(base, over) {
+    if (!over || typeof over !== "object") return base;
+    const out = Array.isArray(base) ? base.slice() : Object.assign({}, base);
+    for (const k of Object.keys(over)) {
+      const b = out[k], o = over[k];
+      out[k] = (b && o && typeof b === "object" && typeof o === "object" && !Array.isArray(o))
+        ? mergeTheory(b, o) : o;
+    }
+    return out;
+  }
+  function applyTheory(obj) {
+    THEORY = mergeTheory(deepClone(DEFAULT_THEORY), obj && typeof obj === "object" ? obj : {});
+    const ta = $("theoryJson");
+    if (ta) ta.value = JSON.stringify(THEORY, null, 2);
+    const custom = JSON.stringify(THEORY) !== JSON.stringify(DEFAULT_THEORY);
+    const badge = $("theoryBadge");
+    if (badge) badge.textContent = custom ? "แก้ไขแล้ว" : "ค่าเริ่มต้น";
+    if (points.length >= need()) renderAnalysis();
+  }
+  async function bootTheory() {
+    const stored = await idbGet("theory");
+    applyTheory(stored);
+  }
+  function saveTheory() { idbSet("theory", THEORY); pushCloudSoon(); }
+
+  function wireTheoryPanel() {
+    const ed = $("theoryEditor"), ta = $("theoryJson"), msg = $("theoryMsg");
+    $("theoryEditBtn").addEventListener("click", () => {
+      ta.value = JSON.stringify(THEORY, null, 2);
+      ed.hidden = !ed.hidden; msg.textContent = "";
+    });
+    $("theoryCancelBtn").addEventListener("click", () => { ed.hidden = true; });
+    $("theorySaveBtn").addEventListener("click", () => {
+      let obj;
+      try { obj = JSON.parse(ta.value); } catch (e) { msg.textContent = "JSON ผิด: " + e.message; return; }
+      applyTheory(obj); saveTheory();
+      msg.textContent = "บันทึกแล้ว"; ed.hidden = true;
+    });
+    $("theoryResetBtn").addEventListener("click", () => {
+      if (!confirm("รีเซ็ตทฤษฎีกลับเป็นค่าเริ่มต้น?")) return;
+      applyTheory(null); idbSet("theory", null); pushCloudSoon();
+    });
+    $("theoryExportBtn").addEventListener("click", () => {
+      const blob = new Blob([JSON.stringify(THEORY, null, 2)], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "ew-theory-pack.json";
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    });
+    $("theoryImportBtn").addEventListener("click", () => $("theoryFile").click());
+    $("theoryFile").addEventListener("change", (e) => {
+      const f = e.target.files[0]; if (!f) return;
+      const r = new FileReader();
+      r.onload = () => {
+        try {
+          const obj = JSON.parse(r.result);
+          applyTheory(obj); saveTheory();
+          alert("นำเข้าทฤษฎีแล้ว");
+        } catch (err) { alert("อ่านไฟล์ไม่สำเร็จ: " + err.message); }
+      };
+      r.readAsText(f);
+      e.target.value = "";
+    });
   }
 
   function patternFamily(label) {
@@ -1366,6 +1570,7 @@
       const snap = await db.collection("users").doc(uid).collection("sync").doc("elliottAnalyzer").get();
       if (!snap.exists) return;
       const d = snap.data() || {};
+      if (d.theory && typeof d.theory === "object") { applyTheory(d.theory); idbSet("theory", THEORY); }
       const remote = Array.isArray(d.counts) ? d.counts : (Array.isArray(d.scenarios) ? d.scenarios : []);
       if (!remote.length) return;
       counts = mergeCounts(counts, remote);
@@ -1382,7 +1587,7 @@
         if (JSON.stringify(counts).length > 800000) payload = counts.map(c => ({ ...c, candles: null, series: null }));
       } catch (e) {}
       await db.collection("users").doc(uid).collection("sync").doc("elliottAnalyzer")
-        .set({ counts: payload, updatedAt: Date.now() }, { merge: true });
+        .set({ counts: payload, theory: THEORY, updatedAt: Date.now() }, { merge: true });
     } catch (err) { console.error("EWA cloud push failed", err); }
   }
   function wireSync() {
@@ -1420,6 +1625,8 @@
   setTool("pan");
   syncModeUI();
   bootCounts();
+  bootTheory();
+  wireTheoryPanel();
   requestAnimationFrame(() => {
     draw();
     renderAnalysis();
