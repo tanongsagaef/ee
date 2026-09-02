@@ -455,6 +455,7 @@
       <button class="ghost cv-quick-btn" data-q="ช่วยหาแนวรับและแนวต้านที่สำคัญของกราฟนี้ พร้อมบอกความแข็งแรงของแต่ละเส้น แล้ววาดเส้นให้ด้วย">หาแนวรับ-แนวต้าน</button>
       <button class="ghost cv-quick-btn" data-q="ช่วยหา swing high และ swing low ที่สำคัญล่าสุด แล้วมาร์กให้บนกราฟ">หา swing high/low</button>
       <button class="ghost cv-quick-btn" data-q="สรุปแนวโน้มตอนนี้ (ขาขึ้น/ขาลง/ออกข้าง) และโซนที่ควรจับตา">แนวโน้มตอนนี้</button>
+      <button class="ghost cv-quick-btn" data-q="ช่วยนับคลื่น Elliott Wave ของกราฟนี้ วาดการนับคลื่นลงบนกราฟ พร้อมบอก degree, ตอนนี้อยู่คลื่นไหน, เช็กกฎ Elliott, การนับทางเลือก และราคาที่ทำให้การนับผิด (invalidation)">นับคลื่น Elliott Wave</button>
       <button class="ghost cv-quick-btn" data-q="ช่วยประเมินฉากทัศน์ราคา 1-2 สัปดาห์ข้างหน้าแบบมีเงื่อนไข (ถ้าหลุด/ยืนแนวไหนแล้วไปทางไหน)">คาดการณ์แบบมีเงื่อนไข</button>
       <button class="ghost cv-quick-btn" data-q="ค้นเว็บ: มีข่าว ปัจจัยพื้นฐาน หรือ catalyst อะไรที่กระทบสินทรัพย์นี้ในช่วง 1-2 สัปดาห์นี้บ้าง สรุปพร้อมแหล่งอ้างอิง">ข่าว/ปัจจัยล่าสุด</button>
     </div>
@@ -2108,9 +2109,9 @@
 
   /* ================= CHART + AI TAB ================= */
   const cv = {
-    inited: false, chart: null, series: null,
+    inited: false, chart: null, series: null, waveSeries: null,
     candles: [], priceLines: [], detectedSwings: { highs: [], lows: [] },
-    levels: [], swings: [], messages: [],
+    levels: [], swings: [], waves: [], messages: [],
     model: "gemini-3.1-pro-preview",
   };
   const CV_LS = { levels: "cv_levels_v1", akey: "cv_gemini_key", model: "cv_model",
@@ -2119,7 +2120,7 @@
   // Gemini function-declaration schema (OpenAPI subset, uppercase types)
   const CV_RENDER_TOOL = {
     name: "render_levels",
-    description: "วาดเส้นแนวรับ/แนวต้าน และมาร์กจุด swing high/low ลงบนกราฟวิเคราะห์ของผู้ใช้ เรียกใช้ทุกครั้งที่ระบุระดับราคาที่สำคัญ",
+    description: "วาดลงบนกราฟวิเคราะห์ของผู้ใช้: เส้นแนวรับ/แนวต้าน, จุด swing high/low, และการนับคลื่น Elliott Wave เรียกใช้ทุกครั้งที่ระบุระดับราคาหรือโครงสร้างคลื่นที่สำคัญ",
     parameters: {
       type: "OBJECT",
       properties: {
@@ -2150,6 +2151,21 @@
             required: ["price", "kind"],
           },
         },
+        waves: {
+          type: "ARRAY",
+          description: "การนับคลื่น Elliott Wave — จุดปลายของแต่ละคลื่น เรียงตามเวลาจากอดีตไปปัจจุบัน จะถูกลากเส้นเชื่อมและติดป้ายกำกับบนกราฟ",
+          items: {
+            type: "OBJECT",
+            properties: {
+              label: { type: "STRING", description: "ป้ายคลื่น เช่น 0,1,2,3,4,5 หรือ A,B,C หรือ (i),(ii) — สั้น ๆ" },
+              price: { type: "NUMBER", description: "ราคาที่จุดปลายคลื่น" },
+              time: { type: "STRING", description: "วันที่/เวลาของจุดนั้น รูปแบบ YYYY-MM-DD หรือ YYYY-MM-DD HH:mm (อ้างจากข้อมูลที่ให้)" },
+              note: { type: "STRING" },
+            },
+            required: ["label", "price", "time"],
+          },
+        },
+        degree: { type: "STRING", description: "ระดับคลื่น (degree) ของการนับนี้ เช่น 'Minor', 'Intermediate' (ไม่บังคับ)" },
       },
       required: ["levels"],
     },
@@ -2274,6 +2290,35 @@
     return d.toISOString().slice(0, 16).replace("T", " ");
   }
 
+  function cvAiTime(v) {
+    if (typeof v === "number") return v > 1e12 ? Math.floor(v / 1000) : Math.floor(v);
+    let s = String(v || "").trim();
+    if (!s) return null;
+    if (/^\d+$/.test(s)) { const n = +s; return n > 1e12 ? Math.floor(n / 1000) : n; }
+    let iso = s.indexOf("T") !== -1 ? s : (s.length <= 10 ? s + "T00:00:00" : s.replace(" ", "T"));
+    if (!/[zZ]|[+-]\d\d:?\d\d$/.test(iso)) iso += "Z";
+    const ms = Date.parse(iso);
+    return isNaN(ms) ? null : Math.floor(ms / 1000);
+  }
+
+  function cvRedrawWaves() {
+    if (!cv.waveSeries) return;
+    const pts = (cv.waves || [])
+      .map(w => ({ time: cvAiTime(w.time), value: +w.price, label: String(w.label == null ? "" : w.label) }))
+      .filter(p => Number.isFinite(p.time) && Number.isFinite(p.value))
+      .sort((a, b) => a.time - b.time);
+    const uniq = [];
+    for (const p of pts) { if (!uniq.length || uniq[uniq.length - 1].time !== p.time) uniq.push(p); }
+    cv.waveSeries.setData(uniq.map(p => ({ time: p.time, value: p.value })));
+    cv.waveSeries.setMarkers(uniq.map((p, i) => ({
+      time: p.time,
+      position: i % 2 ? "belowBar" : "aboveBar",
+      color: "#7c3aed",
+      shape: "circle",
+      text: p.label,
+    })));
+  }
+
   function cvRedrawLevels() {
     if (!cv.series) return;
     cv.priceLines.forEach(pl => { try { cv.series.removePriceLine(pl); } catch (e) {} });
@@ -2301,11 +2346,22 @@
       }));
     });
 
+    cvRedrawWaves();
+
     const box = cvEl("cvLevels");
     const items = cv.levels.map((lv, i) => ({ t: "level", i, lv }))
-      .concat(cv.swings.map((sw, i) => ({ t: "swing", i, sw })));
+      .concat(cv.swings.map((sw, i) => ({ t: "swing", i, sw })))
+      .concat((cv.waves && cv.waves.length ? [{ t: "wavegroup" }] : []));
     if (!items.length) { box.innerHTML = '<div class="small" style="margin:0;text-transform:none;letter-spacing:0;font-weight:400;">ยังไม่มีเส้น — ลองถาม AI ด้านล่าง</div>'; return; }
     box.innerHTML = items.map(it => {
+      if (it.t === "wavegroup") {
+        return `<div class="cv-level-item">
+          <span class="cv-level-dot" style="background:#7c3aed"></span>
+          <span class="mono">${escapeHtml((cv.waves || []).map(w => w.label).join(" – "))}</span>
+          <span class="cv-level-note">Elliott Wave (${(cv.waves || []).length} จุด)</span>
+          <button data-cvdel="waves" data-i="0" title="ลบการนับคลื่น">✕</button>
+        </div>`;
+      }
       if (it.t === "level") {
         const sup = it.lv.kind === "support";
         return `<div class="cv-level-item">
@@ -2326,8 +2382,8 @@
     }).join("");
     box.querySelectorAll("[data-cvdel]").forEach(b => {
       b.addEventListener("click", () => {
-        const arr = b.dataset.cvdel === "level" ? cv.levels : cv.swings;
-        arr.splice(+b.dataset.i, 1);
+        if (b.dataset.cvdel === "waves") { cv.waves = []; }
+        else { (b.dataset.cvdel === "level" ? cv.levels : cv.swings).splice(+b.dataset.i, 1); }
         cvPersistLevels();
         cvRedrawLevels();
       });
@@ -2339,18 +2395,19 @@
       localStorage.setItem(CV_LS.levels, JSON.stringify({
         symbol: cvEl("cvDataSymbol").value.trim().toUpperCase(),
         interval: cvEl("cvInterval").value,
-        levels: cv.levels, swings: cv.swings,
+        levels: cv.levels, swings: cv.swings, waves: cv.waves,
       }));
     } catch (e) {}
   }
   function cvRestoreLevels() {
-    cv.levels = []; cv.swings = [];
+    cv.levels = []; cv.swings = []; cv.waves = [];
     try {
       const saved = JSON.parse(localStorage.getItem(CV_LS.levels) || "null");
       if (saved && saved.symbol === cvEl("cvDataSymbol").value.trim().toUpperCase() &&
           saved.interval === cvEl("cvInterval").value) {
         cv.levels = Array.isArray(saved.levels) ? saved.levels : [];
         cv.swings = Array.isArray(saved.swings) ? saved.swings : [];
+        cv.waves = Array.isArray(saved.waves) ? saved.waves : [];
       }
     } catch (e) {}
   }
@@ -2387,8 +2444,17 @@
       "recent information (news, today's move, latest events, upcoming catalysts) USE Google Search",
       "and cite what you found. Forecasts must be framed as conditional scenarios (if X then Y), not certainties.",
       "Everything here is analysis, NOT financial advice.",
+      "",
       "When the user asks for price levels, call the render_levels function (support/resistance as",
       "`levels`, reversal points as `swings`) AND also give a short Thai explanation in the same reply.",
+      "",
+      "ELLIOTT WAVE: when the user asks for an Elliott Wave count / นับคลื่น, produce a concrete count using",
+      "the swing points in the data below. Fill the `waves` array with the end point of each wave in",
+      "chronological order (label like 0,1,2,3,4,5 for impulses or A,B,C for corrections; each item needs",
+      "label, price, and a `time` taken from the data). Also state in Thai: the wave degree, which wave you",
+      "think price is in now, the key Elliott rules check (w2 not beyond w1 start; w3 not the shortest; w4",
+      "not overlapping w1 for impulses), the main alternate count, and the invalidation price. Keep it grounded",
+      "in the given swings — do not invent turning points that are not in the data.",
     ].join("\n");
     if (!c.length) return common + "\n\n(ยังไม่ได้โหลดข้อมูลราคาลงกราฟ — ถ้าคำถามต้องใช้ราคาย้อนหลัง ให้บอกผู้ใช้กด 'โหลดกราฟ' ก่อน)";
     const last = c[c.length - 1];
@@ -2475,8 +2541,8 @@
     if (!text) return;
     const key = (cvEl("cvGeminiKey").value || "").trim();
     if (!key) { cvShowMsg("ใส่ Google Gemini API key ในส่วน 'ตั้งค่า API key' ก่อน (ขอฟรีที่ aistudio.google.com/apikey)"); return; }
-    const drawFocused = /วาด|เส้น|แนวรับ|แนวต้าน|swing|support|resist/i.test(text);
-    if (drawFocused && !cv.candles.length) { cvShowMsg("กด  'โหลดกราฟ' ให้มีข้อมูลราคาก่อนให้ AI วาดเส้น"); return; }
+    const drawFocused = /วาด|เส้น|แนวรับ|แนวต้าน|swing|support|resist|คลื่น|อีเลียต|เอลเลียต|elliott|wave|impulse|corrective|zigzag|[^a-z]abc|นับคลื่น/i.test(text);
+    if (drawFocused && !cv.candles.length) { cvShowMsg("กด  'โหลดกราฟ' ให้มีข้อมูลราคาก่อนให้ AI วิเคราะห์/วาด"); return; }
     cvShowMsg("");
 
     cvAddBubble("user", text);
@@ -2540,19 +2606,20 @@
       cv.messages.push({ role: "model", parts: parts });
 
       if (calls.length) {
-        let gotLevels = false;
+        let got = false;
         calls.forEach(p => {
           const a = p.functionCall.args || {};
-          if (Array.isArray(a.levels)) { cv.levels = a.levels; gotLevels = true; }
-          if (Array.isArray(a.swings)) cv.swings = a.swings;
+          if (Array.isArray(a.levels)) { cv.levels = a.levels; got = true; }
+          if (Array.isArray(a.swings)) { cv.swings = a.swings; got = true; }
+          if (Array.isArray(a.waves)) { cv.waves = a.waves; got = true; }
         });
         cvPushUser(calls.map(() => ({
           functionResponse: { name: "render_levels", response: { result: "วาดลงบนกราฟเรียบร้อย" } },
         })));
-        if (gotLevels || cv.swings.length) {
+        if (got) {
           cvPersistLevels();
           cvRedrawLevels();
-          if (!textOut) cvAddBubble("ai", "วาดเส้นให้บนกราฟแล้ว " + cv.levels.length + " แนว / swing " + cv.swings.length + " จุด");
+          if (!textOut) cvAddBubble("ai", "วาดให้บนกราฟแล้ว: " + cv.levels.length + " แนว · swing " + cv.swings.length + " จุด" + (cv.waves.length ? " · คลื่น Elliott " + cv.waves.length + " จุด" : ""));
         }
       }
     } catch (err) {
@@ -2711,6 +2778,10 @@
         upColor: "#16a34a", downColor: "#dc2626", borderVisible: false,
         wickUpColor: "#16a34a", wickDownColor: "#dc2626",
       });
+      cv.waveSeries = cv.chart.addLineSeries({
+        color: "#7c3aed", lineWidth: 2, lineStyle: 0,
+        lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false,
+      });
     }
 
     cvEl("cvLoadBtn").addEventListener("click", cvLoad);
@@ -2737,7 +2808,7 @@
       b.addEventListener("click", () => cvSend(b.dataset.q));
     });
     cvEl("cvClearLevels").addEventListener("click", () => {
-      cv.levels = []; cv.swings = [];
+      cv.levels = []; cv.swings = []; cv.waves = [];
       cvPersistLevels(); cvRedrawLevels();
     });
     cvEl("cvGeminiKeyToggle").addEventListener("click", () => {
