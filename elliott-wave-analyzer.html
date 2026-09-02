@@ -141,6 +141,9 @@
   }
   .sc-form input#scName { flex: 1 1 160px; }
   .sc-form input#scGuess { flex: 1 1 160px; }
+  .sc-wrap { overflow: auto; max-height: 48vh; border: 1px solid var(--border); border-radius: 10px; }
+  table.sc .note-line { display: block; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sc-wrap table.sc thead th { position: sticky; top: 0; background: var(--surface); z-index: 1; }
   table.sc { width: 100%; border-collapse: collapse; font-size: 12.5px; }
   table.sc th, table.sc td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--border); }
   table.sc th { font-size: 10.5px; text-transform: uppercase; letter-spacing: .3px; color: var(--muted); font-weight: 800; }
@@ -284,13 +287,14 @@
         <button class="btn" id="importJsonBtn">⭱ Import</button>
         <input type="file" id="importFile" accept="application/json" hidden>
       </div>
-      <div style="overflow-x:auto;">
+      <div class="sc-wrap">
         <table class="sc" id="scTbl">
           <thead><tr><th>วันที่</th><th>ตลาด</th><th>Pattern เด่น</th><th style="text-align:right;">Conf</th><th>ฉันเดา</th><th>ผล</th><th></th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
       <div class="muted-note" id="scEmpty">ยังไม่มีบันทึก — วางจุดให้ครบแล้วกด “บันทึกการนับนี้”</div>
+      <div style="margin-top:6px;"><button class="btn" id="scMoreBtn" hidden></button></div>
 
       <div id="statsBox" hidden>
         <h2 style="margin-top:16px;">สถิติความแม่น <span class="sub">เฉพาะที่ตรวจผลแล้ว</span></h2>
@@ -1958,6 +1962,8 @@
       return true;
     });
   }
+  const SC_PAGE = 25;
+  let scShowAll = false;
   function renderCounts() {
     const tb = $("scTbl").querySelector("tbody");
     $("scEmpty").hidden = counts.length > 0;
@@ -1966,7 +1972,14 @@
     $("trSummary").textContent = counts.length
       ? `${counts.length} การนับ · ตรวจแล้ว ${verified.length} · แม่น ${verified.length ? Math.round(corr / verified.length * 100) : 0}%`
       : "";
-    tb.innerHTML = filteredCounts().map(c => {
+    const all = filteredCounts();
+    const shown = scShowAll ? all : all.slice(0, SC_PAGE);
+    const more = $("scMoreBtn");
+    if (all.length > SC_PAGE) {
+      more.hidden = false;
+      more.textContent = scShowAll ? "ย่อ (แสดง 25 ล่าสุด)" : `แสดงทั้งหมด ${all.length} รายการ`;
+    } else { more.hidden = true; }
+    tb.innerHTML = shown.map(c => {
       const dd = new Date(c.createdAt).toLocaleDateString("th-TH", { day: "2-digit", month: "short" });
       const mk = c.matched ? esc(c.matched.label) : "—";
       const conf = c.matched && c.matched.conf != null ? c.matched.conf + "%" : "—";
@@ -1981,7 +1994,7 @@
       const autoLink = (c.symbol && c.target != null) ? ` <span class="link" data-check="${c.id}" title="เช็คผลอัตโนมัติ">🎯</span>` : "";
       return `<tr${lvTip ? ` title="${lvTip}"` : ""}>
         <td class="mono">${dd}</td>
-        <td>${mkt}${c.name ? `<br><span class="muted-note">${esc(c.name)}</span>` : ""}${c.outcome !== "pending" && c.outcomeNote ? `<br><span class="muted-note">${esc(c.outcomeNote)}</span>` : ""}</td>
+        <td>${mkt}${c.name ? `<br><span class="muted-note">${esc(c.name)}</span>` : ""}${c.outcome !== "pending" && c.outcomeNote ? `<br><span class="muted-note note-line" title="${esc(c.outcomeNote)}">${esc(c.outcomeNote)}</span>` : ""}</td>
         <td>${mk}</td>
         <td style="text-align:right;" class="mono">${conf}</td>
         <td>${esc(c.myGuess || "—")}</td>
@@ -2053,7 +2066,8 @@
     }
   });
   $("checkAllBtn").addEventListener("click", checkAllOutcomes);
-  ["fSym", "fTf", "fPat", "fOut"].forEach(id => $(id).addEventListener("input", renderCounts));
+  $("scMoreBtn").addEventListener("click", () => { scShowAll = !scShowAll; renderCounts(); });
+  ["fSym", "fTf", "fPat", "fOut"].forEach(id => $(id).addEventListener("input", () => { scShowAll = false; renderCounts(); }));
 
   $("scSave").addEventListener("click", () => {
     if (points.length < need()) { alert("วางจุดให้ครบก่อนบันทึก"); return; }
