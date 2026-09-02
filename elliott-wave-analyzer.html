@@ -217,7 +217,7 @@
           <button data-m="combination">ผสม W-X-Y</button>
         </span>
         <button class="btn" id="drawBtn">✏️ วางจุดคลื่น</button>
-        <label class="chk"><input type="checkbox" id="snapChk" checked> สแนปเข้าราคา</label>
+        <label class="chk"><input type="checkbox" id="snapChk" checked> สแนป (ไส้เทียน)</label>
         <button class="btn" id="undoBtn">↶ ถอยจุด</button>
         <button class="btn" id="clearBtn">นับใหม่</button>
         <button class="btn" id="zoomInBtn" title="ซูมเข้า">＋</button>
@@ -413,6 +413,25 @@
     view.i0 = Math.max(0, N - view.n);
   }
   const seriesAt = (i) => series[clamp(i, 0, series.length - 1)];
+  // snap to the closest of a bar's high / low / close (wick-aware); falls back to close
+  function snapValue(i, yPx) {
+    const c = candles && candles[clamp(i, 0, candles.length - 1)];
+    if (!c) return seriesAt(i);
+    if (yPx == null || !scales) return c.c;
+    const vy = scales.vFromY(yPx);
+    return [c.h, c.l, c.c].reduce((best, o) => Math.abs(o - vy) < Math.abs(best - vy) ? o : best, c.c);
+  }
+  // pull engine pivots onto the wick extreme (high at a peak, low at a trough)
+  function snapPivotsToWicks(pv) {
+    if (!candles) return pv;
+    return pv.map((p, k) => {
+      const c = candles[p.i]; if (!c) return p;
+      const prev = pv[k - 1], next = pv[k + 1];
+      const isHigh = (!prev || p.v >= prev.v) && (!next || p.v >= next.v);
+      const isLow = (!prev || p.v <= prev.v) && (!next || p.v <= next.v);
+      return { i: p.i, v: isHigh && !isLow ? c.h : isLow && !isHigh ? c.l : p.v };
+    });
+  }
 
   const MODE_LABELS = {
     impulse: ["0", "1", "2", "3", "4", "5"],
@@ -675,10 +694,10 @@
     let zzLayer = "";
     if (scanOn && b - a > 4) {
       const seg = series.slice(a, b + 1);
-      const pv = zigzagPivots(seg, sensThr(scanSens));
+      const pv = snapPivotsToWicks(zigzagPivots(seg, sensThr(scanSens)).map(p => ({ i: p.i + a, v: p.v })));
       if (pv.length > 1) {
-        const d = pv.map((p, k) => (k ? "L" : "M") + xFor(p.i + a).toFixed(1) + " " + yFor(p.v).toFixed(1)).join(" ");
-        const dots = pv.map(p => `<circle class="zzdot" cx="${xFor(p.i + a).toFixed(1)}" cy="${yFor(p.v).toFixed(1)}" r="2.6"/>`).join("");
+        const d = pv.map((p, k) => (k ? "L" : "M") + xFor(p.i).toFixed(1) + " " + yFor(p.v).toFixed(1)).join(" ");
+        const dots = pv.map(p => `<circle class="zzdot" cx="${xFor(p.i).toFixed(1)}" cy="${yFor(p.v).toFixed(1)}" r="2.6"/>`).join("");
         zzLayer = `<path class="zz" d="${d}"/>${dots}`;
       }
     }
@@ -727,7 +746,7 @@
     const { x, y } = svgXY(e);
     if (dragIdx != null) {
       const i = scales.iFromX(x);
-      points[dragIdx] = { i, v: snap ? seriesAt(i) : +scales.vFromY(y).toFixed(2) };
+      points[dragIdx] = { i, v: snap ? snapValue(i, y) : +scales.vFromY(y).toFixed(2) };
       update();
       return;
     }
@@ -746,7 +765,7 @@
     if (dragIdx != null) { dragIdx = null; return; }
     if (press && !press.moved && tool === "draw" && points.length < need()) {
       const i = scales.iFromX(press.x0);
-      points.push({ i, v: snap ? seriesAt(i) : +scales.vFromY(press.y0).toFixed(2) });
+      points.push({ i, v: snap ? snapValue(i, press.y0) : +scales.vFromY(press.y0).toFixed(2) });
       if (points.length >= need()) setTool("pan");
       update();
     } else if (press && press.moved) {
@@ -1329,10 +1348,9 @@
     const seg = series.slice(i0, i1 + 1);
     if (seg.length < 8) { $("subScanMsg").textContent = "ช่วงคลื่น A สั้นเกินไป — ซูม/ลด TF"; return; }
     // finer sensitivity for sub-waves (about half the chart threshold)
-    let pv = zigzagPivots(seg, sensThr(clamp(scanSens + 3, 1, 12)));
-    // strip a tiny leading/trailing stub if the engine tacked on the running extreme
+    const pv = snapPivotsToWicks(zigzagPivots(seg, sensThr(clamp(scanSens + 3, 1, 12))).map(p => ({ i: p.i + i0, v: p.v })));
     const legs = pv.length - 1;
-    subScan = pv.map(p => ({ i: p.i + i0, v: p.v }));
+    subScan = pv;
     let msg = `จับได้ ${legs} ขา`;
     if (legs === 5 || legs === 3) {
       subALegs = legs; $("subALegs").value = String(legs);
@@ -1361,7 +1379,7 @@
     const N = series.length;
     clampView();
     const a = view.i0, b = Math.min(N - 1, view.i0 + view.n - 1);
-    const pv = zigzagPivots(series.slice(a, b + 1), sensThr(scanSens)).map(p => ({ i: p.i + a, v: p.v }));
+    const pv = snapPivotsToWicks(zigzagPivots(series.slice(a, b + 1), sensThr(scanSens)).map(p => ({ i: p.i + a, v: p.v })));
     proposals = [];
     if (pv.length < 4) {
       $("proposeList").innerHTML = `<div class="muted-note">swing ที่จับได้น้อยไป — เพิ่มความไว หรือขยายกรอบกราฟ</div>`;
@@ -1431,13 +1449,13 @@
     for (let k = 0; k < points.length - 1; k++) {
       const i0 = Math.min(points[k].i, points[k + 1].i), i1 = Math.max(points[k].i, points[k + 1].i);
       const seg = series.slice(i0, i1 + 1);
-      const pv = seg.length >= 6 ? zigzagPivots(seg, thr) : [];
+      const pv = seg.length >= 6 ? snapPivotsToWicks(zigzagPivots(seg, thr).map(p => ({ i: p.i + i0, v: p.v }))) : [];
       const count = Math.max(0, pv.length - 1);
       const e = exp[k] || 0;
       degreeScan.push({
         name: `${lbl[k]}→${lbl[k + 1]}`, count, exp: e,
         ok: e ? count === e : null,
-        pivots: pv.map(p => ({ i: p.i + i0, v: p.v })),
+        pivots: pv,
       });
     }
     $("degreeOut").innerHTML = "ซับเวฟแต่ละคลื่น: " + degreeScan.map(d =>
