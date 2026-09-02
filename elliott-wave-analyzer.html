@@ -694,8 +694,9 @@
   if (window.ResizeObserver) new ResizeObserver(() => scheduleDraw()).observe(svg);
   window.addEventListener("resize", scheduleDraw);
 
-  /* ---------- analysis: impulse ---------- */
+  /* ---------- analysis: impulse 1-2-3-4-5 + diagonal, driven by THEORY ---------- */
   function analyzeImpulse(P) {
+    const G = THEORY.impulse.guide, D = THEORY.diagonal;
     const dir = Math.sign(P[1] - P[0]) || 1;
     const L = [0, Math.abs(P[1] - P[0]), Math.abs(P[2] - P[1]), Math.abs(P[3] - P[2]), Math.abs(P[4] - P[3]), Math.abs(P[5] - P[4])];
     const retr2 = L[1] ? L[2] / L[1] : 0;
@@ -703,75 +704,92 @@
     const ext3 = L[1] ? L[3] / L[1] : 0;
     const ext5 = L[3] ? L[5] / L[3] : 0;
 
-    const rule1 = dir * (P[2] - P[0]) > 0;                 // wave 2 retraces < 100% of wave 1
-    const rule2 = !(L[3] < L[1] && L[3] < L[5]);           // wave 3 not the shortest
-    const overlap = dir * (P[4] - P[1]) <= 0;              // wave 4 enters wave 1 range
+    const rule1 = dir * (P[2] - P[0]) > 0;                 // wave 2 < 100% of wave 1
+    const rule2 = !(L[3] < L[1] && L[3] < L[5]);           // wave 3 not shortest
+    const overlap = dir * (P[4] - P[1]) <= 0;              // wave 4 into wave 1
     const rule3 = !overlap;
-    const w3beyond = dir * (P[3] - P[1]) > 0;
+    const w3beyond = dir * (P[3] - P[1]) > 0;              // wave 3 past end of wave 1
     const w5trunc = dir * (P[5] - P[3]) <= 0;
     const longest = (L[1] >= L[3] && L[1] >= L[5]) ? 1 : (L[3] >= L[5] ? 3 : 5);
     const alt = (retr2 >= 0.5 && retr4 <= 0.382) || (retr2 <= 0.382 && retr4 >= 0.5);
 
     const rules = [
-      { name: "1 · คลื่น 2 ห้ามย่อเกิน 100% ของคลื่น 1", pass: rule1, detail: `ย่อ ${(retr2 * 100).toFixed(0)}%` },
-      { name: "2 · คลื่น 3 ห้ามสั้นที่สุดใน 1 / 3 / 5", pass: rule2, detail: `ยาว 1=${L[1].toFixed(1)}  3=${L[3].toFixed(1)}  5=${L[5].toFixed(1)}` },
-      { name: "3 · คลื่น 4 ห้ามทับเขตราคาคลื่น 1", pass: rule3, detail: overlap ? "ทับเขต → ต้องเป็น diagonal" : "ไม่ทับ" },
+      { name: THEORY.impulse.hardRules[0], pass: rule1, detail: `ย่อ ${(retr2 * 100).toFixed(0)}%` },
+      { name: THEORY.impulse.hardRules[1], pass: rule2, detail: `ยาว 1=${L[1].toFixed(1)} 3=${L[3].toFixed(1)} 5=${L[5].toFixed(1)}` },
+      { name: THEORY.impulse.hardRules[2], pass: rule3, detail: overlap ? "ทับเขต -> ต้องเป็น diagonal" : "ไม่ทับ" },
+      { name: THEORY.impulse.hardRules[3], pass: w3beyond },
     ];
     const guides = [
-      { name: "คลื่น 3 ทะลุจุดจบคลื่น 1", pass: w3beyond },
-      { name: "คลื่น 5 ไม่ truncate (ผ่านจุดสูงคลื่น 3)", pass: !w5trunc },
-      { name: `การสลับ 2↔4  (2 ย่อ ${(retr2 * 100).toFixed(0)}% · 4 ย่อ ${(retr4 * 100).toFixed(0)}%)`, pass: alt },
-      { name: `คลื่นที่ยืด = คลื่น ${longest}${longest === 3 ? " (พบบ่อยสุด)" : ""}`, pass: true, info: true },
+      { name: `คลื่น 5 ไม่ truncate (ผ่านจุดสูงคลื่น 3)`, pass: !w5trunc },
+      { name: `การสลับ 2/4 (2 ย่อ ${(retr2 * 100).toFixed(0)}% / 4 ย่อ ${(retr4 * 100).toFixed(0)}%)`, pass: alt },
+      { name: `คลื่นที่ยืด = คลื่น ${longest}${longest === 3 ? " (พบบ่อยสุด)" : ""}`, pass: null },
+      ...THEORY.impulse.notes.map(n => ({ name: n, pass: null })),
     ];
 
     const cands = [];
-    const valid = rule1 && rule2 && rule3;
+    const valid = rule1 && rule2 && rule3 && w3beyond;
     if (valid) {
-      let c = 60;
-      if (retr2 >= 0.382 && retr2 <= 0.786) c += 12;
-      if (retr2 >= 0.5 && retr2 <= 0.618) c += 6;
-      if (retr4 >= 0.236 && retr4 <= 0.5) c += 10;
+      let c = 58;
+      if (inRange(retr2, G.w2Retrace[0], G.w2Retrace[1])) c += 12;
+      if (inRange(retr2, G.w2Typical[0], G.w2Typical[1])) c += 6;
+      if (inRange(retr4, G.w4Retrace[0], G.w4Retrace[1])) c += 8;
+      if (inRange(retr4, G.w4Typical[0], G.w4Typical[1])) c += 4;
       if (ext3 >= 1.3) c += 10;
       if (longest === 3) c += 6;
       if (alt) c += 8;
-      if (w3beyond) c += 4; else c -= 18;
       if (w5trunc) c -= 10;
-      const notes = [`คลื่น 3 = ${ext3.toFixed(2)}× ของคลื่น 1` + (ext3 >= 1.5 && ext3 <= 1.8 ? " (ใกล้ 1.618 — คลาสสิก)" : "")];
-      if (w5trunc) notes.push("คลื่น 5 สั้น (truncation) → สัญญาณเทรนด์จบแรง เตรียมกลับตัว");
-      if (!alt) notes.push("คลื่น 2 กับ 4 ไม่สลับกันชัด — ระวังนับผิด หรือยังอยู่กลางคลื่น");
-      cands.push({ label: `อิมพัลส์ 5 คลื่น — เทรนด์${dir > 0 ? "ขึ้น" : "ลง"}`, conf: clamp(Math.round(c), 8, 97), notes });
+      const notes = [`คลื่น 3 = ${ext3.toFixed(2)}x ของคลื่น 1` + (ext3 >= 1.5 && ext3 <= 1.8 ? " (ใกล้ 1.618 - คลาสสิก)" : "")];
+      if (w5trunc) notes.push("คลื่น 5 truncation -> เทรนด์จบแรง เตรียมกลับตัว");
+      if (!alt) notes.push("คลื่น 2 กับ 4 ไม่สลับกันชัด - ระวังนับผิด");
+      cands.push({ label: `อิมพัลส์ 5 คลื่น - เทรนด์${dir > 0 ? "ขึ้น" : "ลง"}`, conf: clamp(Math.round(c), 8, 97), notes });
     } else {
       const why = [];
       if (!rule1) why.push("คลื่น 2 ย่อเกิน 100%");
       if (!rule2) why.push("คลื่น 3 สั้นที่สุด");
       if (!rule3) why.push("คลื่น 4 ทับเขตคลื่น 1");
+      if (!w3beyond) why.push("คลื่น 3 ไม่ทะลุจุดจบคลื่น 1");
       cands.push({ label: "อิมพัลส์ที่ถูกกฎ", conf: clamp(18 - why.length * 4, 4, 20),
-        notes: ["ผิดกฎเหล็ก: " + why.join(", ") + " → count นี้ใช้ไม่ได้ ต้องนับใหม่"] });
+        notes: ["ผิดกฎ: " + why.join(", ") + " -> count นี้ใช้ไม่ได้"] });
     }
 
+    // diagonal (wave 4 overlaps wave 1)
     if (rule1 && rule2) {
-      let dc = overlap ? 58 : 22;
-      if (overlap && retr4 > 0.4) dc += 8;
-      if (ext3 < 1.0) dc += 6;
-      cands.push({ label: "Diagonal (leading / ending)", conf: clamp(Math.round(dc), 8, 80),
-        notes: [overlap
-          ? "คลื่น 4 ทับคลื่น 1 ได้เฉพาะ diagonal — ถ้าอยู่ปลายเทรนด์ = ending diagonal (กลับตัวแรง)"
-          : "ยังไม่เห็นการทับเขตแบบ diagonal ชัด ๆ"] });
+      const contracting = L[1] >= L[3] && L[3] >= L[5] && L[2] >= L[4];
+      const expanding = L[3] >= L[1] && L[5] >= L[3];
+      let dc = overlap ? 55 : 20;
+      if (overlap && (contracting || expanding)) dc += 12;
+      if (overlap && retr2 >= 0.6) dc += 4;
+      const shape = contracting ? "Contracting" : expanding ? "Expanding" : "ไม่ชัด";
+      cands.push({
+        label: `Diagonal - ${shape} (leading / ending)`,
+        conf: clamp(Math.round(dc), 6, 82),
+        notes: [
+          ...D.rules,
+          overlap ? "คลื่น 4 ทับคลื่น 1 = เข้าเงื่อนไข diagonal" : "ยังไม่เห็นการทับเขตแบบ diagonal",
+          "ending: " + D.endingNote, "leading: " + D.leadingNote,
+        ],
+      });
     }
 
-    let mc = 16;
+    let mc = 14;
     if (!valid) mc += 20;
     if (!rule1) mc += 10;
     cands.push({ label: "ที่จริงเป็นคลื่นแก้ตัว (นับผิดโหมด)", conf: clamp(mc, 6, 55),
-      notes: ["ลองสลับไปโหมด 0-A-B-C แล้ววางจุดใหม่เพื่อเทียบ"] });
+      notes: ["ลองสลับไปโหมด A-B-C / สามเหลี่ยม / ผสม แล้ววางจุดใหม่"] });
 
     cands.sort((a, b) => b.conf - a.conf);
+
+    const w3t = P[2] + dir * L[1] * G.w3Ext;
+    const w5eq = P[4] + dir * L[1];
+    const w5x = P[4] + dir * Math.abs(P[3] - P[0]) * 0.618;
     const meas = [
       ["ความยาวคลื่น 1 / 3 / 5", `${L[1].toFixed(1)} / ${L[3].toFixed(1)} / ${L[5].toFixed(1)}`],
-      ["คลื่น 2 ย่อ", `${(retr2 * 100).toFixed(1)}%  ของคลื่น 1`],
-      ["คลื่น 4 ย่อ", `${(retr4 * 100).toFixed(1)}%  ของคลื่น 3`],
-      ["คลื่น 3 ยืด", `${ext3.toFixed(2)}×  ของคลื่น 1`],
-      ["คลื่น 5 เทียบคลื่น 3", `${ext5.toFixed(2)}×`],
+      ["คลื่น 2 ย่อ", `${(retr2 * 100).toFixed(1)}% ของคลื่น 1`],
+      ["คลื่น 4 ย่อ", `${(retr4 * 100).toFixed(1)}% ของคลื่น 3`],
+      ["คลื่น 3 ยืด", `${ext3.toFixed(2)}x ของคลื่น 1`],
+      ["คลื่น 5 เทียบคลื่น 3", `${ext5.toFixed(2)}x`],
+      ["เป้าคลื่น 3 (1.618x)", fmt(w3t)],
+      ["เป้าคลื่น 5", `${fmt(w5eq)} (=w1) / ${fmt(w5x)} (0.618x ของ 1->3)`],
     ];
     return { rules, guides, cands, meas };
   }
