@@ -331,7 +331,7 @@
       <table class="meas"><tbody id="measBody"></tbody></table>
     </div>
     <div class="panel">
-      <h2>ความเป็นไปได้ <span class="sub">เรียงตาม confidence</span></h2>
+      <h2>ความเป็นไปได้ <span class="sub" id="candSub">เรียงตาม confidence</span></h2>
       <div id="candList"></div>
     </div>
   </div>
@@ -1295,11 +1295,34 @@
   }
   function candRow(c) {
     const col = c.conf >= 70 ? "var(--bull)" : c.conf >= 45 ? "var(--warn)" : "var(--muted)";
+    const cal = c._calib != null ? ` <span class="mono" style="color:var(--muted)">≈ ${c._calib}% จริง</span>` : "";
     return `<div class="cand">
-      <div class="cand-h"><span class="cand-l">${esc(c.label)}</span><span class="cand-c mono">${c.conf}%</span></div>
+      <div class="cand-h"><span class="cand-l">${esc(c.label)}</span><span class="cand-c mono">${c.conf}%${cal}</span></div>
       <div class="bar"><i style="width:${c.conf}%;background:${col}"></i></div>
       ${c.notes && c.notes.length ? `<ul class="cand-n">${c.notes.map(n => `<li>${esc(n)}</li>`).join("")}</ul>` : ""}
     </div>`;
+  }
+
+  /* Round 1: confidence calibration from verified counts */
+  const CALIB_BUCKETS = [[0, 40], [40, 55], [55, 70], [70, 85], [85, 101]];
+  const MIN_CALIB = 12;
+  let calibration = null;
+  function buildCalibration() {
+    const V = counts.filter(c => (c.outcome === "correct" || c.outcome === "wrong") && c.matched && c.matched.conf != null);
+    if (V.length < MIN_CALIB) { calibration = null; return; }
+    calibration = CALIB_BUCKETS.map(([lo, hi]) => {
+      const g = V.filter(c => c.matched.conf >= lo && c.matched.conf < hi);
+      const hit = g.filter(c => c.outcome === "correct").length;
+      return { lo, hi, n: g.length, hit, rate: g.length ? hit / g.length : null };
+    });
+    calibration._total = V.length;
+    calibration._hit = V.filter(c => c.outcome === "correct").length;
+  }
+  function calibratedConf(raw) {
+    if (!calibration || raw == null) return null;
+    const b = calibration.find(x => raw >= x.lo && raw < x.hi);
+    if (b && b.n >= 3 && b.rate != null) return Math.round(b.rate * 100);
+    return Math.round(calibration._hit / calibration._total * 100);
   }
 
   const VALID_MODES = ["impulse", "corrective", "triangle", "combination"];
@@ -1326,6 +1349,10 @@
       : mode === "combination" ? analyzeCombination(P)
       : analyzeCorrective(P);
     lastAnalysis = a;
+    a.cands.forEach(c => { c._calib = calibratedConf(c.conf); });
+    $("candSub").textContent = calibration
+      ? `เรียงตาม confidence · ปรับจาก ${calibration._total} การนับที่ตรวจแล้ว`
+      : `เรียงตาม confidence · calibrate เมื่อครบ ${MIN_CALIB} การนับที่ตรวจผล`;
     $("rulesList").innerHTML = a.rules.map(ruleRow).join("");
     $("guidesList").innerHTML = a.guides.map(ruleRow).join("");
     $("measBody").innerHTML = a.meas.map(m => `<tr><td>${esc(m[0])}</td><td class="mono">${esc(m[1])}</td></tr>`).join("");
@@ -1603,6 +1630,7 @@
     const verified = counts.filter(c => c.outcome === "correct" || c.outcome === "wrong");
     const correct = verified.filter(c => c.outcome === "correct").length;
     try { localStorage.setItem("ewa_summary_v1", JSON.stringify({ total: counts.length, verified: verified.length, correct })); } catch (e) {}
+    buildCalibration();
   }
   let pushT = 0;
   function pushCloudSoon() { clearTimeout(pushT); pushT = setTimeout(pushCloud, 1200); }
