@@ -208,8 +208,10 @@
       </div>
       <div class="toolbar">
         <span class="seg" id="modeSeg">
-          <button data-m="impulse" class="active">อิมพัลส์ 0-1-2-3-4-5</button>
-          <button data-m="corrective">คลื่นแก้ตัว 0-A-B-C</button>
+          <button data-m="impulse" class="active">อิมพัลส์ 1-2-3-4-5</button>
+          <button data-m="corrective">แก้ตัว A-B-C</button>
+          <button data-m="triangle">สามเหลี่ยม A-B-C-D-E</button>
+          <button data-m="combination">ผสม W-X-Y</button>
         </span>
         <button class="btn" id="drawBtn">✏️ วางจุดคลื่น</button>
         <label class="chk"><input type="checkbox" id="snapChk" checked> สแนปเข้าราคา</label>
@@ -393,8 +395,14 @@
   }
   const seriesAt = (i) => series[clamp(i, 0, series.length - 1)];
 
-  const need = () => (mode === "impulse" ? 6 : 4);
-  const labels = () => (mode === "impulse" ? ["0", "1", "2", "3", "4", "5"] : ["0", "A", "B", "C"]);
+  const MODE_LABELS = {
+    impulse: ["0", "1", "2", "3", "4", "5"],
+    corrective: ["0", "A", "B", "C"],
+    triangle: ["0", "A", "B", "C", "D", "E"],
+    combination: ["0", "W", "X", "Y"],
+  };
+  const labels = () => MODE_LABELS[mode] || MODE_LABELS.corrective;
+  const need = () => labels().length;
 
   /* ---------- synthetic price ---------- */
   function genSeries(seed) {
@@ -1033,6 +1041,141 @@
     return { rules, guides, cands, meas };
   }
 
+  /* ---------- analysis: triangle A-B-C-D-E (0-1-2-3-4-5), driven by THEORY ---------- */
+  function analyzeTriangle(P) {
+    const dirA = Math.sign(P[1] - P[0]) || 1;
+    const LA = Math.abs(P[1] - P[0]), LB = Math.abs(P[2] - P[1]), LC = Math.abs(P[3] - P[2]),
+      LD = Math.abs(P[4] - P[3]), LE = Math.abs(P[5] - P[4]);
+    const bBeyondStart = dirA * (P[2] - P[0]) < 0;
+    const cBeyondEndA = dirA * (P[3] - P[1]) > 0;
+    const dBeyondEndB = dirA * (P[4] - P[2]) < 0;
+    const eBeyondEndC = dirA * (P[5] - P[3]) > 0;
+    const contract = { legs: LC < LA && LD < LB && LE < LC, b: !bBeyondStart, c: !cBeyondEndA, d: !dBeyondEndB, e: !eBeyondEndC };
+    const expand = { legs: LC > LA && LD > LB && LE > LC, b: bBeyondStart, c: cBeyondEndA, d: dBeyondEndB, e: eBeyondEndC };
+    const cScore = Object.values(contract).filter(Boolean).length;
+    const eScore = Object.values(expand).filter(Boolean).length;
+    const type = cScore >= eScore ? "contracting" : "expanding";
+    const T = THEORY.triangle;
+    const cR = LA ? LC / LA : 0, dR = LB ? LD / LB : 0, eR = LC ? LE / LC : 0;
+    const fibNear = (r, t) => Math.abs(r - t) < 0.25;
+    const fibHits = (fibNear(cR, T.fib.cOfA) ? 1 : 0) + (fibNear(dR, T.fib.dOfB) ? 1 : 0) + (fibNear(eR, T.fib.eOfC) ? 1 : 0);
+
+    const barrier = Math.abs(P[2] - P[4]) < 0.15 * (LA || 1);
+    const running = LB > LA && LE < 0.62 * (LD || 1);
+    const baseC = 28 + cScore * 11 + fibHits * 6;
+    const baseE = 26 + eScore * 12;
+    const cands = [];
+    const mk = (name, conf, notes) => cands.push({ label: name, conf: clamp(Math.round(conf), 4, 97), notes });
+    if (type === "contracting") {
+      mk("Standard Triangle (contracting)", baseC + (barrier || running ? -4 : 8),
+        [T.subtypes[0].note, `ขาสลับหดลง C<A ${LC < LA ? "OK" : "x"} / D<B ${LD < LB ? "OK" : "x"} / E<C ${LE < LC ? "OK" : "x"}`, "effect: " + T.effect]);
+      mk("Barrier Triangle", barrier ? baseC + 4 : baseC * 0.4,
+        [T.subtypes[1].note, `ปลาย B-D ห่าง ${(Math.abs(P[2] - P[4]) / (LA || 1) * 100).toFixed(0)}% ของ A`]);
+      mk("Running Triangle", running ? baseC + 2 : baseC * 0.4,
+        [T.subtypes[2].note, `B/A = ${(LB / (LA || 1)).toFixed(2)}x / E/D = ${(LE / (LD || 1)).toFixed(2)}x`]);
+      mk("Expanding Triangle", baseE * 0.5, [T.subtypes[3].note, "โครงสร้างออกไปทาง contracting"]);
+    } else {
+      mk("Expanding Triangle", baseE + 8,
+        [T.subtypes[3].note, `ขาสลับขยาย C>A ${LC > LA ? "OK" : "x"} / D>B ${LD > LB ? "OK" : "x"} / E>C ${LE > LC ? "OK" : "x"}`, "effect: " + T.effect]);
+      mk("Standard Triangle (contracting)", baseC * 0.5, [T.subtypes[0].note, "โครงสร้างออกไปทาง expanding"]);
+    }
+    cands.sort((a, b) => b.conf - a.conf);
+
+    const rules = [
+      { name: `ชนิด: ${type === "contracting" ? "Contracting (หดตัว)" : "Expanding (ขยายตัว)"} [${type === "contracting" ? cScore : eScore}/5 เงื่อนไข]`, pass: null },
+      ...(type === "contracting" ? [
+        { name: "ขาสลับหดลง (C<A, D<B, E<C)", pass: contract.legs },
+        { name: "B ไม่ทะลุจุดเริ่ม A", pass: contract.b },
+        { name: "C ไม่ทะลุจุดจบ A", pass: contract.c },
+        { name: "D ไม่ทะลุจุดจบ B", pass: contract.d },
+        { name: "E ไม่ทะลุจุดจบ C", pass: contract.e },
+      ] : [
+        { name: "ขาสลับขยาย (C>A, D>B, E>C)", pass: expand.legs },
+        { name: "B ทะลุจุดเริ่ม A", pass: expand.b },
+        { name: "C ทะลุจุดจบ A", pass: expand.c },
+        { name: "D ทะลุจุดจบ B", pass: expand.d },
+        { name: "E ทะลุจุดจบ C และยาวสุด", pass: expand.e && LE >= Math.max(LA, LB, LC, LD) },
+      ]),
+    ];
+    const guides = [
+      { name: `Fib: C~0.618A (${cR.toFixed(2)}) / D~0.618B (${dR.toFixed(2)}) / E~0.618C (${eR.toFixed(2)})`, pass: null },
+      ...T.notes.map(n => ({ name: n, pass: null })),
+    ];
+    const height = Math.max(LA, LB);
+    const meas = [
+      ["ความยาว A/B/C/D/E", `${LA.toFixed(1)} / ${LB.toFixed(1)} / ${LC.toFixed(1)} / ${LD.toFixed(1)} / ${LE.toFixed(1)}`],
+      ["C/A / D/B / E/C", `${cR.toFixed(2)} / ${dR.toFixed(2)} / ${eR.toFixed(2)}`],
+      ["ความสูง Triangle", fmt(height)],
+      ["เป้า thrust หลังเบรก", `${fmt(P[5] - height)} หรือ ${fmt(P[5] + height)} (ไปทางเทรนด์เดิม)`],
+    ];
+    return { rules, guides, cands, meas };
+  }
+
+  /* ---------- analysis: combination 0-W-X-Y, driven by THEORY ---------- */
+  function analyzeCombination(P) {
+    const dirW = Math.sign(P[1] - P[0]) || 1;
+    const LW = Math.abs(P[1] - P[0]), LX = Math.abs(P[2] - P[1]), LY = Math.abs(P[3] - P[2]);
+    const xRetr = LW ? LX / LW : 0;
+    const yVsW = LW ? LY / LW : 0;
+    const xDirOk = dirW * (P[2] - P[1]) < 0;
+    const yDirOk = dirW * (P[3] - P[2]) > 0;
+    const net = P[3] - P[1];
+    const sideways = Math.abs(net) < 0.6 * (LW || 1);
+    const trending = dirW * net > 0.3 * (LW || 1);
+    const C = THEORY.combination;
+
+    function scoreCombo(s) {
+      const chk = [];
+      let hard = true, soft = 0, softMax = 0;
+      chk.push({ t: "X ย้อนกลับ W (ถูกทิศ)", pass: xDirOk }); if (!xDirOk) hard = false;
+      chk.push({ t: "Y ต่อทิศเดียวกับ W", pass: yDirOk }); if (!yDirOk) hard = false;
+      const wantX = s.xRetrace || C.xRetrace;
+      softMax += 2;
+      const xin = inRange(xRetr, wantX[0], wantX[1]);
+      chk.push({ t: `X รีเทรซ W = ${(xRetr * 100).toFixed(0)}% (ทฤษฎี ${Math.round(wantX[0] * 100)}-${Math.round(wantX[1] * 100)}%)`, pass: xin });
+      soft += xin ? 2 : (nearRange(xRetr, wantX[0], wantX[1]) ? 1 : 0);
+      softMax += 2;
+      const yin = inRange(yVsW, C.yVsW[0], C.yVsW[1]);
+      chk.push({ t: `Y เทียบ W = ${yVsW.toFixed(2)}x (ทฤษฎี ${C.yVsW[0]}-${C.yVsW[1]}x)`, pass: yin });
+      soft += yin ? 2 : (nearRange(yVsW, C.yVsW[0], C.yVsW[1]) ? 1 : 0);
+      softMax += 2;
+      const dm = s.sideways ? sideways : trending;
+      chk.push({ t: s.sideways ? "วิ่งออกข้าง (Y จบใกล้ปลาย W)" : "วิ่งเป็นเทรนด์ (Y ทะลุปลาย W)", pass: dm });
+      soft += dm ? 2 : 0;
+      if (!dm) hard = false;
+      const ratio = softMax ? soft / softMax : 0;
+      const conf = hard ? clamp(Math.round(34 + ratio * 61), 8, 96) : clamp(Math.round(ratio * 26), 4, 30);
+      return { s, chk, hard, conf };
+    }
+    const scored = C.subtypes.map(scoreCombo);
+    scored.forEach(x => { if (x.s.id === "cmb-triple-three") x.conf = Math.round(x.conf * 0.8); });
+    scored.sort((a, b) => b.conf - a.conf);
+    const best = scored[0];
+
+    const cands = scored.map(x => ({
+      label: x.s.name, conf: x.conf,
+      notes: [x.s.note || "", x.s.effect ? "effect: " + x.s.effect : "",
+        ...(x.hard ? [] : ["ไม่เข้าเกณฑ์: " + x.chk.filter(c => c.pass === false).map(c => c.t).join(" / ")])].filter(Boolean),
+    }));
+    if (best.s.id === "cmb-triple-three") cands[0].notes.unshift("โหมดนี้วางได้แค่ W-X-Y — ประเมิน triple จาก 3 จุดแรก");
+
+    const rules = [
+      { name: best.hard ? `เข้าเกณฑ์ "${best.s.name}"` : `ใกล้สุด "${best.s.name}" (${best.conf}%)`, pass: best.hard },
+      ...best.chk.map(c => ({ name: c.t, pass: c.pass })),
+    ];
+    const guides = [
+      ...C.rules.map(n => ({ name: n, pass: null })),
+      ...C.notes.map(n => ({ name: n, pass: null })),
+    ];
+    const meas = [
+      ["ความยาว W / X / Y", `${LW.toFixed(1)} / ${LX.toFixed(1)} / ${LY.toFixed(1)}`],
+      ["X รีเทรซ W", `${(xRetr * 100).toFixed(1)}%`],
+      ["Y เทียบ W", `${yVsW.toFixed(2)}x`],
+      ["ทิศรวม", sideways ? "ออกข้าง (double/triple three)" : trending ? "เทรนด์ (double zigzag)" : "ไม่ชัด"],
+    ];
+    return { rules, guides, cands, meas };
+  }
+
   /* ---------- render ---------- */
   function ruleRow(r) {
     const ic = (r.info || r.pass == null) ? '<span class="ic info">•</span>'
@@ -1048,6 +1191,8 @@
     </div>`;
   }
 
+  const VALID_MODES = ["impulse", "corrective", "triangle", "combination"];
+  const normMode = (m) => VALID_MODES.includes(m) ? m : "impulse";
   function syncModeUI() { $("subHint").hidden = mode !== "corrective"; }
 
   let lastAnalysis = null;
@@ -1065,7 +1210,10 @@
     }
     $("status").textContent = `ครบ ${n} จุดแล้ว · ลากจุดเพื่อปรับ แล้วผลจะอัปเดตทันที`;
     const P = points.map(p => p.v);
-    const a = mode === "impulse" ? analyzeImpulse(P) : analyzeCorrective(P);
+    const a = mode === "impulse" ? analyzeImpulse(P)
+      : mode === "triangle" ? analyzeTriangle(P)
+      : mode === "combination" ? analyzeCombination(P)
+      : analyzeCorrective(P);
     lastAnalysis = a;
     $("rulesList").innerHTML = a.rules.map(ruleRow).join("");
     $("guidesList").innerHTML = a.guides.map(ruleRow).join("");
@@ -1110,7 +1258,7 @@
       } else if (Array.isArray(d.series) && d.series.length > 10) {
         candles = null; series = d.series;
       } else return false;
-      mode = d.mode === "corrective" ? "corrective" : "impulse";
+      mode = normMode(d.mode);
       points = Array.isArray(d.points) ? d.points.filter(p => p && typeof p.i === "number" && typeof p.v === "number") : [];
       snap = d.snap !== false;
       src = d.src === "sim" ? "sim" : "binance";
@@ -1168,7 +1316,7 @@
       createdAt: s.createdAt || (typeof s.id === "number" ? s.id : Date.now()),
       name: s.name || "",
       myGuess: s.myGuess || "",
-      mode: s.mode === "corrective" ? "corrective" : "impulse",
+      mode: normMode(s.mode),
       symbol: s.symbol || null,
       timeframe: s.timeframe || s.interval || null,
       points: Array.isArray(s.points) ? s.points.map(p => ({ i: p.i, v: p.v })) : [],
@@ -1297,8 +1445,11 @@
   function patternFamily(label) {
     if (!label) return "—";
     const s = String(label).toLowerCase();
-    if (s.includes("zigzag")) return s.includes("double") ? "Double Zigzag" : "Zigzag";
+    if (s.includes("double zigzag")) return "Double Zigzag";
+    if (s.includes("zigzag")) return "Zigzag";
     if (s.includes("flat")) return "Flat";
+    if (s.includes("triangle") || s.includes("สามเหลี่ยม")) return "Triangle";
+    if (s.includes("three") || s.includes("combination") || s.includes("ผสม")) return "Combination";
     if (s.includes("diagonal")) return "Diagonal";
     if (s.includes("อิมพัลส์") || s.includes("impulse")) return "Impulse";
     return String(label);
@@ -1332,7 +1483,8 @@
       const dd = new Date(c.createdAt).toLocaleDateString("th-TH", { day: "2-digit", month: "short" });
       const mk = c.matched ? esc(c.matched.label) : "—";
       const conf = c.matched && c.matched.conf != null ? c.matched.conf + "%" : "—";
-      const mkt = c.symbol ? esc(c.symbol) + " " + esc(c.timeframe || "") : (c.mode === "corrective" ? "A-B-C" : "1-5");
+      const mkt = c.symbol ? esc(c.symbol) + " " + esc(c.timeframe || "")
+        : (MODE_LABELS[c.mode] ? MODE_LABELS[c.mode].slice(1).join("-") : "1-5");
       const sel = `<select class="out-sel" data-out="${c.id}">
         <option value="pending"${c.outcome === "pending" ? " selected" : ""}>รอผล</option>
         <option value="correct"${c.outcome === "correct" ? " selected" : ""}>ถูก</option>
@@ -1356,7 +1508,7 @@
   function loadCountToChart(c) {
     live = false; $("liveChk").checked = false; closeWS();
     noMoreHistory = false;
-    mode = c.mode === "corrective" ? "corrective" : "impulse";
+    mode = normMode(c.mode);
     if (Array.isArray(c.candles) && c.candles.length > 5) {
       candles = c.candles.slice(); series = candles.map(x => x.c); src = "binance";
     } else {
