@@ -147,6 +147,18 @@
   .check-item { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600; color: var(--text); cursor: pointer; }
   .check-item input { width: auto; accent-color: var(--accent); cursor: pointer; }
 
+  /* pre-trade checklist */
+  .pretrade { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; background: var(--surface-alt); margin-bottom: 12px; }
+  .pretrade-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+  .pretrade-meter { font-size: 12px; font-weight: 800; padding: 2px 9px; border-radius: 999px; background: var(--surface); border: 1px solid var(--border); color: var(--muted); }
+  .pretrade-meter.full { background: var(--bull-soft); border-color: var(--bull); color: var(--bull); }
+  .pretrade-meter.partial { background: rgba(217,119,6,0.12); border-color: var(--warn, #d97706); color: #d97706; }
+  .linkbtn { background: none; border: none; color: var(--accent); font-size: 12px; font-weight: 700; cursor: pointer; padding: 0; font-family: inherit; }
+  .linkbtn:hover { text-decoration: underline; }
+  #tfChecklistItems { flex-direction: column; gap: 9px; }
+  #tfChecklistItems .check-item { font-weight: 500; align-items: flex-start; }
+  #tfChecklistEditor textarea { width: 100%; min-height: 130px; }
+
   /* image upload */
   .file-btn { display: inline-flex; align-items: center; background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 9px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; }
   .file-btn:hover { border-color: var(--accent); color: var(--accent); }
@@ -525,6 +537,29 @@
       <div class="side-toggle">
         <button type="button" class="side-btn buy" data-side="long">▲ BUY</button>
         <button type="button" class="side-btn sell" data-side="short">▼ SELL</button>
+      </div>
+    </div>
+
+    <div class="pretrade" id="tfPretrade">
+      <div class="pretrade-head">
+        <label class="small" style="margin:0;">✅ เช็กลิสต์ก่อนเข้าเทรด (Pre-trade)</label>
+        <div class="row" style="gap:10px;">
+          <span class="pretrade-meter" id="tfChecklistMeter">0/0</span>
+          <button type="button" class="linkbtn" id="tfChecklistEdit">แก้ไขรายการ</button>
+        </div>
+      </div>
+      <div class="field" style="max-width:190px; margin-bottom:10px;">
+        <label class="small">ความเสี่ยงต่อไม้ (% ของพอร์ต)</label>
+        <input type="number" id="tfRiskPct" step="0.1" min="0" placeholder="เช่น 1">
+      </div>
+      <div class="check-row" id="tfChecklistItems"></div>
+      <div id="tfChecklistEditor" class="hidden" style="margin-top:10px;">
+        <label class="small">รายการเช็กลิสต์ (บรรทัดละ 1 ข้อ)</label>
+        <textarea id="tfChecklistText"></textarea>
+        <div class="row" style="gap:8px; margin-top:8px;">
+          <button type="button" class="primary" id="tfChecklistSave">บันทึกรายการ</button>
+          <button type="button" class="ghost" id="tfChecklistCancel">ยกเลิก</button>
+        </div>
       </div>
     </div>
 
@@ -1010,7 +1045,12 @@
 
     const flags = [];
     if (isPending(t)) flags.push("⏳ รอผลเทรด");
-    if (t.followedRules) flags.push("ทำตามแผน ✓");
+    if (Array.isArray(t.checklistDone) && t.checklistTotal) {
+      flags.push("แผน " + t.checklistDone.length + "/" + t.checklistTotal + (t.checklistDone.length === t.checklistTotal ? " ✓" : ""));
+    } else if (t.followedRules) {
+      flags.push("ทำตามแผน ✓");
+    }
+    if (t.riskPct != null) flags.push("เสี่ยง " + t.riskPct + "%");
     if (t.breakeven) flags.push("Breakeven");
     if (t.enteredWindow) flags.push("เข้าตามช่วงเวลา ✓");
 
@@ -1465,6 +1505,71 @@
     });
   }
 
+  /* ---------- pre-trade checklist ---------- */
+  const CHECKLIST_LS = "tj_checklist_v1";
+  const DEFAULT_CHECKLIST = [
+    "เข้าเงื่อนไข setup ครบทุกข้อ",
+    "ตั้ง Stop Loss แล้ว รู้จุดผิดทาง",
+    "R:R ≥ 1.5",
+    "ความเสี่ยงต่อไม้ไม่เกินที่กำหนด (เช่น 1–2%)",
+    "เช็กปฏิทินข่าว/เศรษฐกิจแล้ว ไม่มีข่าวแรงใกล้ ๆ",
+    "อยู่ใน session / ช่วงเวลาที่วางแผน",
+    "ไม่ได้เทรดแก้แค้น และไม่ได้ FOMO",
+  ];
+  function loadChecklist() {
+    try {
+      const a = JSON.parse(localStorage.getItem(CHECKLIST_LS) || "null");
+      if (Array.isArray(a) && a.length) return a.map(String);
+    } catch (e) {}
+    return DEFAULT_CHECKLIST.slice();
+  }
+  let checklist = loadChecklist();
+  function saveChecklist() {
+    try { localStorage.setItem(CHECKLIST_LS, JSON.stringify(checklist)); } catch (e) {}
+    if (typeof pushCloudSync === "function") pushCloudSync();
+  }
+  function renderChecklistItems(checkedLabels) {
+    const checked = new Set(checkedLabels || []);
+    const box = document.getElementById("tfChecklistItems");
+    box.innerHTML = checklist.map((label, i) =>
+      `<label class="check-item"><input type="checkbox" data-cl="${i}" ${checked.has(label) ? "checked" : ""}> <span>${escapeHtml(label)}</span></label>`
+    ).join("") || '<span class="small" style="margin:0;text-transform:none;font-weight:400;">ยังไม่มีรายการ — กด "แก้ไขรายการ"</span>';
+    box.querySelectorAll("input[type=checkbox]").forEach(cb =>
+      cb.addEventListener("change", updateChecklistMeter));
+    updateChecklistMeter();
+  }
+  function checklistState() {
+    const boxes = [...document.querySelectorAll("#tfChecklistItems input[type=checkbox]")];
+    const doneLabels = boxes.filter(b => b.checked).map(b => checklist[+b.dataset.cl]).filter(Boolean);
+    return { done: doneLabels.length, total: checklist.length, doneLabels };
+  }
+  function updateChecklistMeter() {
+    const s = checklistState();
+    const m = document.getElementById("tfChecklistMeter");
+    m.textContent = s.done + "/" + s.total;
+    m.classList.toggle("full", s.total > 0 && s.done === s.total);
+    m.classList.toggle("partial", s.total > 0 && s.done < s.total);
+    // drive the "ทำตามแผน" flag from the checklist
+    document.getElementById("tfFollowedRules").checked = s.total > 0 && s.done === s.total;
+  }
+  document.getElementById("tfChecklistEdit").addEventListener("click", () => {
+    const ed = document.getElementById("tfChecklistEditor");
+    const show = ed.classList.contains("hidden");
+    ed.classList.toggle("hidden", !show);
+    if (show) document.getElementById("tfChecklistText").value = checklist.join("\n");
+  });
+  document.getElementById("tfChecklistCancel").addEventListener("click", () =>
+    document.getElementById("tfChecklistEditor").classList.add("hidden"));
+  document.getElementById("tfChecklistSave").addEventListener("click", () => {
+    const lines = document.getElementById("tfChecklistText").value
+      .split("\n").map(s => s.trim()).filter(Boolean);
+    checklist = lines.length ? lines : DEFAULT_CHECKLIST.slice();
+    saveChecklist();
+    const cur = checklistState().doneLabels;
+    renderChecklistItems(cur);
+    document.getElementById("tfChecklistEditor").classList.add("hidden");
+  });
+
   /* ---------- add/edit trade modal ---------- */
   const tradeModal = document.getElementById("tradeModal");
   const tfMarketType = document.getElementById("tfMarketType");
@@ -1623,6 +1728,11 @@
     document.getElementById("tfFollowedRules").checked = t ? !!t.followedRules : false;
     document.getElementById("tfBreakeven").checked = t ? !!t.breakeven : false;
     document.getElementById("tfEntryWindow").checked = t ? !!t.enteredWindow : false;
+    document.getElementById("tfRiskPct").value = t && t.riskPct != null ? t.riskPct : "";
+    document.getElementById("tfChecklistEditor").classList.add("hidden");
+    renderChecklistItems(t ? (t.checklistDone || []) : []);
+    // legacy trades saved before the checklist existed keep their own "ทำตามแผน" value
+    if (t && !Array.isArray(t.checklistDone)) document.getElementById("tfFollowedRules").checked = !!t.followedRules;
     document.getElementById("tfTags").value = t ? (t.tags || []).join(", ") : "";
     document.getElementById("tfNegTags").value = t ? (t.negTags || []).join(", ") : "";
     document.getElementById("tfTvLink").value = t ? (t.tvLink || "") : "";
@@ -1748,6 +1858,24 @@
   document.getElementById("tfAiReviewBtn").addEventListener("click", tfAiReviewTrade);
 
   document.getElementById("tradeSaveBtn").addEventListener("click", () => {
+    const cl = checklistState();
+    if (!editingId && cl.total > 0 && cl.done < cl.total) {
+      Swal.fire({
+        icon: "warning",
+        title: "เช็กลิสต์ยังไม่ครบ",
+        html: `ติ๊กแล้ว <b>${cl.done}/${cl.total}</b> ข้อ<br>วินัยคือทำตามแผนทุกครั้ง — แน่ใจไหมว่าจะบันทึกเทรดนี้?`,
+        showCancelButton: true,
+        confirmButtonText: "บันทึกทั้งที่ไม่ครบ",
+        cancelButtonText: "กลับไปติ๊ก",
+        confirmButtonColor: "#d97706",
+        reverseButtons: true,
+      }).then(r => { if (r.isConfirmed) commitTrade(); });
+      return;
+    }
+    commitTrade();
+  });
+
+  function commitTrade() {
     const isEdit = !!editingId;
     const date = document.getElementById("tfDate").value || todayKey();
     const pnlRaw = document.getElementById("tfPnl").value;
@@ -1781,6 +1909,9 @@
       followedRules: document.getElementById("tfFollowedRules").checked,
       breakeven: document.getElementById("tfBreakeven").checked,
       enteredWindow: document.getElementById("tfEntryWindow").checked,
+      riskPct: document.getElementById("tfRiskPct").value !== "" ? Number(document.getElementById("tfRiskPct").value) : null,
+      checklistDone: checklistState().doneLabels,
+      checklistTotal: checklist.length,
       tags,
       negTags,
       imageBefore: currentImageBefore,
@@ -1801,7 +1932,7 @@
     renderCalendar();
     renderLog();
     successToast(isEdit ? "แก้ไขเทรดเรียบร้อย" : "บันทึกเทรดเรียบร้อย");
-  });
+  }
 
   document.getElementById("tradeDeleteBtn").addEventListener("click", () => {
     if (!editingId) return;
@@ -1892,7 +2023,7 @@
       app: "ee-suite-backup",
       exportedAt: new Date().toISOString(),
       elliottWave: { chapters: exportChapters },
-      tradeJournal: { trades, capital },
+      tradeJournal: { trades, capital, checklist },
       stockDecide: {
         watchlist: JSON.parse(localStorage.getItem("sd_watchlist") || "[]"),
         log: JSON.parse(localStorage.getItem("sd_log") || "[]"),
@@ -1920,6 +2051,10 @@
     if (tj && tj.capital != null && !isNaN(Number(tj.capital))) {
       capital = Number(tj.capital);
       saveCapital();
+    }
+    if (tj && Array.isArray(tj.checklist) && tj.checklist.length) {
+      checklist = tj.checklist.map(String);
+      try { localStorage.setItem(CHECKLIST_LS, JSON.stringify(checklist)); } catch (e) {}
     }
 
     // Elliott Wave (remote — merge straight into its IndexedDB)
@@ -2019,7 +2154,7 @@
     const db = FirebaseSync.getDb();
     const uid = FirebaseSync.getUser().uid;
     db.collection("users").doc(uid).collection("sync").doc("tradeJournal")
-      .set({ trades, capital, updatedAt: Date.now() })
+      .set({ trades, capital, checklist, updatedAt: Date.now() })
       .catch(err => console.error("sync push failed", err));
   }
 
@@ -2035,13 +2170,17 @@
         trades.forEach(t => { map[t.id] = t; }); // local wins if the same id exists on both sides
         trades = Object.values(map);
         if (remote.capital != null && capital === 0) capital = remote.capital;
+        if (Array.isArray(remote.checklist) && remote.checklist.length) {
+          checklist = remote.checklist.map(String);
+          try { localStorage.setItem(CHECKLIST_LS, JSON.stringify(checklist)); } catch (e) {}
+        }
         syncApplyingRemote = true;
         saveTrades();
         saveCapital();
         syncApplyingRemote = false;
-        await ref.set({ trades, capital, updatedAt: Date.now() });
+        await ref.set({ trades, capital, checklist, updatedAt: Date.now() });
       } else {
-        await ref.set({ trades, capital, updatedAt: Date.now() });
+        await ref.set({ trades, capital, checklist, updatedAt: Date.now() });
       }
     } catch (err) {
       console.error("initial sync failed", err);
@@ -2056,6 +2195,10 @@
       syncApplyingRemote = true;
       trades = data.trades || [];
       if (data.capital != null) capital = data.capital;
+      if (Array.isArray(data.checklist) && data.checklist.length) {
+        checklist = data.checklist.map(String);
+        try { localStorage.setItem(CHECKLIST_LS, JSON.stringify(checklist)); } catch (e) {}
+      }
       saveTrades();
       saveCapital();
       syncApplyingRemote = false;
