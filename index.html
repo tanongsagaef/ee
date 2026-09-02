@@ -129,6 +129,7 @@
     <a class="navlink" href="trade-journal.html">📓 Trade Journal</a>
     <a class="navlink" href="stock-decision-terminal.html">📊 Stock / Decide</a>
     <a class="navlink" href="elliott-wave.html">〜 Elliott Wave</a>
+    <a class="navlink" href="elliott-wave-analyzer.html">📐 EW Analyzer</a>
     <button class="navlink plain" id="syncBtn" title="ซิงค์ข้ามอุปกรณ์ด้วย Google">☁ ซิงค์</button>
     <img id="syncAvatar" hidden style="width:26px;height:26px;border-radius:50%;">
     <span id="syncStatus" hidden></span>
@@ -197,6 +198,11 @@
         <div class="t">〜 Elliott Wave</div>
         <div class="d">ทบทวนบทเรียนจากรูป / PDF</div>
         <div class="c" id="cntEw">—</div>
+      </a>
+      <a class="app-card" href="elliott-wave-analyzer.html">
+        <div class="t">📐 EW Analyzer</div>
+        <div class="d">ลากวางจุดคลื่นบนกราฟ / เช็คกฎเหล็ก / จัดอันดับ pattern</div>
+        <div class="c" id="cntEwa">—</div>
       </a>
     </div>
   </div>
@@ -423,6 +429,8 @@
     $("cntTrades").textContent = trades.length + " เทรดบันทึกไว้";
     $("cntStock").textContent = (sd.watchlist.length) + " หุ้นติดตาม · " + (sd.log.length) + " การตัดสินใจ";
     $("cntEw").textContent = ewCount == null ? "…" : ewCount + " บทเรียน";
+    const ewa = readLS("ewa_scenarios_v1", []);
+    $("cntEwa").textContent = (Array.isArray(ewa) ? ewa.length : 0) + " scenario บันทึกไว้";
   }
 
   function escapeHtml(s) {

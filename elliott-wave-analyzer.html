@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="color-scheme" content="light dark" />
+<title>EW Analyzer · ลากวางจุดคลื่น</title>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f4f6fb; --surface: #ffffff; --surface-alt: #f3f4f9; --border: #e5e7f0;
+    --text: #14162a; --muted: #6b7080;
+    --accent: #4f46e5; --accent-hover: #4338ca; --accent-soft: #eef0fe;
+    --bull: #16a34a; --bull-soft: rgba(22,163,74,0.10);
+    --bear: #dc2626; --bear-soft: rgba(220,38,38,0.10);
+    --warn: #d97706;
+    --shadow: 0 1px 2px rgba(16,24,40,.04), 0 6px 16px rgba(16,24,40,.06);
+    --radius: 14px;
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #0f1117; --surface: #171923; --surface-alt: #1e2029; --border: #2a2d3a;
+    --text: #eceefb; --muted: #9a9db3;
+    --accent: #8386ff; --accent-hover: #9a9dff; --accent-soft: #262a52;
+    --bull: #34c77b; --bull-soft: rgba(52,199,123,0.14);
+    --bear: #ff6f68; --bear-soft: rgba(255,111,104,0.14);
+    --warn: #f0a54a;
+    --shadow: 0 1px 3px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 20px 20px 60px;
+    font-family: "Sarabun", "Noto Sans Thai", "Segoe UI", system-ui, sans-serif;
+    background: var(--bg); color: var(--text);
+  }
+  .mono { font-family: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", monospace; }
+
+  .header {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 14px 20px; box-shadow: var(--shadow); margin-bottom: 18px;
+  }
+  .brand { font-size: 20px; font-weight: 800; letter-spacing: .2px; display: flex; align-items: center; gap: 8px; }
+  .brand .dot { color: var(--accent); }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .navlink {
+    background: var(--accent-soft); border: 1px solid transparent; color: var(--accent);
+    padding: 9px 14px; border-radius: 10px; font-size: 13px; text-decoration: none; font-weight: 700;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .navlink:hover { background: var(--accent); color: #fff; }
+  .navlink.plain { background: var(--surface); border-color: var(--border); color: var(--text); }
+  .navlink.plain:hover { border-color: var(--accent); color: var(--accent); }
+  .icon-btn {
+    background: var(--surface); border: 1px solid var(--border); color: var(--text);
+    width: 34px; height: 34px; border-radius: 8px; cursor: pointer; font-size: 15px;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .icon-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .layout { display: grid; grid-template-columns: 1.55fr 1fr; gap: 16px; align-items: start; }
+  @media (max-width: 960px) { .layout { grid-template-columns: 1fr; } }
+
+  .panel {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 16px 18px; box-shadow: var(--shadow); margin-bottom: 16px;
+  }
+  .panel h2 {
+    margin: 0 0 12px; font-size: 12px; letter-spacing: .5px; color: var(--muted);
+    text-transform: uppercase; font-weight: 800;
+  }
+  .panel h2 .sub { text-transform: none; letter-spacing: 0; font-weight: 600; color: var(--muted); margin-left: 8px; }
+
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+  .seg { display: inline-flex; gap: 4px; background: var(--surface-alt); border-radius: 10px; padding: 4px; }
+  .seg button {
+    border: none; background: transparent; color: var(--muted); font-weight: 700; font-size: 12px;
+    padding: 6px 12px; border-radius: 7px; cursor: pointer; font-family: inherit;
+  }
+  .seg button.active { background: var(--surface); color: var(--accent); box-shadow: var(--shadow); }
+  .btn {
+    background: var(--surface); border: 1px solid var(--border); color: var(--text);
+    padding: 7px 12px; border-radius: 9px; font-size: 12.5px; font-weight: 700; cursor: pointer; font-family: inherit;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn.solid { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.solid:hover { background: var(--accent-hover); color: #fff; }
+  label.chk { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); font-weight: 700; cursor: pointer; }
+
+  .chart-wrap { width: 100%; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-alt); overflow: hidden; }
+  svg.chart { width: 100%; height: clamp(360px, 56vh, 560px); display: block; touch-action: none; cursor: crosshair; }
+  svg.chart .grid { stroke: var(--border); stroke-width: 1; }
+  svg.chart .axis { fill: var(--muted); font: 10px ui-monospace, monospace; }
+  svg.chart .area { fill: var(--accent); opacity: .06; }
+  svg.chart .ser { fill: none; stroke: var(--muted); stroke-width: 1.5; opacity: .55; }
+  svg.chart .wave { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-linejoin: round; }
+  svg.chart .mk circle { fill: var(--surface); stroke: var(--accent); stroke-width: 2.5; cursor: grab; }
+  svg.chart .mk text { fill: var(--text); font: 800 12px "Sarabun", system-ui, sans-serif; }
+
+  .hint { font-size: 12.5px; color: var(--muted); margin-top: 10px; }
+  .status { font-size: 12.5px; font-weight: 700; margin-top: 8px; }
+
+  .rules { list-style: none; margin: 0 0 4px; padding: 0; }
+  .rules li { display: flex; gap: 9px; padding: 7px 0; border-bottom: 1px solid var(--border); }
+  .rules li:last-child { border-bottom: none; }
+  .ic { flex: none; width: 18px; height: 18px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 900; }
+  .ic.ok { background: var(--bull-soft); color: var(--bull); }
+  .ic.bad { background: var(--bear-soft); color: var(--bear); }
+  .ic.info { background: var(--accent-soft); color: var(--accent); }
+  .rn { font-size: 13px; font-weight: 600; }
+  .rd { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+
+  table.meas { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  table.meas td { padding: 6px 8px; border-bottom: 1px solid var(--border); }
+  table.meas td:first-child { color: var(--muted); }
+  table.meas td:last-child { text-align: right; font-weight: 700; }
+
+  .cand { padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .cand:last-child { border-bottom: none; }
+  .cand-h { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .cand-l { font-size: 13.5px; font-weight: 800; }
+  .cand-c { font-size: 13px; color: var(--muted); }
+  .bar { height: 7px; border-radius: 4px; background: var(--surface-alt); margin: 6px 0; overflow: hidden; }
+  .bar i { display: block; height: 100%; border-radius: 4px; }
+  .cand-n { margin: 4px 0 0; padding-left: 16px; font-size: 11.5px; color: var(--muted); }
+  .cand-n li { margin: 2px 0; }
+
+  .sc-form { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+  .sc-form input {
+    background: var(--surface-alt); border: 1px solid var(--border); color: var(--text);
+    padding: 7px 10px; border-radius: 9px; font-size: 12.5px; font-family: inherit;
+  }
+  .sc-form input#scName { flex: 1 1 160px; }
+  .sc-form input#scGuess { flex: 1 1 160px; }
+  table.sc { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  table.sc th, table.sc td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--border); }
+  table.sc th { font-size: 10.5px; text-transform: uppercase; letter-spacing: .3px; color: var(--muted); font-weight: 800; }
+  table.sc .link { color: var(--accent); cursor: pointer; font-weight: 700; }
+  .muted-note { color: var(--muted); font-size: 12.5px; }
+
+  .importbox { margin-top: 10px; }
+  .importbox textarea {
+    width: 100%; min-height: 90px; background: var(--surface-alt); border: 1px solid var(--border);
+    color: var(--text); border-radius: 10px; padding: 8px 10px; font: 12px ui-monospace, monospace; resize: vertical;
+  }
+  #syncStatus { font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+  @media (max-width: 560px) { body { padding: 12px 12px 50px; } }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="brand"><span class="dot">◆</span> EW Analyzer <span class="mono" style="font-size:12px;color:var(--muted);font-weight:600;">ลากวางจุดคลื่น</span></div>
+  <div class="row">
+    <a class="navlink plain" href="index.html">◂ ห้องนักบิน</a>
+    <a class="navlink" href="trade-journal.html">📓 Trade Journal</a>
+    <a class="navlink" href="stock-decision-terminal.html">📊 Stock / Decide</a>
+    <a class="navlink" href="elliott-wave.html">〜 Elliott Wave</a>
+    <button class="navlink plain" id="syncBtn" title="ซิงค์ scenario ข้ามอุปกรณ์ด้วย Google">☁ ซิงค์</button>
+    <img id="syncAvatar" hidden style="width:26px;height:26px;border-radius:50%;">
+    <span id="syncStatus" hidden></span>
+    <button class="navlink plain" id="signOutBtn" hidden>ออก</button>
+    <button class="icon-btn" id="themeToggle" title="สลับโหมดสว่าง/มืด">◐</button>
+  </div>
+</div>
+
+<div class="layout">
+
+  <div class="col">
+    <div class="panel">
+      <h2>กราฟ <span class="sub">คลิกบนกราฟเพื่อวางจุด · ลากจุดเพื่อปรับ</span></h2>
+      <div class="toolbar">
+        <span class="seg" id="modeSeg">
+          <button data-m="impulse" class="active">อิมพัลส์ 0-1-2-3-4-5</button>
+          <button data-m="corrective">คลื่นแก้ตัว 0-A-B-C</button>
+        </span>
+        <label class="chk"><input type="checkbox" id="snapChk" checked> สแนปเข้าราคา</label>
+        <button class="btn" id="undoBtn">↶ ถอยจุด</button>
+        <button class="btn" id="clearBtn">นับใหม่</button>
+        <button class="btn" id="regenBtn">สุ่มกราฟใหม่</button>
+        <button class="btn" id="importBtn">นำเข้าข้อมูล</button>
+      </div>
+      <div class="importbox" id="importBox" hidden>
+        <textarea id="importTa" placeholder="วางราคาปิดบรรทัดละค่า หรือ &quot;วันที่,ราคา&quot; ต่อบรรทัด (อย่างน้อย 12 ค่า)"></textarea>
+        <div style="margin-top:6px;display:flex;gap:8px;">
+          <button class="btn solid" id="importApply">ใช้ข้อมูลนี้</button>
+          <button class="btn" id="importCancel">ยกเลิก</button>
+        </div>
+      </div>
+      <div class="chart-wrap"><svg class="chart" id="chart"></svg></div>
+      <div class="status" id="status"></div>
+      <div class="hint">Phase 1 — กราฟเป็นข้อมูลจำลองสำหรับฝึกนับ (ต่อ Binance ราคาจริงในเฟสถัดไป) ·
+        การวิเคราะห์ใช้ <b>ราคา + ลำดับจุด</b> ที่วาง ไม่ฟันธงคำตอบเดียว</div>
+    </div>
+
+    <div class="panel">
+      <h2>เทียบ Scenario <span class="sub">เก็บ count ทางเลือกไว้เทียบกัน (บันทึกในเครื่อง)</span></h2>
+      <div class="sc-form">
+        <input id="scName" placeholder="ชื่อ scenario เช่น 'นับหลัก TF วัน'">
+        <input id="scGuess" placeholder="สิ่งที่ฉันเดา (เช่น Zigzag)">
+        <button class="btn solid" id="scSave">＋ บันทึกจุดปัจจุบัน</button>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="sc" id="scTbl">
+          <thead><tr><th>ชื่อ</th><th>โหมด</th><th>Pattern เด่น</th><th style="text-align:right;">Conf</th><th>ฉันเดา</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="muted-note" id="scEmpty">ยังไม่มี scenario — วางจุดให้ครบแล้วกด “บันทึกจุดปัจจุบัน”</div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="panel">
+      <h2>กฎเหล็ก / ตัวแยก</h2>
+      <ul class="rules" id="rulesList"></ul>
+    </div>
+    <div class="panel">
+      <h2>แนวทาง (guidelines)</h2>
+      <ul class="rules" id="guidesList"></ul>
+    </div>
+    <div class="panel">
+      <h2>ผลการวัด</h2>
+      <table class="meas"><tbody id="measBody"></tbody></table>
+    </div>
+    <div class="panel">
+      <h2>ความเป็นไปได้ <span class="sub">เรียงตาม confidence</span></h2>
+      <div id="candList"></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="firebase-sync.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  /* ---------- theme (shares tj_theme with the rest of the suite) ---------- */
+  const root = document.documentElement;
+  function applyTheme(t) {
+    root.setAttribute("data-theme", t);
+    try { localStorage.setItem("tj_theme", t); } catch (e) {}
+  }
+  applyTheme(
+    (function () { try { return localStorage.getItem("tj_theme"); } catch (e) { return null; } })() ||
+    (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+  );
+  document.getElementById("themeToggle").addEventListener("click", () => {
+    applyTheme(root.getAttribute("data-theme") === "dark" ? "light" : "dark");
+    draw();
+  });
+
+  /* ---------- helpers ---------- */
+  const $ = (id) => document.getElementById(id);
+  const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
+  const fmt = (n) => Number(n).toLocaleString("en-US", { maximumFractionDigits: 2 });
+  const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const DRAFT_KEY = "ewa_draft_v1";
+  const SC_KEY = "ewa_scenarios_v1";
+
+  /* ---------- state ---------- */
+  let mode = "impulse";           // "impulse" | "corrective"
+  let series = [];                // array of numbers (synthetic price)
+  let points = [];                // [{ i, v }]  wave pivots, in placed order
+  let snap = true;
+  let scales = null;
+  let dragIdx = null;
+  let scenarios = [];
+
+  const need = () => (mode === "impulse" ? 6 : 4);
+  const labels = () => (mode === "impulse" ? ["0", "1", "2", "3", "4", "5"] : ["0", "A", "B", "C"]);
+
+  /* ---------- synthetic price ---------- */
+  function genSeries(seed) {
+    const N = 140;
+    let s = (seed >>> 0) || ((Math.random() * 1e9) >>> 0);
+    const rnd = () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296;
+    const anchors = [0, 34, 12, 92, 58, 128];   // rough shape of a 5-wave advance
+    const seg = Math.floor(N / (anchors.length - 1));
+    const out = [];
+    const base = 100;
+    for (let k = 0; k < anchors.length - 1; k++) {
+      const a = anchors[k], b = anchors[k + 1];
+      for (let j = 0; j < seg; j++) {
+        const f = j / seg;
+        out.push(+(base + a + (b - a) * f + (rnd() - 0.5) * 6).toFixed(2));
+      }
+    }
+    while (out.length < N) out.push(+(out[out.length - 1] + (rnd() - 0.5) * 6).toFixed(2));
+    return out;
+  }
+
+  /* ---------- chart ---------- */
+  const svg = $("chart");
+  const PAD = { l: 54, r: 14, t: 12, b: 24 };
+
+  function draw() {
+    const rect = svg.getBoundingClientRect();
+    const w = Math.max(320, rect.width), h = Math.max(300, rect.height);
+    svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+    const N = series.length;
+    const vals = series.concat(points.map(p => p.v));
+    let lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
+    const pad = (hi - lo) * 0.06 || 1;
+    lo -= pad; hi += pad;
+
+    const xFor = (i) => PAD.l + (i / (N - 1)) * (w - PAD.l - PAD.r);
+    const yFor = (v) => PAD.t + (1 - (v - lo) / (hi - lo)) * (h - PAD.t - PAD.b);
+
+    let grid = "";
+    for (let t = 0; t <= 4; t++) {
+      const v = lo + (hi - lo) * t / 4, y = yFor(v);
+      grid += `<line class="grid" x1="${PAD.l}" y1="${y.toFixed(1)}" x2="${(w - PAD.r).toFixed(1)}" y2="${y.toFixed(1)}"/>`;
+      grid += `<text class="axis" x="${PAD.l - 8}" y="${(y + 3).toFixed(1)}" text-anchor="end">${fmt(v)}</text>`;
+    }
+
+    let d = "";
+    for (let i = 0; i < N; i++) d += (i ? "L" : "M") + xFor(i).toFixed(1) + " " + yFor(series[i]).toFixed(1) + " ";
+    const area = d + `L${xFor(N - 1).toFixed(1)} ${yFor(lo).toFixed(1)} L${xFor(0).toFixed(1)} ${yFor(lo).toFixed(1)} Z`;
+
+    let wl = "", wm = "";
+    points.forEach((p, idx) => {
+      const x = xFor(p.i), y = yFor(p.v);
+      wl += (idx ? "L" : "M") + x.toFixed(1) + " " + y.toFixed(1) + " ";
+      wm += `<g class="mk" data-idx="${idx}">` +
+            `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="6"/>` +
+            `<text x="${x.toFixed(1)}" y="${(y - 12).toFixed(1)}" text-anchor="middle">${labels()[idx]}</text></g>`;
+    });
+
+    svg.innerHTML =
+      `<path class="area" d="${area}"/><g>${grid}</g><path class="ser" d="${d}"/>` +
+      (points.length ? `<path class="wave" d="${wl}"/>` : "") + wm;
+
+    scales = {
+      iFromX: (x) => clamp(Math.round((x - PAD.l) / (w - PAD.l - PAD.r) * (N - 1)), 0, N - 1),
+      vFromY: (y) => lo + (1 - (y - PAD.t) / (h - PAD.t - PAD.b)) * (hi - lo),
+    };
+  }
+
+  function svgXY(e) {
+    const r = svg.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  }
+
+  svg.addEventListener("pointerdown", (e) => {
+    const mk = e.target.closest(".mk");
+    if (mk) { dragIdx = +mk.dataset.idx; svg.setPointerCapture(e.pointerId); return; }
+    if (points.length >= need()) return;
+    const { x, y } = svgXY(e);
+    const i = scales.iFromX(x);
+    points.push({ i, v: snap ? series[i] : +scales.vFromY(y).toFixed(2) });
+    update();
+  });
+  svg.addEventListener("pointermove", (e) => {
+    if (dragIdx == null) return;
+    const { x, y } = svgXY(e);
+    const i = scales.iFromX(x);
+    points[dragIdx] = { i, v: snap ? series[i] : +scales.vFromY(y).toFixed(2) };
+    update();
+  });
+  const endDrag = () => { dragIdx = null; };
+  svg.addEventListener("pointerup", endDrag);
+  svg.addEventListener("pointercancel", endDrag);
+
+  if (window.ResizeObserver) new ResizeObserver(() => draw()).observe(svg);
+  window.addEventListener("resize", draw);
+
+  /* ---------- analysis: impulse ---------- */
+  function analyzeImpulse(P) {
+    const dir = Math.sign(P[1] - P[0]) || 1;
+    const L = [0, Math.abs(P[1] - P[0]), Math.abs(P[2] - P[1]), Math.abs(P[3] - P[2]), Math.abs(P[4] - P[3]), Math.abs(P[5] - P[4])];
+    const retr2 = L[1] ? L[2] / L[1] : 0;
+    const retr4 = L[3] ? L[4] / L[3] : 0;
+    const ext3 = L[1] ? L[3] / L[1] : 0;
+    const ext5 = L[3] ? L[5] / L[3] : 0;
+
+    const rule1 = dir * (P[2] - P[0]) > 0;                 // wave 2 retraces < 100% of wave 1
+    const rule2 = !(L[3] < L[1] && L[3] < L[5]);           // wave 3 not the shortest
+    const overlap = dir * (P[4] - P[1]) <= 0;              // wave 4 enters wave 1 range
+    const rule3 = !overlap;
+    const w3beyond = dir * (P[3] - P[1]) > 0;
+    const w5trunc = dir * (P[5] - P[3]) <= 0;
+    const longest = (L[1] >= L[3] && L[1] >= L[5]) ? 1 : (L[3] >= L[5] ? 3 : 5);
+    const alt = (retr2 >= 0.5 && retr4 <= 0.382) || (retr2 <= 0.382 && retr4 >= 0.5);
+
+    const rules = [
+      { name: "1 · คลื่น 2 ห้ามย่อเกิน 100% ของคลื่น 1", pass: rule1, detail: `ย่อ ${(retr2 * 100).toFixed(0)}%` },
+      { name: "2 · คลื่น 3 ห้ามสั้นที่สุดใน 1 / 3 / 5", pass: rule2, detail: `ยาว 1=${L[1].toFixed(1)}  3=${L[3].toFixed(1)}  5=${L[5].toFixed(1)}` },
+      { name: "3 · คลื่น 4 ห้ามทับเขตราคาคลื่น 1", pass: rule3, detail: overlap ? "ทับเขต → ต้องเป็น diagonal" : "ไม่ทับ" },
+    ];
+    const guides = [
+      { name: "คลื่น 3 ทะลุจุดจบคลื่น 1", pass: w3beyond },
+      { name: "คลื่น 5 ไม่ truncate (ผ่านจุดสูงคลื่น 3)", pass: !w5trunc },
+      { name: `การสลับ 2↔4  (2 ย่อ ${(retr2 * 100).toFixed(0)}% · 4 ย่อ ${(retr4 * 100).toFixed(0)}%)`, pass: alt },
+      { name: `คลื่นที่ยืด = คลื่น ${longest}${longest === 3 ? " (พบบ่อยสุด)" : ""}`, pass: true, info: true },
+    ];
+
+    const cands = [];
+    const valid = rule1 && rule2 && rule3;
+    if (valid) {
+      let c = 60;
+      if (retr2 >= 0.382 && retr2 <= 0.786) c += 12;
+      if (retr2 >= 0.5 && retr2 <= 0.618) c += 6;
+      if (retr4 >= 0.236 && retr4 <= 0.5) c += 10;
+      if (ext3 >= 1.3) c += 10;
+      if (longest === 3) c += 6;
+      if (alt) c += 8;
+      if (w3beyond) c += 4; else c -= 18;
+      if (w5trunc) c -= 10;
+      const notes = [`คลื่น 3 = ${ext3.toFixed(2)}× ของคลื่น 1` + (ext3 >= 1.5 && ext3 <= 1.8 ? " (ใกล้ 1.618 — คลาสสิก)" : "")];
+      if (w5trunc) notes.push("คลื่น 5 สั้น (truncation) → สัญญาณเทรนด์จบแรง เตรียมกลับตัว");
+      if (!alt) notes.push("คลื่น 2 กับ 4 ไม่สลับกันชัด — ระวังนับผิด หรือยังอยู่กลางคลื่น");
+      cands.push({ label: `อิมพัลส์ 5 คลื่น — เทรนด์${dir > 0 ? "ขึ้น" : "ลง"}`, conf: clamp(Math.round(c), 8, 97), notes });
+    } else {
+      const why = [];
+      if (!rule1) why.push("คลื่น 2 ย่อเกิน 100%");
+      if (!rule2) why.push("คลื่น 3 สั้นที่สุด");
+      if (!rule3) why.push("คลื่น 4 ทับเขตคลื่น 1");
+      cands.push({ label: "อิมพัลส์ที่ถูกกฎ", conf: clamp(18 - why.length * 4, 4, 20),
+        notes: ["ผิดกฎเหล็ก: " + why.join(", ") + " → count นี้ใช้ไม่ได้ ต้องนับใหม่"] });
+    }
+
+    if (rule1 && rule2) {
+      let dc = overlap ? 58 : 22;
+      if (overlap && retr4 > 0.4) dc += 8;
+      if (ext3 < 1.0) dc += 6;
+      cands.push({ label: "Diagonal (leading / ending)", conf: clamp(Math.round(dc), 8, 80),
+        notes: [overlap
+          ? "คลื่น 4 ทับคลื่น 1 ได้เฉพาะ diagonal — ถ้าอยู่ปลายเทรนด์ = ending diagonal (กลับตัวแรง)"
+          : "ยังไม่เห็นการทับเขตแบบ diagonal ชัด ๆ"] });
+    }
+
+    let mc = 16;
+    if (!valid) mc += 20;
+    if (!rule1) mc += 10;
+    cands.push({ label: "ที่จริงเป็นคลื่นแก้ตัว (นับผิดโหมด)", conf: clamp(mc, 6, 55),
+      notes: ["ลองสลับไปโหมด 0-A-B-C แล้ววางจุดใหม่เพื่อเทียบ"] });
+
+    cands.sort((a, b) => b.conf - a.conf);
+    const meas = [
+      ["ความยาวคลื่น 1 / 3 / 5", `${L[1].toFixed(1)} / ${L[3].toFixed(1)} / ${L[5].toFixed(1)}`],
+      ["คลื่น 2 ย่อ", `${(retr2 * 100).toFixed(1)}%  ของคลื่น 1`],
+      ["คลื่น 4 ย่อ", `${(retr4 * 100).toFixed(1)}%  ของคลื่น 3`],
+      ["คลื่น 3 ยืด", `${ext3.toFixed(2)}×  ของคลื่น 1`],
+      ["คลื่น 5 เทียบคลื่น 3", `${ext5.toFixed(2)}×`],
+    ];
+    return { rules, guides, cands, meas };
+  }
+
+  /* ---------- analysis: corrective A-B-C ---------- */
+  function analyzeCorrective(P) {
+    const dirA = Math.sign(P[1] - P[0]) || 1;
+    const LA = Math.abs(P[1] - P[0]);
+    const LB = Math.abs(P[2] - P[1]);
+    const LC = Math.abs(P[3] - P[2]);
+    const bRetr = LA ? LB / LA : 0;
+    const cExt = LA ? LC / LA : 0;
+    const bBeyondStart = dirA * (P[2] - P[0]) < 0;
+    const cBeyondEndA = dirA * (P[3] - P[1]) > 0;
+    const cDirOk = dirA * (P[3] - P[2]) > 0;
+
+    const famZig = clamp(
+      bRetr <= 0.618 ? 80 - bRetr * 12
+      : bRetr < 0.9 ? 78 - (bRetr - 0.618) * 185
+      : 18, 8, 85);
+    const famFlat = clamp(
+      bRetr >= 0.9 ? 68 + (bRetr - 0.9) * 130
+      : bRetr > 0.618 ? 24 + (bRetr - 0.618) * 150
+      : 16, 8, 93);
+
+    const cands = [];
+    let zLabel, zFit;
+    if (cExt < 0.9) { zLabel = "Zigzag — Truncated (C สั้น)"; zFit = 0.8; }
+    else if (cExt <= 1.2) { zLabel = "Zigzag — มาตรฐาน (5-3-5)"; zFit = 1.0; }
+    else if (cExt < 1.5) { zLabel = "Zigzag — C ยาวกว่ามาตรฐาน"; zFit = 0.85; }
+    else { zLabel = "Zigzag — Extended (C ยืด)"; zFit = 0.9; }
+    cands.push({ label: zLabel, conf: clamp(Math.round(famZig * zFit), 5, 95),
+      notes: [`B ย่อ A ${(bRetr * 100).toFixed(0)}% (<61.8% = โซน zigzag)`, `C = ${cExt.toFixed(2)}× ของ A`] });
+    if (cExt > 2.3) {
+      cands.push({ label: "Double Zigzag (W-X-Y)", conf: clamp(Math.round(famZig * 0.7), 5, 80),
+        notes: ["C ยาวผิดปกติ (>2.3× ของ A) → อาจเป็นคลื่นแก้ตัวซ้อนสองชุด"] });
+    }
+
+    let fLabel, fFit, fNote;
+    const similar = Math.abs(1 - LB / (LA || 1)) < 0.2 && Math.abs(1 - LC / (LA || 1)) < 0.25;
+    if (bBeyondStart && cBeyondEndA) { fLabel = "Flat — Expanded (พบบ่อย / อันตราย)"; fFit = 1.0; fNote = "B ทะลุจุดเริ่ม A และ C ทะลุปลาย A — เบรกหลอกทั้งสองทาง"; }
+    else if (bBeyondStart && !cBeyondEndA) { fLabel = "Flat — Running (เทรนด์เดิมแข็งมาก)"; fFit = 0.85; fNote = "B ทะลุจุดเริ่ม A แต่ C ไม่ถึงปลาย A — แรงเทรนด์เดิมสูง"; }
+    else if (similar) { fLabel = "Flat — Regular"; fFit = 0.95; fNote = "A ≈ B ≈ C — พักฐานออกข้าง"; }
+    else { fLabel = "Flat — ไม่สมมาตร"; fFit = 0.7; fNote = "รูปแบบ flat ไม่ชัด ตรวจจุด B / C อีกครั้ง"; }
+    cands.push({ label: fLabel, conf: clamp(Math.round(famFlat * fFit), 5, 95),
+      notes: [fNote, `B ย่อ A ${(bRetr * 100).toFixed(0)}% (≥90% = โซน flat)`] });
+
+    cands.push({ label: "ที่จริงเป็นอิมพัลส์ (นับผิดโหมด)", conf: clamp(cDirOk ? 14 : 26, 5, 45),
+      notes: ["ถ้า A แบ่งเป็น 5 ขาได้ → น่าจะเป็นอิมพัลส์ ลองสลับโหมด"] });
+
+    cands.sort((a, b) => b.conf - a.conf);
+
+    const rules = [
+      { name: `ตัวแยกหลัก — B ย่อกลับ ${(bRetr * 100).toFixed(0)}% ของ A`, pass: true, info: true,
+        detail: bRetr < 0.618 ? "→ ตระกูล Zigzag" : bRetr < 0.9 ? "→ ก้ำกึ่ง ต้องดู sub-wave ของ A" : "→ ตระกูล Flat" },
+      { name: "B ทะลุจุดเริ่มของ A", pass: bBeyondStart, detail: bBeyondStart ? "ใช่ (เข้าเงื่อนไข expanded / running)" : "ไม่" },
+      { name: "C ทะลุปลายของ A", pass: cBeyondEndA, detail: cBeyondEndA ? "ใช่" : "ไม่ (อาจเป็น running / truncated)" },
+      { name: "C ต่อทิศเดียวกับ A", pass: cDirOk, detail: cDirOk ? "ใช่" : "ผิดทิศ — ตรวจจุด C" },
+    ];
+    const guides = [
+      { name: "sub-wave ของ A: 5 ขา → Zigzag · 3 ขา → Flat", pass: true, info: true },
+      { name: "ถ้าขาที่ 4 ของ A ทับขาที่ 1 = ต้องเป็น Flat (motive ไม่ได้)", pass: true, info: true },
+    ];
+    const t1 = P[2] + dirA * LA, t2 = P[2] + dirA * LA * 1.618;
+    const meas = [
+      ["ความยาว A / B / C", `${LA.toFixed(1)} / ${LB.toFixed(1)} / ${LC.toFixed(1)}`],
+      ["B ย่อ A", `${(bRetr * 100).toFixed(1)}%`],
+      ["C เทียบ A", `${cExt.toFixed(2)}×`],
+      ["เป้า C (Fib)", `${fmt(t1)} = A×1.0  ·  ${fmt(t2)} = A×1.618`],
+      ["C ปัจจุบัน", `${fmt(P[3])}`],
+    ];
+    return { rules, guides, cands, meas };
+  }
+
+  /* ---------- render ---------- */
+  function ruleRow(r) {
+    const ic = r.info ? '<span class="ic info">•</span>'
+      : (r.pass ? '<span class="ic ok">✓</span>' : '<span class="ic bad">✗</span>');
+    return `<li>${ic}<div><div class="rn">${esc(r.name)}</div>${r.detail ? `<div class="rd">${esc(r.detail)}</div>` : ""}</div></li>`;
+  }
+  function candRow(c) {
+    const col = c.conf >= 70 ? "var(--bull)" : c.conf >= 45 ? "var(--warn)" : "var(--muted)";
+    return `<div class="cand">
+      <div class="cand-h"><span class="cand-l">${esc(c.label)}</span><span class="cand-c mono">${c.conf}%</span></div>
+      <div class="bar"><i style="width:${c.conf}%;background:${col}"></i></div>
+      ${c.notes && c.notes.length ? `<ul class="cand-n">${c.notes.map(n => `<li>${esc(n)}</li>`).join("")}</ul>` : ""}
+    </div>`;
+  }
+
+  let lastAnalysis = null;
+  function renderAnalysis() {
+    const n = need(), placed = points.length;
+    if (placed < n) {
+      lastAnalysis = null;
+      $("status").textContent = `วางอีก ${n - placed} จุด (${labels().slice(placed).join(" · ")})`;
+      $("rulesList").innerHTML = `<li class="muted-note" style="padding:8px 0;">วางจุดให้ครบ ${n} จุดก่อน</li>`;
+      $("guidesList").innerHTML = "";
+      $("measBody").innerHTML = "";
+      $("candList").innerHTML = `<div class="muted-note">— ยังไม่มีผล —</div>`;
+      return;
+    }
+    $("status").textContent = `ครบ ${n} จุดแล้ว · ลากจุดเพื่อปรับ แล้วผลจะอัปเดตทันที`;
+    const P = points.map(p => p.v);
+    const a = mode === "impulse" ? analyzeImpulse(P) : analyzeCorrective(P);
+    lastAnalysis = a;
+    $("rulesList").innerHTML = a.rules.map(ruleRow).join("");
+    $("guidesList").innerHTML = a.guides.map(ruleRow).join("");
+    $("measBody").innerHTML = a.meas.map(m => `<tr><td>${esc(m[0])}</td><td class="mono">${esc(m[1])}</td></tr>`).join("");
+    $("candList").innerHTML = a.cands.map(candRow).join("");
+  }
+
+  function update() {
+    draw();
+    renderAnalysis();
+    saveDraft();
+  }
+
+  /* ---------- draft persistence ---------- */
+  function saveDraft() {
+    try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ mode, series, points, snap })); } catch (e) {}
+  }
+  function loadDraft() {
+    try {
+      const d = JSON.parse(localStorage.getItem(DRAFT_KEY) || "null");
+      if (d && Array.isArray(d.series) && d.series.length > 10) {
+        mode = d.mode === "corrective" ? "corrective" : "impulse";
+        series = d.series;
+        points = Array.isArray(d.points) ? d.points.filter(p => p && typeof p.i === "number" && typeof p.v === "number") : [];
+        snap = d.snap !== false;
+        return true;
+      }
+    } catch (e) {}
+    return false;
+  }
+
+  /* ---------- scenarios ---------- */
+  function loadScenarios() {
+    try {
+      const s = JSON.parse(localStorage.getItem(SC_KEY) || "[]");
+      scenarios = Array.isArray(s) ? s : [];
+    } catch (e) { scenarios = []; }
+  }
+  function saveScenarios() {
+    try { localStorage.setItem(SC_KEY, JSON.stringify(scenarios)); } catch (e) {}
+  }
+  function renderScenarios() {
+    const tb = $("scTbl").querySelector("tbody");
+    $("scEmpty").hidden = scenarios.length > 0;
+    tb.innerHTML = scenarios.map((s, idx) => {
+      const top = s.top || { label: "—", conf: 0 };
+      return `<tr>
+        <td>${esc(s.name || "(ไม่มีชื่อ)")}</td>
+        <td>${s.mode === "corrective" ? "0-A-B-C" : "0-1-2-3-4-5"}</td>
+        <td>${esc(top.label)}</td>
+        <td style="text-align:right;" class="mono">${top.conf}%</td>
+        <td>${esc(s.myGuess || "—")}</td>
+        <td style="white-space:nowrap;">
+          <span class="link" data-load="${idx}">โหลด</span> ·
+          <span class="link" data-del="${idx}" style="color:var(--bear);">ลบ</span>
+        </td>
+      </tr>`;
+    }).join("");
+  }
+  $("scTbl").addEventListener("click", (e) => {
+    const el = e.target.closest("[data-load],[data-del]");
+    if (!el) return;
+    if (el.dataset.load != null) {
+      const s = scenarios[+el.dataset.load];
+      if (!s) return;
+      mode = s.mode === "corrective" ? "corrective" : "impulse";
+      series = s.series.slice();
+      points = s.points.map(p => ({ i: p.i, v: p.v }));
+      [...$("modeSeg").children].forEach(b => b.classList.toggle("active", b.dataset.m === mode));
+      update();
+    } else {
+      scenarios.splice(+el.dataset.del, 1);
+      saveScenarios(); renderScenarios(); pushCloud();
+    }
+  });
+  $("scSave").addEventListener("click", () => {
+    if (points.length < need()) { alert("วางจุดให้ครบก่อนบันทึก scenario"); return; }
+    const name = $("scName").value.trim() || new Date().toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" });
+    const top = lastAnalysis && lastAnalysis.cands[0] ? { label: lastAnalysis.cands[0].label, conf: lastAnalysis.cands[0].conf } : null;
+    scenarios.unshift({
+      id: Date.now(), name, myGuess: $("scGuess").value.trim(),
+      mode, series: series.slice(), points: points.map(p => ({ i: p.i, v: p.v })),
+      top, createdAt: Date.now(),
+    });
+    $("scName").value = ""; $("scGuess").value = "";
+    saveScenarios(); renderScenarios(); pushCloud();
+  });
+
+  /* ---------- toolbar ---------- */
+  $("modeSeg").addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    mode = b.dataset.m;
+    [...$("modeSeg").children].forEach(x => x.classList.toggle("active", x === b));
+    points = [];
+    update();
+  });
+  $("snapChk").addEventListener("change", (e) => { snap = e.target.checked; saveDraft(); });
+  $("undoBtn").addEventListener("click", () => { points.pop(); update(); });
+  $("clearBtn").addEventListener("click", () => { points = []; update(); });
+  $("regenBtn").addEventListener("click", () => { series = genSeries(); points = []; update(); });
+
+  $("importBtn").addEventListener("click", () => { $("importBox").hidden = !$("importBox").hidden; });
+  $("importCancel").addEventListener("click", () => { $("importBox").hidden = true; });
+  $("importApply").addEventListener("click", () => {
+    const nums = $("importTa").value.split(/[\r\n]+/).map(line => {
+      const m = line.trim().match(/-?\d+(\.\d+)?\s*$/);
+      return m ? parseFloat(m[0]) : NaN;
+    }).filter(v => !isNaN(v));
+    if (nums.length < 12) { alert("ต้องมีอย่างน้อย 12 ค่า"); return; }
+    series = nums; points = []; $("importBox").hidden = true; update();
+  });
+
+  /* ---------- Firebase: sync scenarios (users/{uid}/sync/elliottAnalyzer) ---------- */
+  async function pullCloud() {
+    if (!window.FirebaseSync || !FirebaseSync.enabled || !FirebaseSync.getUser()) return;
+    try {
+      const db = FirebaseSync.getDb(), uid = FirebaseSync.getUser().uid;
+      const snap = await db.collection("users").doc(uid).collection("sync").doc("elliottAnalyzer").get();
+      if (snap.exists && Array.isArray((snap.data() || {}).scenarios)) {
+        scenarios = snap.data().scenarios;
+        saveScenarios(); renderScenarios();
+      }
+    } catch (err) { console.error("EWA cloud pull failed", err); }
+  }
+  async function pushCloud() {
+    if (!window.FirebaseSync || !FirebaseSync.enabled || !FirebaseSync.getUser()) return;
+    try {
+      const db = FirebaseSync.getDb(), uid = FirebaseSync.getUser().uid;
+      await db.collection("users").doc(uid).collection("sync").doc("elliottAnalyzer")
+        .set({ scenarios, updatedAt: Date.now() }, { merge: true });
+    } catch (err) { console.error("EWA cloud push failed", err); }
+  }
+  function wireSync() {
+    const btn = $("syncBtn"), out = $("signOutBtn"), av = $("syncAvatar"), st = $("syncStatus");
+    if (!window.FirebaseSync || !FirebaseSync.enabled) { btn.disabled = true; btn.title = "ซิงค์ไม่พร้อมใช้งาน"; return; }
+    btn.addEventListener("click", () => FirebaseSync.signIn().catch(err => alert("ลงชื่อเข้าใช้ไม่สำเร็จ: " + err.message)));
+    out.addEventListener("click", () => FirebaseSync.signOut());
+    FirebaseSync.onAuthChange((user) => {
+      if (user) {
+        btn.hidden = true; out.hidden = false;
+        st.hidden = false; st.textContent = user.displayName || user.email || "ซิงค์อยู่";
+        if (user.photoURL) { av.hidden = false; av.src = user.photoURL; }
+        pullCloud();
+      } else {
+        btn.hidden = false; out.hidden = true; st.hidden = true; av.hidden = true;
+      }
+    });
+  }
+
+  /* ---------- boot ---------- */
+  if (!loadDraft()) { series = genSeries(1); points = []; }
+  $("snapChk").checked = snap;
+  [...$("modeSeg").children].forEach(b => b.classList.toggle("active", b.dataset.m === mode));
+  loadScenarios();
+  renderScenarios();
+  requestAnimationFrame(() => { draw(); renderAnalysis(); });
+  wireSync();
+})();
+</script>
+</body>
+</html>
