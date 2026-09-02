@@ -1692,12 +1692,14 @@
   async function idbSet(key, val) {
     try {
       const db = await idbOpen();
-      await new Promise((res) => {
+      return await new Promise((res) => {
         const t = db.transaction(IDB_STORE, "readwrite");
         t.objectStore(IDB_STORE).put(val, key);
-        t.oncomplete = () => res(); t.onerror = () => res();
+        t.oncomplete = () => res(true);
+        t.onerror = () => res(false);
+        t.onabort = () => res(false);
       });
-    } catch (e) {}
+    } catch (e) { return false; }
   }
 
   function normCount(s) {
@@ -2069,8 +2071,27 @@
   $("scMoreBtn").addEventListener("click", () => { scShowAll = !scShowAll; renderCounts(); });
   ["fSym", "fTf", "fPat", "fOut"].forEach(id => $(id).addEventListener("input", () => { scShowAll = false; renderCounts(); }));
 
-  $("scSave").addEventListener("click", () => {
-    if (points.length < need()) { alert("วางจุดให้ครบก่อนบันทึก"); return; }
+  // make sure a count actually carries the drawn chart + points before we save it
+  function validateCountForSave(c) {
+    const n = need();
+    if (!Array.isArray(c.points) || c.points.length !== n)
+      return `จุดคลื่นไม่ครบ (${c.points ? c.points.length : 0}/${n})`;
+    if (c.points.some(p => !p || !isFinite(p.i) || !isFinite(p.v)))
+      return "จุดคลื่นบางจุดเสียหาย (ไม่มีตำแหน่ง/ราคา)";
+    const chartLen = Array.isArray(c.candles) ? c.candles.length
+      : Array.isArray(c.series) ? c.series.length : 0;
+    if (!chartLen || (c.candles ? chartLen < n : chartLen < 12))
+      return "ไม่มีข้อมูลกราฟติดมากับการนับ (โหลดกราฟก่อนวางจุด)";
+    if (c.points.some(p => p.i < 0 || p.i >= chartLen))
+      return "ตำแหน่งจุดคลื่นอยู่นอกช่วงข้อมูลกราฟที่บันทึก";
+    return null;
+  }
+
+  $("scSave").addEventListener("click", async () => {
+    if (points.length < need()) { alert("⚠ วางจุดคลื่นให้ครบ " + need() + " จุดก่อนบันทึก (ตอนนี้ " + points.length + " จุด)"); return; }
+    if (!(Array.isArray(candles) && candles.length) && !(Array.isArray(series) && series.length >= 12)) {
+      alert("⚠ ยังไม่มีข้อมูลกราฟ — โหลดกราฟ (Binance / จำลอง / นำเข้า) ก่อนบันทึก"); return;
+    }
     const CAP = 800;
     let cs = candles, pts = points.map(p => ({ i: p.i, v: p.v })), v = { i0: view.i0, n: view.n };
     if (candles && candles.length > CAP) {
@@ -2084,7 +2105,7 @@
     const lv = countLevels(mode, points.map(p => p.v), position);
     const lastBar = candles && points.length ? candles[points[points.length - 1].i] : null;
     const lastPivotT = lastBar && lastBar.t ? lastBar.t : null;
-    counts.unshift(normCount({
+    const cObj = normCount({
       name: $("scName").value.trim(),
       myGuess: $("scGuess").value.trim(),
       mode,
@@ -2100,10 +2121,21 @@
       position,
       dir: lv.dir, target: lv.target, invalidation: lv.invalidation, lastPivotT,
       createdAt: Date.now(),
-    }));
-    $("scName").value = ""; $("scGuess").value = "";
-    persistCounts();
+    });
+    const err = validateCountForSave(cObj);
+    if (err) { alert("⚠ บันทึกไม่ได้ — " + err + "\n(ข้อมูลที่กรอกยังอยู่ ลองแก้แล้วกดใหม่)"); return; }
+
+    counts.unshift(cObj);
+    counts.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    const ok = await idbSet("counts", counts);
+    if (!ok) {
+      counts = counts.filter(x => x !== cObj);
+      alert("⚠ บันทึกลงเครื่องไม่สำเร็จ (พื้นที่เก็บเต็ม?) — การนับนี้ไม่ถูกบันทึก ลอง Export สำรอง/ลบของเก่าออกก่อน");
+      return;
+    }
+    writeSummary(); renderCounts(); pushCloudSoon();
     refreshPatFilter();
+    $("scName").value = ""; $("scGuess").value = "";
   });
 
   /* ---------- stats ---------- */
