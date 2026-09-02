@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light dark">
+<title>ทบทวน Elliott Wave</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <button id="brandHome" class="brand">
+    <span class="brand-wave">〜</span>
+    <span>ทบทวน Elliott Wave</span>
+  </button>
+  <div class="topbar-actions">
+    <a href="index.html" class="btn btn-secondary" style="text-decoration:none;">🏠 หน้าหลัก</a>
+    <a href="stock-decision-terminal.html" class="btn btn-secondary" style="text-decoration:none;">STOCK/DECIDE</a>
+    <a href="trade-journal.html" class="btn btn-secondary" style="text-decoration:none;">TRADE JOURNAL</a>
+    <div class="topbar-actions" id="syncWidget" style="gap:6px;">
+      <button class="btn btn-secondary" id="syncSignInBtn" title="ลงชื่อเข้าใช้ด้วย Google เพื่อซิงค์ข้อมูลข้ามอุปกรณ์แบบเรียลไทม์">☁ ซิงค์ข้ามอุปกรณ์</button>
+      <img id="syncAvatar" hidden style="width:26px;height:26px;border-radius:50%;vertical-align:middle;">
+      <span id="syncStatus" hidden style="font-size:11.5px;color:var(--text-muted);white-space:nowrap;"></span>
+      <button class="btn btn-secondary" id="syncSignOutBtn" hidden title="ออกจากระบบ (หยุดซิงค์บนเครื่องนี้)">ออกจากระบบ</button>
+    </div>
+    <button id="exportBtn" class="btn btn-secondary" title="ส่งออกข้อมูลทั้งหมด (Elliott Wave + Trade Journal + Stock/Decide) เป็นไฟล์เดียว">ส่งออกข้อมูลทั้งหมด</button>
+    <button id="importBtn" class="btn btn-secondary" title="นำเข้าไฟล์สำรองรวม — จะเพิ่มต่อท้ายข้อมูลเดิมของทั้ง 3 ระบบ ไม่ทับของเดิม">นำเข้าข้อมูลทั้งหมด</button>
+    <input type="file" id="importInput" accept="application/json" hidden>
+    <button id="addContentBtn" class="btn btn-primary">+ เพิ่มเนื้อหา</button>
+    <button id="themeToggle" class="icon-btn" aria-label="สลับโหมดสี" title="สลับโหมดสว่าง/มืด">
+      <svg id="iconSun" viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12 4.5a1 1 0 0 1-1-1V2a1 1 0 1 1 2 0v1.5a1 1 0 0 1-1 1zm0 15a1 1 0 0 1 1 1V22a1 1 0 1 1-2 0v-1.5a1 1 0 0 1 1-1zm7.5-7.5a1 1 0 0 1 1-1H22a1 1 0 1 1 0 2h-1.5a1 1 0 0 1-1-1zm-15 0a1 1 0 0 1-1 1H2a1 1 0 1 1 0-2h1.5a1 1 0 0 1 1 1zm12.02-5.52a1 1 0 0 1 0-1.42l1.06-1.06a1 1 0 1 1 1.42 1.42l-1.06 1.06a1 1 0 0 1-1.42 0zm-11.04 11.04a1 1 0 0 1 0-1.42l1.06-1.06a1 1 0 1 1 1.42 1.42L6.9 17.52a1 1 0 0 1-1.42 0zm11.04 0a1 1 0 0 1 1.42 0l1.06 1.06a1 1 0 1 1-1.42 1.42l-1.06-1.06a1 1 0 0 1 0-1.42zM5.48 5.48a1 1 0 0 1 1.42 0l1.06 1.06A1 1 0 1 1 6.54 7.96L5.48 6.9a1 1 0 0 1 0-1.42zM12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10z"/></svg>
+      <svg id="iconMoon" viewBox="0 0 24 24" width="20" height="20" style="display:none"><path fill="currentColor" d="M20.7 15.5A8.5 8.5 0 0 1 8.5 3.3a.6.6 0 0 0-.77-.75A10 10 0 1 0 21.45 16.3a.6.6 0 0 0-.75-.8z"/></svg>
+    </button>
+  </div>
+</header>
+
+<main id="content" class="content"></main>
+
+<!-- Modal: เพิ่มเนื้อหา -->
+<div id="modal" class="modal-backdrop">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>เพิ่มเนื้อหาใหม่</h2>
+      <button id="modalClose" class="icon-btn" aria-label="ปิด">
+        <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M18.3 5.71 12 12l6.3 6.29-1.41 1.42L10.59 13.4 4.3 19.71 2.89 18.3 9.17 12 2.89 5.71 4.3 4.3l6.29 6.29 6.3-6.29z"/></svg>
+      </button>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="image">จากรูปภาพ</button>
+      <button class="tab-btn" data-tab="pdf">ไฟล์ PDF</button>
+      <button class="tab-btn" data-tab="manual">พิมพ์เอง</button>
+    </div>
+
+    <div id="tabImage" class="tab-panel active">
+      <label class="dropzone" id="dropzone">
+        <input type="file" id="imageInput" accept="image/*" multiple hidden>
+        <span id="dropzoneText">คลิกเพื่อเลือกรูป (เลือกได้หลายรูปพร้อมกัน) หรือวางรูปที่นี่</span>
+      </label>
+      <div id="imageItemsList" class="image-items"></div>
+      <button id="ocrAllBtn" class="btn btn-secondary" disabled>อ่านข้อความจากรูปทั้งหมด</button>
+      <button id="imgToPdfBtn" class="btn btn-secondary" disabled>แปลงรูปเป็น PDF แทน (ไม่ต้อง OCR)</button>
+      <p id="ocrStatus" class="ocr-status"></p>
+      <p class="hint-text">ถ้าอ่านข้อความไม่ชัดหรือผิดเพี้ยน ลอง "แปลงรูปเป็น PDF แทน" จะเก็บภาพต้นฉบับไว้ครบ ไม่ต้องพึ่งการอ่านตัวอักษร</p>
+    </div>
+
+    <div id="tabPdf" class="tab-panel">
+      <label class="dropzone" id="pdfDropzone">
+        <input type="file" id="pdfInput" accept="application/pdf" hidden>
+        <span id="pdfDropzoneText">คลิกเพื่อเลือกไฟล์ PDF หรือวางไฟล์ที่นี่</span>
+      </label>
+      <div id="pdfPreviewWrap" hidden>
+        <iframe id="pdfPreviewFrame" class="pdf-preview-frame" title="ตัวอย่างไฟล์ PDF"></iframe>
+        <p id="pdfFileInfo" class="pdf-file-info"></p>
+      </div>
+      <p class="hint-text">ไฟล์จะถูกแสดงตามต้นฉบับในหน้าเนื้อหา ไม่มีการแปลงเป็นข้อความ (จำกัดขนาดไฟล์ 30MB)</p>
+    </div>
+
+    <div id="tabManual" class="tab-panel">
+      <textarea id="manualText" rows="8" placeholder="พิมพ์เนื้อหาที่นี่..."></textarea>
+    </div>
+
+    <div class="form-row">
+      <label for="chapterSelect">บันทึกลงบท</label>
+      <select id="chapterSelect"></select>
+    </div>
+    <div class="form-row" id="newChapterRow" hidden>
+      <label for="newChapterName">ชื่อบทใหม่</label>
+      <input type="text" id="newChapterName" placeholder="เช่น บันทึกจากรูปที่ 1">
+    </div>
+    <div class="form-row">
+      <label for="sectionTitle">หัวข้อย่อย</label>
+      <input type="text" id="sectionTitle" placeholder="เช่น สรุปจากสไลด์หน้า 3 (ถ้าเลือกหลายรูปจะเติมเลขลำดับให้อัตโนมัติ)">
+    </div>
+    <div class="form-row">
+      <label>หัวข้อย่อยเพิ่มเติม (ถ้ามี)</label>
+      <div id="modalSubsectionsList" class="image-items"></div>
+      <button type="button" id="addModalSubsecBtn" class="btn btn-secondary">+ เพิ่มหัวข้อย่อย</button>
+    </div>
+
+    <div class="modal-footer">
+      <button id="cancelBtn" class="btn btn-secondary">ยกเลิก</button>
+      <button id="saveContentBtn" class="btn btn-primary">บันทึกเนื้อหา</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
+<script src="firebase-sync.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

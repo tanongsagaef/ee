@@ -1,117 +1,514 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="color-scheme" content="light dark">
-<title>ทบทวน Elliott Wave</title>
-<link rel="stylesheet" href="style.css">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="color-scheme" content="light dark" />
+<title>ห้องนักบิน · Trading Cockpit</title>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f4f6fb; --surface: #ffffff; --surface-alt: #f3f4f9; --border: #e5e7f0;
+    --text: #14162a; --muted: #6b7080;
+    --accent: #4f46e5; --accent-hover: #4338ca; --accent-soft: #eef0fe;
+    --bull: #16a34a; --bull-soft: rgba(22,163,74,0.10);
+    --bear: #dc2626; --bear-soft: rgba(220,38,38,0.10);
+    --warn: #d97706;
+    --shadow: 0 1px 2px rgba(16,24,40,.04), 0 6px 16px rgba(16,24,40,.06);
+    --radius: 14px;
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #0f1117; --surface: #171923; --surface-alt: #1e2029; --border: #2a2d3a;
+    --text: #eceefb; --muted: #9a9db3;
+    --accent: #8386ff; --accent-hover: #9a9dff; --accent-soft: #262a52;
+    --bull: #34c77b; --bull-soft: rgba(52,199,123,0.14);
+    --bear: #ff6f68; --bear-soft: rgba(255,111,104,0.14);
+    --warn: #f0a54a;
+    --shadow: 0 1px 3px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 20px 20px 60px;
+    font-family: "Sarabun", "Noto Sans Thai", "Segoe UI", system-ui, sans-serif;
+    background: var(--bg); color: var(--text);
+  }
+  .mono { font-family: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", monospace; }
+  .pos { color: var(--bull); } .neg { color: var(--bear); }
+  a { color: inherit; }
+
+  .header {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 14px 20px; box-shadow: var(--shadow); margin-bottom: 18px;
+  }
+  .brand { font-size: 20px; font-weight: 800; letter-spacing: .2px; display: flex; align-items: center; gap: 8px; }
+  .brand .dot { color: var(--accent); }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .navlink {
+    background: var(--accent-soft); border: 1px solid transparent; color: var(--accent);
+    padding: 9px 14px; border-radius: 10px; font-size: 13px; text-decoration: none; font-weight: 700;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .navlink:hover { background: var(--accent); color: #fff; }
+  .navlink.plain { background: var(--surface); border-color: var(--border); color: var(--text); }
+  .navlink.plain:hover { border-color: var(--accent); color: var(--accent); }
+  .icon-btn {
+    background: var(--surface); border: 1px solid var(--border); color: var(--text);
+    width: 34px; height: 34px; border-radius: 8px; cursor: pointer; font-size: 15px;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .icon-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .grid { display: grid; gap: 16px; }
+  .panel {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 16px 18px; box-shadow: var(--shadow);
+  }
+  .panel h2 {
+    margin: 0 0 12px; font-size: 12px; letter-spacing: .5px; color: var(--muted);
+    text-transform: uppercase; font-weight: 800;
+  }
+  .panel h2 .sub { text-transform: none; letter-spacing: 0; font-weight: 600; color: var(--muted); margin-left: 8px; }
+
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+  .tile { background: var(--surface-alt); border: 1px solid var(--border); border-radius: 12px; padding: 13px 15px; }
+  .tile .k { font-size: 10.5px; text-transform: uppercase; letter-spacing: .4px; color: var(--muted); font-weight: 800; margin-bottom: 6px; }
+  .tile .v { font-size: 21px; font-weight: 800; line-height: 1.1; }
+  .tile .v.small { font-size: 15px; }
+  .tile .note { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+  .seg { display: inline-flex; gap: 4px; background: var(--surface-alt); border-radius: 10px; padding: 4px; }
+  .seg button {
+    border: none; background: transparent; color: var(--muted); font-weight: 700; font-size: 12px;
+    padding: 6px 12px; border-radius: 7px; cursor: pointer; font-family: inherit;
+  }
+  .seg button.active { background: var(--surface); color: var(--accent); box-shadow: var(--shadow); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  th { font-size: 10.5px; text-transform: uppercase; letter-spacing: .3px; color: var(--muted); font-weight: 800; }
+  tbody tr { cursor: pointer; }
+  tbody tr:hover { background: var(--surface-alt); }
+  .badge { font-size: 10.5px; font-weight: 800; padding: 2px 7px; border-radius: 6px; letter-spacing: .3px; }
+  .badge.up { background: var(--bull-soft); color: var(--bull); }
+  .badge.down { background: var(--bear-soft); color: var(--bear); }
+  .badge.neutral { background: var(--accent-soft); color: var(--accent); }
+  .grade-stamp { display: inline-flex; width: 20px; height: 20px; align-items: center; justify-content: center;
+    border-radius: 6px; font-weight: 900; font-size: 11px; background: var(--surface-alt); border: 1px solid var(--border); }
+
+  .wl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+  .wl-card { background: var(--surface-alt); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+  .wl-card .sym { font-weight: 800; font-size: 14px; }
+  .wl-card .px { font-size: 12px; color: var(--muted); margin: 2px 0 6px; }
+
+  .apps { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+  .app-card {
+    display: block; text-decoration: none; background: var(--surface-alt); border: 1px solid var(--border);
+    border-radius: 12px; padding: 16px; transition: border-color .15s, transform .1s;
+  }
+  .app-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .app-card .t { font-size: 15px; font-weight: 800; margin-bottom: 4px; }
+  .app-card .d { font-size: 12px; color: var(--muted); }
+  .app-card .c { font-size: 12px; color: var(--accent); font-weight: 700; margin-top: 8px; }
+
+  .equity-wrap { width: 100%; overflow: hidden; }
+  svg.equity { width: 100%; height: 120px; display: block; }
+
+  .muted-note { color: var(--muted); font-size: 12.5px; }
+  #syncStatus { font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+  .updated { font-size: 11px; color: var(--muted); }
+  @media (max-width: 560px) { body { padding: 12px 12px 50px; } .tile .v { font-size: 18px; } }
+</style>
 </head>
 <body>
 
-<header class="topbar">
-  <button id="brandHome" class="brand">
-    <span class="brand-wave">〜</span>
-    <span>ทบทวน Elliott Wave</span>
-  </button>
-  <div class="topbar-actions">
-    <a href="stock-decision-terminal.html" class="btn btn-secondary" style="text-decoration:none;">STOCK/DECIDE</a>
-    <a href="trade-journal.html" class="btn btn-secondary" style="text-decoration:none;">TRADE JOURNAL</a>
-    <div class="topbar-actions" id="syncWidget" style="gap:6px;">
-      <button class="btn btn-secondary" id="syncSignInBtn" title="ลงชื่อเข้าใช้ด้วย Google เพื่อซิงค์ข้อมูลข้ามอุปกรณ์แบบเรียลไทม์">☁ ซิงค์ข้ามอุปกรณ์</button>
-      <img id="syncAvatar" hidden style="width:26px;height:26px;border-radius:50%;vertical-align:middle;">
-      <span id="syncStatus" hidden style="font-size:11.5px;color:var(--text-muted);white-space:nowrap;"></span>
-      <button class="btn btn-secondary" id="syncSignOutBtn" hidden title="ออกจากระบบ (หยุดซิงค์บนเครื่องนี้)">ออกจากระบบ</button>
-    </div>
-    <button id="exportBtn" class="btn btn-secondary" title="ส่งออกข้อมูลทั้งหมด (Elliott Wave + Trade Journal + Stock/Decide) เป็นไฟล์เดียว">ส่งออกข้อมูลทั้งหมด</button>
-    <button id="importBtn" class="btn btn-secondary" title="นำเข้าไฟล์สำรองรวม — จะเพิ่มต่อท้ายข้อมูลเดิมของทั้ง 3 ระบบ ไม่ทับของเดิม">นำเข้าข้อมูลทั้งหมด</button>
-    <input type="file" id="importInput" accept="application/json" hidden>
-    <button id="addContentBtn" class="btn btn-primary">+ เพิ่มเนื้อหา</button>
-    <button id="themeToggle" class="icon-btn" aria-label="สลับโหมดสี" title="สลับโหมดสว่าง/มืด">
-      <svg id="iconSun" viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12 4.5a1 1 0 0 1-1-1V2a1 1 0 1 1 2 0v1.5a1 1 0 0 1-1 1zm0 15a1 1 0 0 1 1 1V22a1 1 0 1 1-2 0v-1.5a1 1 0 0 1 1-1zm7.5-7.5a1 1 0 0 1 1-1H22a1 1 0 1 1 0 2h-1.5a1 1 0 0 1-1-1zm-15 0a1 1 0 0 1-1 1H2a1 1 0 1 1 0-2h1.5a1 1 0 0 1 1 1zm12.02-5.52a1 1 0 0 1 0-1.42l1.06-1.06a1 1 0 1 1 1.42 1.42l-1.06 1.06a1 1 0 0 1-1.42 0zm-11.04 11.04a1 1 0 0 1 0-1.42l1.06-1.06a1 1 0 1 1 1.42 1.42L6.9 17.52a1 1 0 0 1-1.42 0zm11.04 0a1 1 0 0 1 1.42 0l1.06 1.06a1 1 0 1 1-1.42 1.42l-1.06-1.06a1 1 0 0 1 0-1.42zM5.48 5.48a1 1 0 0 1 1.42 0l1.06 1.06A1 1 0 1 1 6.54 7.96L5.48 6.9a1 1 0 0 1 0-1.42zM12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10z"/></svg>
-      <svg id="iconMoon" viewBox="0 0 24 24" width="20" height="20" style="display:none"><path fill="currentColor" d="M20.7 15.5A8.5 8.5 0 0 1 8.5 3.3a.6.6 0 0 0-.77-.75A10 10 0 1 0 21.45 16.3a.6.6 0 0 0-.75-.8z"/></svg>
-    </button>
-  </div>
-</header>
-
-<main id="content" class="content"></main>
-
-<!-- Modal: เพิ่มเนื้อหา -->
-<div id="modal" class="modal-backdrop">
-  <div class="modal">
-    <div class="modal-header">
-      <h2>เพิ่มเนื้อหาใหม่</h2>
-      <button id="modalClose" class="icon-btn" aria-label="ปิด">
-        <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M18.3 5.71 12 12l6.3 6.29-1.41 1.42L10.59 13.4 4.3 19.71 2.89 18.3 9.17 12 2.89 5.71 4.3 4.3l6.29 6.29 6.3-6.29z"/></svg>
-      </button>
-    </div>
-
-    <div class="tabs">
-      <button class="tab-btn active" data-tab="image">จากรูปภาพ</button>
-      <button class="tab-btn" data-tab="pdf">ไฟล์ PDF</button>
-      <button class="tab-btn" data-tab="manual">พิมพ์เอง</button>
-    </div>
-
-    <div id="tabImage" class="tab-panel active">
-      <label class="dropzone" id="dropzone">
-        <input type="file" id="imageInput" accept="image/*" multiple hidden>
-        <span id="dropzoneText">คลิกเพื่อเลือกรูป (เลือกได้หลายรูปพร้อมกัน) หรือวางรูปที่นี่</span>
-      </label>
-      <div id="imageItemsList" class="image-items"></div>
-      <button id="ocrAllBtn" class="btn btn-secondary" disabled>อ่านข้อความจากรูปทั้งหมด</button>
-      <button id="imgToPdfBtn" class="btn btn-secondary" disabled>แปลงรูปเป็น PDF แทน (ไม่ต้อง OCR)</button>
-      <p id="ocrStatus" class="ocr-status"></p>
-      <p class="hint-text">ถ้าอ่านข้อความไม่ชัดหรือผิดเพี้ยน ลอง "แปลงรูปเป็น PDF แทน" จะเก็บภาพต้นฉบับไว้ครบ ไม่ต้องพึ่งการอ่านตัวอักษร</p>
-    </div>
-
-    <div id="tabPdf" class="tab-panel">
-      <label class="dropzone" id="pdfDropzone">
-        <input type="file" id="pdfInput" accept="application/pdf" hidden>
-        <span id="pdfDropzoneText">คลิกเพื่อเลือกไฟล์ PDF หรือวางไฟล์ที่นี่</span>
-      </label>
-      <div id="pdfPreviewWrap" hidden>
-        <iframe id="pdfPreviewFrame" class="pdf-preview-frame" title="ตัวอย่างไฟล์ PDF"></iframe>
-        <p id="pdfFileInfo" class="pdf-file-info"></p>
-      </div>
-      <p class="hint-text">ไฟล์จะถูกแสดงตามต้นฉบับในหน้าเนื้อหา ไม่มีการแปลงเป็นข้อความ (จำกัดขนาดไฟล์ 30MB)</p>
-    </div>
-
-    <div id="tabManual" class="tab-panel">
-      <textarea id="manualText" rows="8" placeholder="พิมพ์เนื้อหาที่นี่..."></textarea>
-    </div>
-
-    <div class="form-row">
-      <label for="chapterSelect">บันทึกลงบท</label>
-      <select id="chapterSelect"></select>
-    </div>
-    <div class="form-row" id="newChapterRow" hidden>
-      <label for="newChapterName">ชื่อบทใหม่</label>
-      <input type="text" id="newChapterName" placeholder="เช่น บันทึกจากรูปที่ 1">
-    </div>
-    <div class="form-row">
-      <label for="sectionTitle">หัวข้อย่อย</label>
-      <input type="text" id="sectionTitle" placeholder="เช่น สรุปจากสไลด์หน้า 3 (ถ้าเลือกหลายรูปจะเติมเลขลำดับให้อัตโนมัติ)">
-    </div>
-    <div class="form-row">
-      <label>หัวข้อย่อยเพิ่มเติม (ถ้ามี)</label>
-      <div id="modalSubsectionsList" class="image-items"></div>
-      <button type="button" id="addModalSubsecBtn" class="btn btn-secondary">+ เพิ่มหัวข้อย่อย</button>
-    </div>
-
-    <div class="modal-footer">
-      <button id="cancelBtn" class="btn btn-secondary">ยกเลิก</button>
-      <button id="saveContentBtn" class="btn btn-primary">บันทึกเนื้อหา</button>
-    </div>
+<div class="header">
+  <div class="brand"><span class="dot">◆</span> ห้องนักบิน <span class="mono" style="font-size:12px;color:var(--muted);font-weight:600;">Cockpit</span></div>
+  <div class="row">
+    <a class="navlink" href="trade-journal.html">📓 Trade Journal</a>
+    <a class="navlink" href="stock-decision-terminal.html">📊 Stock / Decide</a>
+    <a class="navlink" href="elliott-wave.html">〜 Elliott Wave</a>
+    <button class="navlink plain" id="syncBtn" title="ซิงค์ข้ามอุปกรณ์ด้วย Google">☁ ซิงค์</button>
+    <img id="syncAvatar" hidden style="width:26px;height:26px;border-radius:50%;">
+    <span id="syncStatus" hidden></span>
+    <button class="navlink plain" id="signOutBtn" hidden>ออก</button>
+    <button class="icon-btn" id="refreshBtn" title="รีเฟรชข้อมูล">⟳</button>
+    <button class="icon-btn" id="themeToggle" title="สลับโหมดสว่าง/มืด">◐</button>
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<div class="grid">
+
+  <div class="panel">
+    <h2>วันนี้ <span class="sub" id="todayDate"></span></h2>
+    <div class="tiles" id="todayTiles"></div>
+  </div>
+
+  <div class="panel">
+    <h2>สรุปผลงาน
+      <span class="sub">
+        <span class="seg" id="periodSeg">
+          <button data-d="7">7 วัน</button>
+          <button data-d="30" class="active">30 วัน</button>
+          <button data-d="90">90 วัน</button>
+          <button data-d="0">ทั้งหมด</button>
+        </span>
+      </span>
+    </h2>
+    <div class="tiles" id="kpiTiles"></div>
+    <div class="equity-wrap" style="margin-top:14px;">
+      <div class="muted-note" style="margin-bottom:4px;">เส้นทุนสะสม (กำไร/ขาดทุนรวมของเทรดที่ปิดแล้วในช่วงนี้)</div>
+      <svg class="equity" id="equitySvg" viewBox="0 0 600 120" preserveAspectRatio="none"></svg>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>เทรดล่าสุด</h2>
+    <div style="overflow-x:auto;">
+      <table id="recentTbl">
+        <thead><tr><th>วันที่</th><th>สัญลักษณ์</th><th>ทิศทาง</th><th style="text-align:right;">P/L</th><th>เกรด</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="muted-note" id="recentEmpty" hidden>ยังไม่มีเทรด — เปิด Trade Journal เพื่อเริ่มบันทึก</div>
+  </div>
+
+  <div class="panel">
+    <h2>Watchlist <span class="sub" id="wlUpdated"></span></h2>
+    <div class="wl-grid" id="wlGrid"></div>
+    <div class="muted-note" id="wlEmpty" hidden>ยังไม่มีหุ้นใน watchlist — เพิ่มได้ในหน้า Stock / Decide</div>
+  </div>
+
+  <div class="panel">
+    <h2>เครื่องมือ</h2>
+    <div class="apps">
+      <a class="app-card" href="trade-journal.html">
+        <div class="t">📓 Trade Journal</div>
+        <div class="d">บันทึก / ปฏิทิน / สถิติ / กราฟ + AI</div>
+        <div class="c" id="cntTrades">—</div>
+      </a>
+      <a class="app-card" href="stock-decision-terminal.html">
+        <div class="t">📊 Stock / Decide</div>
+        <div class="d">ให้คะแนนหุ้น / watchlist / บันทึกการตัดสินใจ</div>
+        <div class="c" id="cntStock">—</div>
+      </a>
+      <a class="app-card" href="elliott-wave.html">
+        <div class="t">〜 Elliott Wave</div>
+        <div class="d">ทบทวนบทเรียนจากรูป / PDF</div>
+        <div class="c" id="cntEw">—</div>
+      </a>
+    </div>
+  </div>
+
+  <div class="updated" id="lastUpdated"></div>
+</div>
+
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
 <script src="firebase-sync.js"></script>
-<script src="script.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  /* ---------- theme (shares tj_theme with Trade Journal) ---------- */
+  const root = document.documentElement;
+  function applyTheme(t) {
+    root.setAttribute("data-theme", t);
+    try { localStorage.setItem("tj_theme", t); } catch (e) {}
+  }
+  applyTheme(
+    (function () { try { return localStorage.getItem("tj_theme"); } catch (e) { return null; } })() ||
+    (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+  );
+  document.getElementById("themeToggle").addEventListener("click", () => {
+    applyTheme(root.getAttribute("data-theme") === "dark" ? "light" : "dark");
+    renderAll();
+  });
+
+  /* ---------- helpers ---------- */
+  const $ = (id) => document.getElementById(id);
+  const money = (n) => (n >= 0 ? "+" : "-") + "$" + Math.abs(n).toLocaleString("en-US", { maximumFractionDigits: 2 });
+  const pct = (n) => (n * 100).toFixed(n >= 0.1 || n <= -0.1 ? 0 : 1) + "%";
+  const todayKey = () => {
+    const d = new Date();
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  };
+  function readLS(key, fallback) {
+    try { return JSON.parse(localStorage.getItem(key) || "null") ?? fallback; }
+    catch (e) { return fallback; }
+  }
+  const isClosed = (t) => t && t.pnl != null && !isNaN(Number(t.pnl));
+  function rMultiple(t) {
+    if (t.entry == null || t.sl == null || t.exit == null) return null;
+    const risk = Math.abs(Number(t.entry) - Number(t.sl));
+    if (!(risk > 0)) return null;
+    const dir = t.side === "short" ? -1 : 1;
+    return ((Number(t.exit) - Number(t.entry)) * dir) / risk;
+  }
+  function ordered(list) {
+    return list.slice().sort((a, b) =>
+      (a.date || "").localeCompare(b.date || "") || (a.createdAt || 0) - (b.createdAt || 0));
+  }
+
+  /* ---------- state ---------- */
+  let trades = [];
+  let sd = { watchlist: [], log: [], scores: {} };
+  let ewCount = null;
+  let period = 30;
+
+  function loadLocal() {
+    trades = Array.isArray(readLS("tj_trades_v1", [])) ? readLS("tj_trades_v1", []) : [];
+    sd.watchlist = readLS("sd_watchlist", []) || [];
+    sd.log = readLS("sd_log", []) || [];
+    sd.scores = readLS("sd_watchlist_scores", {}) || {};
+  }
+
+  /* Elliott Wave chapter count from its IndexedDB (best effort) */
+  function loadEwCount() {
+    try {
+      const req = indexedDB.open("ewReviewDB", 1);
+      req.onsuccess = () => {
+        try {
+          const db = req.result;
+          if (!db.objectStoreNames.contains("chapters")) { ewCount = 0; renderApps(); return; }
+          const g = db.transaction("chapters", "readonly").objectStore("chapters").get("data");
+          g.onsuccess = () => {
+            const data = g.result;
+            ewCount = Array.isArray(data) ? data.length : (data && Array.isArray(data.chapters) ? data.chapters.length : 0);
+            renderApps();
+          };
+          g.onerror = () => { ewCount = 0; renderApps(); };
+        } catch (e) { ewCount = 0; renderApps(); }
+      };
+      req.onerror = () => { ewCount = 0; renderApps(); };
+    } catch (e) { ewCount = 0; renderApps(); }
+  }
+
+  /* ---------- period filter ---------- */
+  function inPeriod(t) {
+    if (!period) return true;
+    if (!t.date) return false;
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - (period - 1));
+    const c = cutoff.getFullYear() + "-" + String(cutoff.getMonth() + 1).padStart(2, "0") + "-" + String(cutoff.getDate()).padStart(2, "0");
+    return t.date >= c;
+  }
+
+  /* ---------- render: today ---------- */
+  function renderToday() {
+    $("todayDate").textContent = todayKey();
+    const tk = todayKey();
+    const today = trades.filter(t => t.date === tk);
+    const closed = today.filter(isClosed);
+    const net = closed.reduce((s, t) => s + Number(t.pnl), 0);
+    const pending = today.length - closed.length;
+    $("todayTiles").innerHTML = [
+      tile("P/L วันนี้", closed.length ? `<span class="${net >= 0 ? "pos" : "neg"}">${money(net)}</span>` : "—",
+        closed.length ? closed.length + " เทรดปิดแล้ว" : "ยังไม่มีเทรดปิด"),
+      tile("เทรดวันนี้", String(today.length), ""),
+      tile("รอผล", String(pending), pending ? "ยังไม่ปิด" : ""),
+    ].join("");
+  }
+  function tile(k, v, note, small) {
+    return `<div class="tile"><div class="k">${k}</div><div class="v${small ? " small" : ""}">${v}</div>${note ? `<div class="note">${note}</div>` : ""}</div>`;
+  }
+
+  /* ---------- render: KPI ---------- */
+  function renderKpi() {
+    const list = ordered(trades.filter(t => inPeriod(t) && isClosed(t)));
+    const wins = list.filter(t => Number(t.pnl) > 0);
+    const losses = list.filter(t => Number(t.pnl) < 0);
+    const net = list.reduce((s, t) => s + Number(t.pnl), 0);
+    const grossW = wins.reduce((s, t) => s + Number(t.pnl), 0);
+    const grossL = Math.abs(losses.reduce((s, t) => s + Number(t.pnl), 0));
+    const wr = (wins.length + losses.length) ? wins.length / (wins.length + losses.length) : 0;
+    const pf = grossL ? grossW / grossL : (grossW ? Infinity : 0);
+    const rs = list.map(rMultiple).filter(v => v != null);
+    const avgR = rs.length ? rs.reduce((s, v) => s + v, 0) / rs.length : null;
+    const best = list.reduce((m, t) => Number(t.pnl) > (m ? Number(m.pnl) : -Infinity) ? t : m, null);
+    const worst = list.reduce((m, t) => Number(t.pnl) < (m ? Number(m.pnl) : Infinity) ? t : m, null);
+
+    // streak (trailing)
+    let streak = 0, sign = 0;
+    for (let i = list.length - 1; i >= 0; i--) {
+      const p = Number(list[i].pnl);
+      const s = p > 0 ? 1 : p < 0 ? -1 : 0;
+      if (s === 0) break;
+      if (sign === 0) sign = s;
+      if (s === sign) streak++; else break;
+    }
+    const streakTxt = streak ? (sign > 0 ? "ชนะ " : "แพ้ ") + streak + " ไม้ติด" : "—";
+
+    $("kpiTiles").innerHTML = [
+      tile("Win rate", (wins.length + losses.length) ? pct(wr) : "—", `${wins.length}W / ${losses.length}L`),
+      tile("Net P/L", `<span class="${net >= 0 ? "pos" : "neg"}">${list.length ? money(net) : "—"}</span>`, list.length + " เทรด"),
+      tile("Profit factor", pf === Infinity ? "∞" : (grossW + grossL ? pf.toFixed(2) : "—"), ""),
+      tile("Avg R", avgR == null ? "—" : (avgR >= 0 ? "+" : "") + avgR.toFixed(2) + "R", rs.length ? rs.length + " เทรดมี SL" : "ใส่ราคา SL เพื่อคำนวณ", true),
+      tile("ไม้ดีสุด / แย่สุด", (best ? `<span class="pos">${money(Number(best.pnl))}</span>` : "—") + " / " + (worst ? `<span class="neg">${money(Number(worst.pnl))}</span>` : "—"), "", true),
+      tile("สตรีคปัจจุบัน", streakTxt, "", true),
+    ].join("");
+
+    renderEquity(list);
+  }
+
+  /* ---------- render: equity curve (inline SVG) ---------- */
+  function renderEquity(list) {
+    const svg = $("equitySvg");
+    const W = 600, H = 120, pad = 6;
+    if (!list.length) { svg.innerHTML = `<text x="12" y="64" fill="var(--muted)" font-size="12">ยังไม่มีเทรดที่ปิดแล้วในช่วงนี้</text>`; return; }
+    let cum = 0;
+    const pts = [{ x: 0, y: 0 }];
+    list.forEach(t => { cum += Number(t.pnl); pts.push({ x: pts.length, y: cum }); });
+    const ys = pts.map(p => p.y);
+    const minY = Math.min(0, ...ys), maxY = Math.max(0, ...ys);
+    const spanY = (maxY - minY) || 1;
+    const spanX = (pts.length - 1) || 1;
+    const X = (i) => pad + (i / spanX) * (W - pad * 2);
+    const Y = (v) => H - pad - ((v - minY) / spanY) * (H - pad * 2);
+    const line = pts.map((p, i) => (i ? "L" : "M") + X(i).toFixed(1) + " " + Y(p.y).toFixed(1)).join(" ");
+    const area = line + " L" + X(pts.length - 1).toFixed(1) + " " + Y(minY).toFixed(1) + " L" + X(0).toFixed(1) + " " + Y(minY).toFixed(1) + " Z";
+    const up = cum >= 0;
+    const col = up ? "var(--bull)" : "var(--bear)";
+    const zeroY = Y(0).toFixed(1);
+    svg.innerHTML =
+      `<line x1="0" y1="${zeroY}" x2="${W}" y2="${zeroY}" stroke="var(--border)" stroke-width="1" stroke-dasharray="3 3"/>` +
+      `<path d="${area}" fill="${col}" opacity="0.12"/>` +
+      `<path d="${line}" fill="none" stroke="${col}" stroke-width="2" stroke-linejoin="round"/>`;
+  }
+
+  /* ---------- render: recent trades ---------- */
+  function renderRecent() {
+    const list = ordered(trades).slice(-6).reverse();
+    const tb = $("recentTbl").querySelector("tbody");
+    $("recentEmpty").hidden = list.length > 0;
+    tb.innerHTML = list.map(t => {
+      const closed = isClosed(t);
+      const p = Number(t.pnl);
+      const pl = closed ? `<span class="${p >= 0 ? "pos" : "neg"} mono">${money(p)}</span>` : `<span class="muted-note">รอผล</span>`;
+      const dir = t.side === "short" ? `<span class="badge down">SELL</span>` : `<span class="badge up">BUY</span>`;
+      const grade = t.grade ? `<span class="grade-stamp">${t.grade}</span>` : "";
+      return `<tr onclick="location.href='trade-journal.html'"><td class="mono">${t.date || "—"}</td><td>${escapeHtml(t.symbol || "—")}</td><td>${dir}</td><td style="text-align:right;">${pl}</td><td>${grade}</td></tr>`;
+    }).join("");
+  }
+
+  /* ---------- render: watchlist ---------- */
+  function renderWatchlist() {
+    const syms = sd.watchlist || [];
+    $("wlEmpty").hidden = syms.length > 0;
+    const scores = sd.scores || {};
+    let latest = 0;
+    const cards = syms.slice(0, 12).map(sym => {
+      const s = scores[sym] || {};
+      if (s.updatedAt && s.updatedAt > latest) latest = s.updatedAt;
+      const v = String(s.verdict || "").toUpperCase();
+      const cls = /BULL|BUY|ซื้อ/.test(v) ? "up" : /BEAR|SELL|ขาย/.test(v) ? "down" : "neutral";
+      return `<div class="wl-card">
+        <div class="sym">${escapeHtml(sym)}</div>
+        <div class="px mono">${s.price != null ? Number(s.price).toLocaleString("en-US", { maximumFractionDigits: 2 }) : "—"}</div>
+        <div class="row" style="gap:6px;">
+          ${s.verdict ? `<span class="badge ${cls}">${escapeHtml(String(s.verdict))}</span>` : ""}
+          ${s.score != null ? `<span class="muted-note mono">คะแนน ${s.score}</span>` : ""}
+          ${s.rsi14 != null ? `<span class="muted-note mono">RSI ${Number(s.rsi14).toFixed(0)}</span>` : ""}
+        </div>
+      </div>`;
+    });
+    $("wlGrid").innerHTML = cards.join("");
+    $("wlUpdated").textContent = latest ? "อัปเดต " + new Date(latest).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" }) : "";
+  }
+
+  /* ---------- render: app counts ---------- */
+  function renderApps() {
+    $("cntTrades").textContent = trades.length + " เทรดบันทึกไว้";
+    $("cntStock").textContent = (sd.watchlist.length) + " หุ้นติดตาม · " + (sd.log.length) + " การตัดสินใจ";
+    $("cntEw").textContent = ewCount == null ? "…" : ewCount + " บทเรียน";
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  function renderAll() {
+    renderToday();
+    renderKpi();
+    renderRecent();
+    renderWatchlist();
+    renderApps();
+    $("lastUpdated").textContent = "อ่านข้อมูลเมื่อ " + new Date().toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" });
+  }
+
+  /* ---------- period control ---------- */
+  $("periodSeg").addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    period = Number(b.dataset.d);
+    [...$("periodSeg").children].forEach(x => x.classList.toggle("active", x === b));
+    renderKpi();
+  });
+
+  $("refreshBtn").addEventListener("click", () => { loadLocal(); pullCloud(); renderAll(); });
+  window.addEventListener("focus", () => { loadLocal(); renderAll(); });
+
+  /* ---------- Firebase: pull the 3 sync docs when signed in ---------- */
+  async function pullCloud() {
+    if (!window.FirebaseSync || !FirebaseSync.enabled || !FirebaseSync.getUser()) return;
+    try {
+      const db = FirebaseSync.getDb();
+      const uid = FirebaseSync.getUser().uid;
+      const base = db.collection("users").doc(uid).collection("sync");
+      const [tj, st, ew] = await Promise.all([
+        base.doc("tradeJournal").get(),
+        base.doc("stockDecide").get(),
+        base.doc("elliottWave").get(),
+      ]);
+      if (tj.exists && Array.isArray((tj.data() || {}).trades)) {
+        trades = tj.data().trades;
+        try { localStorage.setItem("tj_trades_v1", JSON.stringify(trades)); } catch (e) {}
+      }
+      if (st.exists) {
+        const d = st.data() || {};
+        sd.watchlist = d.watchlist || sd.watchlist;
+        sd.log = d.log || sd.log;
+        sd.scores = d.watchlistScores || sd.scores;
+        try {
+          localStorage.setItem("sd_watchlist", JSON.stringify(sd.watchlist));
+          localStorage.setItem("sd_log", JSON.stringify(sd.log));
+          localStorage.setItem("sd_watchlist_scores", JSON.stringify(sd.scores));
+        } catch (e) {}
+      }
+      if (ew.exists && Array.isArray((ew.data() || {}).chapters)) {
+        ewCount = ew.data().chapters.length;
+      }
+      renderAll();
+    } catch (err) {
+      console.error("dashboard cloud pull failed", err);
+    }
+  }
+
+  /* ---------- sync widget ---------- */
+  function wireSync() {
+    const btn = $("syncBtn"), out = $("signOutBtn"), av = $("syncAvatar"), st = $("syncStatus");
+    if (!window.FirebaseSync || !FirebaseSync.enabled) { btn.disabled = true; btn.title = "ซิงค์ไม่พร้อมใช้งาน"; return; }
+    btn.addEventListener("click", () => FirebaseSync.signIn().catch(err => alert("ลงชื่อเข้าใช้ไม่สำเร็จ: " + err.message)));
+    out.addEventListener("click", () => FirebaseSync.signOut());
+    FirebaseSync.onAuthChange((user) => {
+      if (user) {
+        btn.hidden = true; out.hidden = false;
+        st.hidden = false; st.textContent = user.displayName || user.email || "ซิงค์อยู่";
+        if (user.photoURL) { av.hidden = false; av.src = user.photoURL; }
+        pullCloud();
+      } else {
+        btn.hidden = false; out.hidden = true; st.hidden = true; av.hidden = true;
+      }
+    });
+  }
+
+  /* ---------- boot ---------- */
+  loadLocal();
+  renderAll();
+  loadEwCount();
+  wireSync();
+})();
+</script>
 </body>
 </html>
