@@ -148,6 +148,20 @@
     color: var(--text); border-radius: 10px; padding: 8px 10px; font: 12px ui-monospace, monospace; resize: vertical;
   }
   #syncStatus { font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+
+  .tr-filters { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0; }
+  .tr-filters input, .tr-filters select {
+    background: var(--surface-alt); border: 1px solid var(--border); color: var(--text);
+    padding: 6px 8px; border-radius: 8px; font-size: 12px; font-family: inherit;
+  }
+  table.sc .out-sel { font-family: inherit; font-size: 11.5px; border-radius: 6px; border: 1px solid var(--border); padding: 2px 4px; background: var(--surface-alt); color: var(--text); }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin: 10px 0; }
+  .tile { background: var(--surface-alt); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+  .tile .k { font-size: 10px; text-transform: uppercase; letter-spacing: .4px; color: var(--muted); font-weight: 800; }
+  .tile .v { font-size: 19px; font-weight: 800; margin-top: 3px; }
+  .stat-sub { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 6px; }
+  #statsBox h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .4px; color: var(--muted); margin: 10px 0 4px; }
+  @media (max-width: 720px) { .stat-sub { grid-template-columns: 1fr; } }
   @media (max-width: 560px) { body { padding: 12px 12px 50px; } }
 </style>
 </head>
@@ -160,7 +174,7 @@
     <a class="navlink" href="trade-journal.html">📓 Trade Journal</a>
     <a class="navlink" href="stock-decision-terminal.html">📊 Stock / Decide</a>
     <a class="navlink" href="elliott-wave.html">〜 Elliott Wave</a>
-    <button class="navlink plain" id="syncBtn" title="ซิงค์ scenario ข้ามอุปกรณ์ด้วย Google">☁ ซิงค์</button>
+    <button class="navlink plain" id="syncBtn" title="ซิงค์ track record ข้ามอุปกรณ์ด้วย Google">☁ ซิงค์</button>
     <img id="syncAvatar" hidden style="width:26px;height:26px;border-radius:50%;">
     <span id="syncStatus" hidden></span>
     <button class="navlink plain" id="signOutBtn" hidden>ออก</button>
@@ -221,19 +235,39 @@
     </div>
 
     <div class="panel">
-      <h2>เทียบ Scenario <span class="sub">เก็บ count ทางเลือกไว้เทียบกัน (บันทึกในเครื่อง)</span></h2>
+      <h2>บันทึกการนับ · Track Record <span class="sub" id="trSummary"></span></h2>
       <div class="sc-form">
-        <input id="scName" placeholder="ชื่อ scenario เช่น 'นับหลัก TF วัน'">
-        <input id="scGuess" placeholder="สิ่งที่ฉันเดา (เช่น Zigzag)">
-        <button class="btn solid" id="scSave">＋ บันทึกจุดปัจจุบัน</button>
+        <input id="scName" placeholder="ชื่อ/โน้ตสั้น ๆ เช่น 'นับหลัก TF 4h'">
+        <input id="scGuess" placeholder="ฉันเดาว่าเป็น (เช่น Zigzag)">
+        <button class="btn solid" id="scSave">＋ บันทึกการนับนี้</button>
+      </div>
+      <div class="tr-filters">
+        <input id="fSym" placeholder="เหรียญ" style="width:88px;text-transform:uppercase;">
+        <select id="fTf"><option value="">TF ทั้งหมด</option><option>15m</option><option>1h</option><option>4h</option><option>1d</option><option>1w</option></select>
+        <select id="fPat"><option value="">Pattern ทั้งหมด</option></select>
+        <select id="fOut"><option value="">ผลทั้งหมด</option><option value="pending">รอผล</option><option value="correct">ถูก</option><option value="wrong">ผิด</option></select>
+        <button class="btn" id="statsBtn">📊 สถิติ</button>
+        <button class="btn" id="exportBtn">⭳ Export</button>
+        <button class="btn" id="importJsonBtn">⭱ Import</button>
+        <input type="file" id="importFile" accept="application/json" hidden>
       </div>
       <div style="overflow-x:auto;">
         <table class="sc" id="scTbl">
-          <thead><tr><th>ชื่อ</th><th>โหมด</th><th>Pattern เด่น</th><th style="text-align:right;">Conf</th><th>ฉันเดา</th><th></th></tr></thead>
+          <thead><tr><th>วันที่</th><th>ตลาด</th><th>Pattern เด่น</th><th style="text-align:right;">Conf</th><th>ฉันเดา</th><th>ผล</th><th></th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
-      <div class="muted-note" id="scEmpty">ยังไม่มี scenario — วางจุดให้ครบแล้วกด “บันทึกจุดปัจจุบัน”</div>
+      <div class="muted-note" id="scEmpty">ยังไม่มีบันทึก — วางจุดให้ครบแล้วกด “บันทึกการนับนี้”</div>
+
+      <div id="statsBox" hidden>
+        <h2 style="margin-top:16px;">สถิติความแม่น <span class="sub">เฉพาะที่ตรวจผลแล้ว</span></h2>
+        <div class="tiles" id="statTiles"></div>
+        <div class="stat-sub">
+          <div><h3>แยกตาม Pattern</h3><table class="meas"><tbody id="statByPat"></tbody></table></div>
+          <div><h3>Confidence calibration</h3><table class="meas"><tbody id="statCalib"></tbody></table></div>
+        </div>
+        <div class="muted-note" id="statMyGuess" style="margin-top:8px;"></div>
+      </div>
     </div>
   </div>
 
@@ -303,7 +337,7 @@
   let snap = true;
   let scales = null;
   let dragIdx = null;
-  let scenarios = [];
+  let counts = [];
 
   let view = { i0: 0, n: 120 };   // visible window: first bar index + bar count
   let tool = "pan";               // "pan" (drag = scroll history) | "draw" (tap = place pivot)
@@ -861,66 +895,212 @@
     return false;
   }
 
-  /* ---------- scenarios ---------- */
-  function loadScenarios() {
+  /* ---------- track record: wave_counts in IndexedDB + one Firestore sync doc ---------- */
+  const IDB_NAME = "ewaDB", IDB_STORE = "kv";
+  let _idb = null;
+  function idbOpen() {
+    if (_idb) return _idb;
+    _idb = new Promise((res, rej) => {
+      let r;
+      try { r = indexedDB.open(IDB_NAME, 1); } catch (e) { return rej(e); }
+      r.onupgradeneeded = () => { const db = r.result; if (!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE); };
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error);
+    });
+    _idb.catch(() => { _idb = null; });
+    return _idb;
+  }
+  async function idbGet(key) {
     try {
-      const s = JSON.parse(localStorage.getItem(SC_KEY) || "[]");
-      scenarios = Array.isArray(s) ? s : [];
-    } catch (e) { scenarios = []; }
+      const db = await idbOpen();
+      return await new Promise((res) => {
+        const q = db.transaction(IDB_STORE, "readonly").objectStore(IDB_STORE).get(key);
+        q.onsuccess = () => res(q.result); q.onerror = () => res(undefined);
+      });
+    } catch (e) { return undefined; }
   }
-  function saveScenarios() {
-    try { localStorage.setItem(SC_KEY, JSON.stringify(scenarios)); } catch (e) {}
+  async function idbSet(key, val) {
+    try {
+      const db = await idbOpen();
+      await new Promise((res) => {
+        const t = db.transaction(IDB_STORE, "readwrite");
+        t.objectStore(IDB_STORE).put(val, key);
+        t.oncomplete = () => res(); t.onerror = () => res();
+      });
+    } catch (e) {}
   }
-  function renderScenarios() {
+
+  function normCount(s) {
+    s = s || {};
+    return {
+      id: s.id || (Date.now() + Math.floor(Math.random() * 1e6)),
+      createdAt: s.createdAt || (typeof s.id === "number" ? s.id : Date.now()),
+      name: s.name || "",
+      myGuess: s.myGuess || "",
+      mode: s.mode === "corrective" ? "corrective" : "impulse",
+      symbol: s.symbol || null,
+      timeframe: s.timeframe || s.interval || null,
+      points: Array.isArray(s.points) ? s.points.map(p => ({ i: p.i, v: p.v })) : [],
+      candles: Array.isArray(s.candles) ? s.candles : null,
+      series: Array.isArray(s.series) ? s.series : null,
+      view: s.view && typeof s.view.i0 === "number" ? { i0: s.view.i0, n: s.view.n || 120 } : null,
+      matched: s.matched || s.top || null,
+      candidates: Array.isArray(s.candidates) ? s.candidates : (s.top ? [s.top] : []),
+      outcome: /^(correct|wrong)$/.test(s.outcome) ? s.outcome : "pending",
+      outcomeNote: s.outcomeNote || "",
+      verifiedAt: s.verifiedAt || null,
+    };
+  }
+  function mergeCounts(a, b) {
+    const map = new Map();
+    const score = (x) => (x.verifiedAt ? 2e13 : 0) + (x.verifiedAt || x.createdAt || 0);
+    const rich = (x) => (x.candles ? 2 : 0) + (x.series ? 1 : 0) + (x.outcomeNote ? 1 : 0);
+    [...(a || []), ...(b || [])].forEach(raw => {
+      const n = normCount(raw);
+      const cur = map.get(n.id);
+      if (!cur) { map.set(n.id, n); return; }
+      const sn = score(n), sc = score(cur);
+      if (sn > sc || (sn === sc && rich(n) > rich(cur))) map.set(n.id, n);
+    });
+    return [...map.values()].sort((x, y) => (y.createdAt || 0) - (x.createdAt || 0));
+  }
+
+  function writeSummary() {
+    const verified = counts.filter(c => c.outcome === "correct" || c.outcome === "wrong");
+    const correct = verified.filter(c => c.outcome === "correct").length;
+    try { localStorage.setItem("ewa_summary_v1", JSON.stringify({ total: counts.length, verified: verified.length, correct })); } catch (e) {}
+  }
+  let pushT = 0;
+  function pushCloudSoon() { clearTimeout(pushT); pushT = setTimeout(pushCloud, 1200); }
+  function persistCounts() {
+    counts.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    idbSet("counts", counts);
+    writeSummary();
+    renderCounts();
+    pushCloudSoon();
+  }
+  async function bootCounts() {
+    const stored = await idbGet("counts");
+    if (Array.isArray(stored) && stored.length) {
+      counts = stored.map(normCount);
+    } else {
+      let legacy = [];
+      try { legacy = JSON.parse(localStorage.getItem(SC_KEY) || "[]"); } catch (e) {}
+      counts = (Array.isArray(legacy) ? legacy : []).map(normCount);
+      if (counts.length) idbSet("counts", counts);
+    }
+    writeSummary();
+    refreshPatFilter();
+    renderCounts();
+  }
+
+  function patternFamily(label) {
+    if (!label) return "—";
+    const s = String(label).toLowerCase();
+    if (s.includes("zigzag")) return s.includes("double") ? "Double Zigzag" : "Zigzag";
+    if (s.includes("flat")) return "Flat";
+    if (s.includes("diagonal")) return "Diagonal";
+    if (s.includes("อิมพัลส์") || s.includes("impulse")) return "Impulse";
+    return String(label);
+  }
+  function refreshPatFilter() {
+    const fams = [...new Set(counts.map(c => patternFamily(c.matched && c.matched.label)))].filter(x => x && x !== "—").sort();
+    const sel = $("fPat"), cur = sel.value;
+    sel.innerHTML = `<option value="">Pattern ทั้งหมด</option>` + fams.map(f => `<option>${esc(f)}</option>`).join("");
+    sel.value = cur;
+  }
+  function filteredCounts() {
+    const sym = ($("fSym").value || "").trim().toUpperCase();
+    const tf = $("fTf").value, pat = $("fPat").value, out = $("fOut").value;
+    return counts.filter(c => {
+      if (sym && (c.symbol || "").toUpperCase().indexOf(sym) < 0) return false;
+      if (tf && c.timeframe !== tf) return false;
+      if (pat && patternFamily(c.matched && c.matched.label) !== pat) return false;
+      if (out && c.outcome !== out) return false;
+      return true;
+    });
+  }
+  function renderCounts() {
     const tb = $("scTbl").querySelector("tbody");
-    $("scEmpty").hidden = scenarios.length > 0;
-    tb.innerHTML = scenarios.map((s, idx) => {
-      const top = s.top || { label: "—", conf: 0 };
+    $("scEmpty").hidden = counts.length > 0;
+    const verified = counts.filter(c => c.outcome !== "pending");
+    const corr = verified.filter(c => c.outcome === "correct").length;
+    $("trSummary").textContent = counts.length
+      ? `${counts.length} การนับ · ตรวจแล้ว ${verified.length} · แม่น ${verified.length ? Math.round(corr / verified.length * 100) : 0}%`
+      : "";
+    tb.innerHTML = filteredCounts().map(c => {
+      const dd = new Date(c.createdAt).toLocaleDateString("th-TH", { day: "2-digit", month: "short" });
+      const mk = c.matched ? esc(c.matched.label) : "—";
+      const conf = c.matched && c.matched.conf != null ? c.matched.conf + "%" : "—";
+      const mkt = c.symbol ? esc(c.symbol) + " " + esc(c.timeframe || "") : (c.mode === "corrective" ? "A-B-C" : "1-5");
+      const sel = `<select class="out-sel" data-out="${c.id}">
+        <option value="pending"${c.outcome === "pending" ? " selected" : ""}>รอผล</option>
+        <option value="correct"${c.outcome === "correct" ? " selected" : ""}>ถูก</option>
+        <option value="wrong"${c.outcome === "wrong" ? " selected" : ""}>ผิด</option></select>`;
       return `<tr>
-        <td>${esc(s.name || "(ไม่มีชื่อ)")}</td>
-        <td>${s.mode === "corrective" ? "0-A-B-C" : "0-1-2-3-4-5"}${s.symbol ? `<br><span class="muted-note">${esc(s.symbol)} ${esc(s.interval || "")}</span>` : ""}</td>
-        <td>${esc(top.label)}</td>
-        <td style="text-align:right;" class="mono">${top.conf}%</td>
-        <td>${esc(s.myGuess || "—")}</td>
+        <td class="mono">${dd}</td>
+        <td>${mkt}${c.name ? `<br><span class="muted-note">${esc(c.name)}</span>` : ""}</td>
+        <td>${mk}</td>
+        <td style="text-align:right;" class="mono">${conf}</td>
+        <td>${esc(c.myGuess || "—")}</td>
+        <td style="white-space:nowrap;">${sel} <span class="link" data-note="${c.id}" title="โน้ตผล">📝</span></td>
         <td style="white-space:nowrap;">
-          <span class="link" data-load="${idx}">โหลด</span> ·
-          <span class="link" data-del="${idx}" style="color:var(--bear);">ลบ</span>
+          <span class="link" data-open="${c.id}">เปิด</span> ·
+          <span class="link" data-del="${c.id}" style="color:var(--bear);">ลบ</span>
         </td>
       </tr>`;
     }).join("");
+    if (!$("statsBox").hidden) renderStats();
   }
-  $("scTbl").addEventListener("click", (e) => {
-    const el = e.target.closest("[data-load],[data-del]");
-    if (!el) return;
-    if (el.dataset.load != null) {
-      const s = scenarios[+el.dataset.load];
-      if (!s) return;
-      live = false; $("liveChk").checked = false; closeWS();
-      noMoreHistory = false;
-      mode = s.mode === "corrective" ? "corrective" : "impulse";
-      if (Array.isArray(s.candles) && s.candles.length > 5) {
-        candles = s.candles.slice(); series = candles.map(c => c.c); src = "binance";
-      } else {
-        candles = null; series = (s.series || []).slice(); src = "sim";
-      }
-      points = s.points.map(p => ({ i: p.i, v: p.v }));
-      if (s.view && typeof s.view.i0 === "number") view = { i0: s.view.i0, n: s.view.n || 120 };
-      else fitView(120);
-      if (s.symbol) { symbol = s.symbol; $("symIn").value = s.symbol; }
-      if (s.interval) { interval = s.interval; $("tfSel").value = s.interval; }
-      [...$("srcSeg").children].forEach(b => b.classList.toggle("active", b.dataset.s === src));
-      [...$("modeSeg").children].forEach(b => b.classList.toggle("active", b.dataset.m === mode));
-      setTool("pan");
-      update();
+
+  function loadCountToChart(c) {
+    live = false; $("liveChk").checked = false; closeWS();
+    noMoreHistory = false;
+    mode = c.mode === "corrective" ? "corrective" : "impulse";
+    if (Array.isArray(c.candles) && c.candles.length > 5) {
+      candles = c.candles.slice(); series = candles.map(x => x.c); src = "binance";
     } else {
-      scenarios.splice(+el.dataset.del, 1);
-      saveScenarios(); renderScenarios(); pushCloud();
+      candles = null; series = (c.series || []).slice(); src = "sim";
+    }
+    points = c.points.map(p => ({ i: p.i, v: p.v }));
+    if (c.view && typeof c.view.i0 === "number") view = { i0: c.view.i0, n: c.view.n || 120 };
+    else fitView(120);
+    if (c.symbol) { symbol = c.symbol; $("symIn").value = c.symbol; }
+    if (c.timeframe) { interval = c.timeframe; $("tfSel").value = c.timeframe; }
+    [...$("srcSeg").children].forEach(b => b.classList.toggle("active", b.dataset.s === src));
+    [...$("modeSeg").children].forEach(b => b.classList.toggle("active", b.dataset.m === mode));
+    setTool("pan");
+    update();
+  }
+
+  $("scTbl").addEventListener("change", (e) => {
+    const s = e.target.closest("select[data-out]");
+    if (!s) return;
+    const c = counts.find(x => String(x.id) === s.dataset.out);
+    if (!c) return;
+    c.outcome = s.value;
+    c.verifiedAt = s.value === "pending" ? null : Date.now();
+    persistCounts();
+  });
+  $("scTbl").addEventListener("click", (e) => {
+    const el = e.target.closest("[data-open],[data-del],[data-note]");
+    if (!el) return;
+    const id = el.dataset.open || el.dataset.del || el.dataset.note;
+    const c = counts.find(x => String(x.id) === id);
+    if (!c) return;
+    if (el.dataset.note != null) {
+      const v = prompt("โน้ตผลการนับนี้:", c.outcomeNote || "");
+      if (v != null) { c.outcomeNote = v.trim(); persistCounts(); }
+    } else if (el.dataset.del != null) {
+      if (confirm("ลบการนับนี้?")) { counts = counts.filter(x => x !== c); persistCounts(); refreshPatFilter(); }
+    } else {
+      loadCountToChart(c);
     }
   });
+  ["fSym", "fTf", "fPat", "fOut"].forEach(id => $(id).addEventListener("input", renderCounts));
+
   $("scSave").addEventListener("click", () => {
-    if (points.length < need()) { alert("วางจุดให้ครบก่อนบันทึก scenario"); return; }
-    const name = $("scName").value.trim() || new Date().toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" });
-    const top = lastAnalysis && lastAnalysis.cands[0] ? { label: lastAnalysis.cands[0].label, conf: lastAnalysis.cands[0].conf } : null;
+    if (points.length < need()) { alert("วางจุดให้ครบก่อนบันทึก"); return; }
     const CAP = 800;
     let cs = candles, pts = points.map(p => ({ i: p.i, v: p.v })), v = { i0: view.i0, n: view.n };
     if (candles && candles.length > CAP) {
@@ -929,19 +1109,93 @@
       pts = pts.map(p => ({ i: p.i - off, v: p.v }));
       v = { i0: Math.max(0, view.i0 - off), n: view.n };
     }
-    scenarios.unshift({
-      id: Date.now(), name, myGuess: $("scGuess").value.trim(),
+    const cands = lastAnalysis ? lastAnalysis.cands.map(x => ({ label: x.label, conf: x.conf })) : [];
+    counts.unshift(normCount({
+      name: $("scName").value.trim(),
+      myGuess: $("scGuess").value.trim(),
       mode,
       symbol: src === "binance" ? symbol : null,
-      interval: src === "binance" ? interval : null,
-      series: candles ? null : series.slice(),
-      candles: cs ? cs.slice() : null,
+      timeframe: src === "binance" ? interval : null,
       points: pts,
+      candles: cs ? cs.slice() : null,
+      series: cs ? null : series.slice(),
       view: v,
-      top, createdAt: Date.now(),
-    });
+      matched: cands[0] || null,
+      candidates: cands,
+      createdAt: Date.now(),
+    }));
     $("scName").value = ""; $("scGuess").value = "";
-    saveScenarios(); renderScenarios(); pushCloud();
+    persistCounts();
+    refreshPatFilter();
+  });
+
+  /* ---------- stats ---------- */
+  function renderStats() {
+    const V = counts.filter(c => c.outcome === "correct" || c.outcome === "wrong");
+    const corr = V.filter(c => c.outcome === "correct").length;
+    $("statTiles").innerHTML = [
+      ["ตรวจผลแล้ว", V.length + " / " + counts.length],
+      ["ความแม่นรวม", V.length ? Math.round(corr / V.length * 100) + "%" : "—"],
+      ["ถูก / ผิด", corr + " / " + (V.length - corr)],
+      ["รอผล", counts.filter(c => c.outcome === "pending").length],
+    ].map(t => `<div class="tile"><div class="k">${t[0]}</div><div class="v">${t[1]}</div></div>`).join("");
+
+    const byPat = {};
+    V.forEach(c => {
+      const f = patternFamily(c.matched && c.matched.label);
+      (byPat[f] = byPat[f] || { n: 0, c: 0 }).n++;
+      if (c.outcome === "correct") byPat[f].c++;
+    });
+    $("statByPat").innerHTML = Object.keys(byPat).sort().map(f =>
+      `<tr><td>${esc(f)}</td><td class="mono">${byPat[f].c}/${byPat[f].n} · ${Math.round(byPat[f].c / byPat[f].n * 100)}%</td></tr>`
+    ).join("") || `<tr><td class="muted-note">ยังไม่มีข้อมูล</td><td></td></tr>`;
+
+    const buckets = [[0, 40], [40, 55], [55, 70], [70, 85], [85, 101]];
+    $("statCalib").innerHTML = buckets.map(([lo, hi]) => {
+      const g = V.filter(c => { const q = c.matched && c.matched.conf; return q != null && q >= lo && q < hi; });
+      const gc = g.filter(c => c.outcome === "correct").length;
+      return `<tr><td>conf ${lo}–${hi === 101 ? 100 : hi}</td><td class="mono">${g.length ? gc + "/" + g.length + " · " + Math.round(gc / g.length * 100) + "%" : "—"}</td></tr>`;
+    }).join("");
+
+    const wg = V.filter(c => c.myGuess);
+    const agree = wg.filter(c => patternFamily(c.myGuess) === patternFamily(c.matched && c.matched.label));
+    const dis = wg.filter(c => !agree.includes(c));
+    const pct = (arr) => arr.length ? Math.round(arr.filter(c => c.outcome === "correct").length / arr.length * 100) + "%" : "—";
+    $("statMyGuess").textContent = wg.length
+      ? `ฉันเดาตรงกับที่เครื่องจับ ${agree.length}/${wg.length} ครั้ง · แม่นตอนเห็นตรงกัน ${pct(agree)} · แม่นตอนเห็นต่าง ${pct(dis)}`
+      : "ยังไม่มีการนับที่ใส่ “ฉันเดา” แล้วตรวจผล";
+  }
+  $("statsBtn").addEventListener("click", () => {
+    const b = $("statsBox");
+    b.hidden = !b.hidden;
+    if (!b.hidden) renderStats();
+  });
+
+  /* ---------- export / import ---------- */
+  $("exportBtn").addEventListener("click", () => {
+    const blob = new Blob([JSON.stringify({ type: "ewa_counts", exportedAt: Date.now(), counts }, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "ewa-track-record-" + new Date().toISOString().slice(0, 10) + ".json";
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  });
+  $("importJsonBtn").addEventListener("click", () => $("importFile").click());
+  $("importFile").addEventListener("change", (e) => {
+    const file = e.target.files[0]; if (!file) return;
+    const r = new FileReader();
+    r.onload = () => {
+      try {
+        const d = JSON.parse(r.result);
+        const arr = Array.isArray(d) ? d : (Array.isArray(d.counts) ? d.counts : (Array.isArray(d.scenarios) ? d.scenarios : null));
+        if (!arr) { alert("ไฟล์ไม่ถูกต้อง"); return; }
+        counts = mergeCounts(counts, arr);
+        persistCounts(); refreshPatFilter();
+        alert("นำเข้า " + arr.length + " รายการ (รวมกับของเดิมแล้ว)");
+      } catch (err) { alert("อ่านไฟล์ไม่สำเร็จ: " + err.message); }
+    };
+    r.readAsText(file);
+    e.target.value = "";
   });
 
   /* ---------- toolbar ---------- */
@@ -1000,28 +1254,31 @@
     update();
   });
 
-  /* ---------- Firebase: sync scenarios (users/{uid}/sync/elliottAnalyzer) ---------- */
+  /* ---------- Firebase: sync the track record via ONE doc (users/{uid}/sync/elliottAnalyzer) ---------- */
   async function pullCloud() {
     if (!window.FirebaseSync || !FirebaseSync.enabled || !FirebaseSync.getUser()) return;
     try {
       const db = FirebaseSync.getDb(), uid = FirebaseSync.getUser().uid;
       const snap = await db.collection("users").doc(uid).collection("sync").doc("elliottAnalyzer").get();
-      if (snap.exists && Array.isArray((snap.data() || {}).scenarios)) {
-        scenarios = snap.data().scenarios;
-        saveScenarios(); renderScenarios();
-      }
+      if (!snap.exists) return;
+      const d = snap.data() || {};
+      const remote = Array.isArray(d.counts) ? d.counts : (Array.isArray(d.scenarios) ? d.scenarios : []);
+      if (!remote.length) return;
+      counts = mergeCounts(counts, remote);
+      idbSet("counts", counts);
+      writeSummary(); refreshPatFilter(); renderCounts();
     } catch (err) { console.error("EWA cloud pull failed", err); }
   }
   async function pushCloud() {
     if (!window.FirebaseSync || !FirebaseSync.enabled || !FirebaseSync.getUser()) return;
     try {
       const db = FirebaseSync.getDb(), uid = FirebaseSync.getUser().uid;
-      let payload = scenarios;
+      let payload = counts;
       try {
-        if (JSON.stringify(scenarios).length > 800000) payload = scenarios.map(s => ({ ...s, candles: null }));
+        if (JSON.stringify(counts).length > 800000) payload = counts.map(c => ({ ...c, candles: null, series: null }));
       } catch (e) {}
       await db.collection("users").doc(uid).collection("sync").doc("elliottAnalyzer")
-        .set({ scenarios: payload, updatedAt: Date.now() }, { merge: true });
+        .set({ counts: payload, updatedAt: Date.now() }, { merge: true });
     } catch (err) { console.error("EWA cloud push failed", err); }
   }
   function wireSync() {
@@ -1055,8 +1312,7 @@
   [...$("srcSeg").children].forEach(b => b.classList.toggle("active", b.dataset.s === src));
   [...$("modeSeg").children].forEach(b => b.classList.toggle("active", b.dataset.m === mode));
   setTool("pan");
-  loadScenarios();
-  renderScenarios();
+  bootCounts();
   requestAnimationFrame(() => {
     draw();
     renderAnalysis();

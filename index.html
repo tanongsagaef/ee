@@ -201,7 +201,7 @@
       </a>
       <a class="app-card" href="elliott-wave-analyzer.html">
         <div class="t">📐 EW Analyzer</div>
-        <div class="d">ลากวางจุดคลื่นบนกราฟ / เช็คกฎเหล็ก / จัดอันดับ pattern</div>
+        <div class="d">ลากวางจุดคลื่น / เช็คกฎเหล็ก / จัดอันดับ pattern / track record ความแม่น</div>
         <div class="c" id="cntEwa">—</div>
       </a>
     </div>
@@ -429,8 +429,14 @@
     $("cntTrades").textContent = trades.length + " เทรดบันทึกไว้";
     $("cntStock").textContent = (sd.watchlist.length) + " หุ้นติดตาม · " + (sd.log.length) + " การตัดสินใจ";
     $("cntEw").textContent = ewCount == null ? "…" : ewCount + " บทเรียน";
-    const ewa = readLS("ewa_scenarios_v1", []);
-    $("cntEwa").textContent = (Array.isArray(ewa) ? ewa.length : 0) + " scenario บันทึกไว้";
+    const ewaSum = readLS("ewa_summary_v1", null);
+    if (ewaSum && typeof ewaSum.total === "number") {
+      const acc = ewaSum.verified ? Math.round(ewaSum.correct / ewaSum.verified * 100) : null;
+      $("cntEwa").textContent = ewaSum.total + " การนับ" + (acc != null ? " · แม่น " + acc + "%" : "");
+    } else {
+      const ewa = readLS("ewa_scenarios_v1", []);
+      $("cntEwa").textContent = (Array.isArray(ewa) ? ewa.length : 0) + " การนับ";
+    }
   }
 
   function escapeHtml(s) {
