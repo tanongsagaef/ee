@@ -221,6 +221,15 @@
         <button class="btn" id="importBtn">นำเข้าข้อมูล</button>
       </div>
       <div class="status" id="toolHint"></div>
+      <div class="toolbar" id="subHint" hidden>
+        <span class="muted-note">sub-wave ของ A (ตัวชี้ขาด):</span>
+        <select id="subALegs">
+          <option value="0">ไม่ระบุจำนวนขา</option>
+          <option value="3">A = 3 ขา (corrective)</option>
+          <option value="5">A = 5 ขา (motive)</option>
+        </select>
+        <label class="chk"><input type="checkbox" id="subA4Overlap"> ขา 4 ของ A ทับขา 1</label>
+      </div>
       <div class="importbox" id="importBox" hidden>
         <textarea id="importTa" placeholder="วางราคาปิดบรรทัดละค่า หรือ &quot;วันที่,ราคา&quot; ต่อบรรทัด (อย่างน้อย 12 ค่า)"></textarea>
         <div style="margin-top:6px;display:flex;gap:8px;">
@@ -341,6 +350,8 @@
 
   let view = { i0: 0, n: 120 };   // visible window: first bar index + bar count
   let tool = "pan";               // "pan" (drag = scroll history) | "draw" (tap = place pivot)
+  let subALegs = 0;               // corrective sub-wave hint: 0 unknown / 3 / 5 legs in wave A
+  let subA4Overlap = false;       // wave-4 of A overlaps wave-1 of A → must be Flat
   let press = null;               // active background press: { x0, y0, i00, moved }
   let loadingOlder = false, noMoreHistory = false;
 
@@ -737,79 +748,157 @@
     return { rules, guides, cands, meas };
   }
 
-  /* ---------- analysis: corrective A-B-C ---------- */
+  /* ---------- analysis: corrective A-B-C (theory-driven, from CLAUDE.md) ---------- */
+  const CORRECTION_RULES = [
+    { family: "Zigzag", subtype: "Zigzag มาตรฐาน (5-3-5)",
+      bMin: 0.382, bMax: 0.618, cMin: 0.9, cMax: 1.2, bBeyondStart: false, cBeyondEndA: true, subA: 5,
+      descTh: "คลื่นแก้ตัวชัน 5-3-5 · B ตื้น (<61.8%) · C ยาวใกล้เคียง A",
+      noteTh: "เป้ากลับตัวชัด เทรดตามทิศ C ได้ · จบแล้วเทรนด์เดิมไปต่อ" },
+    { family: "Zigzag", subtype: "Zigzag — C สั้น (Truncated)",
+      bMin: 0.382, bMax: 0.618, cMin: 0.5, cMax: 0.9, bBeyondStart: false, cBeyondEndA: false, subA: 5,
+      descTh: "โครงเดียวกับ zigzag แต่ C ไม่ถึง 0.9× ของ A — โมเมนตัมกลับตัวอ่อน",
+      noteTh: "ระวัง correction ยังไม่จบ อาจต่อเป็น double zigzag" },
+    { family: "Zigzag", subtype: "Zigzag — C ยืด (Extended)",
+      bMin: 0.236, bMax: 0.618, cMin: 1.5, cMax: 2.3, bBeyondStart: false, cBeyondEndA: true, subA: 5,
+      descTh: "B ตื้น · C ยืด 1.5–2.3× ของ A",
+      noteTh: "C มักวิ่งถึง A×1.618 วัดจากจุด B" },
+    { family: "Zigzag", subtype: "Double Zigzag (W-X-Y)",
+      bMin: 0.236, bMax: 0.7, cMin: 2.3, cMax: 6, bBeyondStart: false, cBeyondEndA: true, subA: 5,
+      descTh: "C ยาวผิดปกติ >2.3× — น่าจะเป็นซิกแซ็กซ้อนสองชุด (W-X-Y) คั่นด้วยคลื่น X",
+      noteTh: "นับใหม่เป็น W-X-Y แต่ละชุดจะได้อัตราส่วนปกติ" },
+    { family: "Flat", subtype: "Regular Flat (3-3-5)",
+      bMin: 0.8, bMax: 1.05, cMin: 0.9, cMax: 1.15, bBeyondStart: false, cBeyondEndA: true, subA: 3,
+      descTh: "A ≈ B ≈ C · B ย่อเกือบเต็ม A แต่ไม่ทะลุจุดเริ่ม · C จบใกล้ปลาย A",
+      noteTh: "เทรนด์เดิมยังแข็ง มักไปต่อหลังจบ C" },
+    { family: "Flat", subtype: "Expanded Flat (พบบ่อยสุด/อันตรายสุด)",
+      bMin: 1.0, bMax: 1.5, cMin: 1.0, cMax: 1.618, bBeyondStart: true, cBeyondEndA: true, subA: 3,
+      descTh: "B ทะลุจุดเริ่ม A และ C ทะลุปลาย A — เบรกหลอกทั้งสองทาง",
+      noteTh: "ห้ามไล่เบรก B · รอ C จบราว A×1.272–1.618 แล้วสวนกลับเทรนด์เดิม" },
+    { family: "Flat", subtype: "Running Flat (เทรนด์เดิมแข็งมาก)",
+      bMin: 1.0, bMax: 1.5, cMin: 0.5, cMax: 1.0, bBeyondStart: true, cBeyondEndA: false, subA: 3,
+      descTh: "B ทะลุจุดเริ่ม A แต่ C ไม่ถึงปลาย A",
+      noteTh: "สัญญาณเทรนด์เดิมแรงมาก — พร้อมไปต่อทันทีหลัง C จบ" },
+  ];
+  const inRange = (x, lo, hi) => x >= lo && x <= hi;
+  const nearRange = (x, lo, hi) => { const m = (hi - lo) * 0.35 + 1e-9; return x >= lo - m && x <= hi + m; };
+
   function analyzeCorrective(P) {
     const dirA = Math.sign(P[1] - P[0]) || 1;
-    const LA = Math.abs(P[1] - P[0]);
-    const LB = Math.abs(P[2] - P[1]);
-    const LC = Math.abs(P[3] - P[2]);
+    const LA = Math.abs(P[1] - P[0]), LB = Math.abs(P[2] - P[1]), LC = Math.abs(P[3] - P[2]);
     const bRetr = LA ? LB / LA : 0;
     const cExt = LA ? LC / LA : 0;
     const bBeyondStart = dirA * (P[2] - P[0]) < 0;
     const cBeyondEndA = dirA * (P[3] - P[1]) > 0;
     const cDirOk = dirA * (P[3] - P[2]) > 0;
+    const legs = subALegs;            // 0 = unknown / 3 / 5
+    const overlap = subA4Overlap;
 
-    const famZig = clamp(
-      bRetr <= 0.618 ? 80 - bRetr * 12
-      : bRetr < 0.9 ? 78 - (bRetr - 0.618) * 185
-      : 18, 8, 85);
-    const famFlat = clamp(
-      bRetr >= 0.9 ? 68 + (bRetr - 0.9) * 130
-      : bRetr > 0.618 ? 24 + (bRetr - 0.618) * 150
-      : 16, 8, 93);
+    const zone = bRetr < 0.618 ? "Zigzag" : bRetr < 0.9 ? "ambiguous" : "Flat";
+    const zoneTxt = zone === "Zigzag" ? "→ ตระกูล Zigzag (5-3-5)"
+      : zone === "Flat" ? "→ ตระกูล Flat (3-3-5)"
+      : "→ ก้ำกึ่ง (61.8–90%) ต้องดู sub-wave ของ A";
 
-    const cands = [];
-    let zLabel, zFit;
-    if (cExt < 0.9) { zLabel = "Zigzag — Truncated (C สั้น)"; zFit = 0.8; }
-    else if (cExt <= 1.2) { zLabel = "Zigzag — มาตรฐาน (5-3-5)"; zFit = 1.0; }
-    else if (cExt < 1.5) { zLabel = "Zigzag — C ยาวกว่ามาตรฐาน"; zFit = 0.85; }
-    else { zLabel = "Zigzag — Extended (C ยืด)"; zFit = 0.9; }
-    cands.push({ label: zLabel, conf: clamp(Math.round(famZig * zFit), 5, 95),
-      notes: [`B ย่อ A ${(bRetr * 100).toFixed(0)}% (<61.8% = โซน zigzag)`, `C = ${cExt.toFixed(2)}× ของ A`] });
-    if (cExt > 2.3) {
-      cands.push({ label: "Double Zigzag (W-X-Y)", conf: clamp(Math.round(famZig * 0.7), 5, 80),
-        notes: ["C ยาวผิดปกติ (>2.3× ของ A) → อาจเป็นคลื่นแก้ตัวซ้อนสองชุด"] });
+    function scoreRule(r) {
+      const chk = [];
+      let hard = true, soft = 0, softMax = 0;
+
+      const bOk = r.bBeyondStart === bBeyondStart;
+      chk.push({ t: `B ${r.bBeyondStart ? "ทะลุ" : "ไม่ทะลุ"}จุดเริ่ม A`, pass: bOk });
+      if (!bOk) hard = false;
+
+      const cOk = r.cBeyondEndA === cBeyondEndA;
+      chk.push({ t: `C ${r.cBeyondEndA ? "ทะลุ" : "ไม่ทะลุ"}ปลาย A`, pass: cOk });
+      if (!cOk) hard = false;
+
+      chk.push({ t: "C ต่อทิศทางเดียวกับ A", pass: cDirOk });
+      if (!cDirOk) hard = false;
+
+      softMax += 2;
+      const bIn = inRange(bRetr, r.bMin, r.bMax);
+      chk.push({ t: `B ย่อ A = ${(bRetr * 100).toFixed(0)}% (ทฤษฎี ${Math.round(r.bMin * 100)}–${Math.round(r.bMax * 100)}%)`, pass: bIn });
+      soft += bIn ? 2 : (nearRange(bRetr, r.bMin, r.bMax) ? 1 : 0);
+
+      softMax += 2;
+      const cIn = inRange(cExt, r.cMin, r.cMax);
+      chk.push({ t: `C เทียบ A = ${cExt.toFixed(2)}× (ทฤษฎี ${r.cMin}–${r.cMax}×)`, pass: cIn });
+      soft += cIn ? 2 : (nearRange(cExt, r.cMin, r.cMax) ? 1 : 0);
+
+      softMax += 3;
+      if (legs === 3 || legs === 5) {
+        const subOk = legs === r.subA;
+        chk.push({ t: `A นับได้ ${legs} ขา → ต้องเป็น ${legs === 5 ? "motive (ตระกูล Zigzag)" : "corrective (ตระกูล Flat)"}`, pass: subOk });
+        soft += subOk ? 3 : 0;
+        if (!subOk) hard = false;                 // sub-wave count is decisive
+      } else {
+        chk.push({ t: "ยังไม่ระบุจำนวนขาของ A (ตัวชี้ขาดที่แม่นสุด)", pass: null });
+        soft += 1.3;
+      }
+
+      if (overlap && r.subA === 5) {
+        chk.push({ t: "ขาที่ 4 ของ A ทับขาที่ 1 → A เป็น motive ไม่ได้ → ต้องเป็น Flat", pass: false });
+        hard = false;
+      }
+
+      const ratio = softMax ? soft / softMax : 0;
+      const conf = hard ? clamp(Math.round(36 + ratio * 61), 8, 97) : clamp(Math.round(ratio * 28), 4, 30);
+      return { r, chk, hard, conf };
     }
 
-    let fLabel, fFit, fNote;
-    const similar = Math.abs(1 - LB / (LA || 1)) < 0.2 && Math.abs(1 - LC / (LA || 1)) < 0.25;
-    if (bBeyondStart && cBeyondEndA) { fLabel = "Flat — Expanded (พบบ่อย / อันตราย)"; fFit = 1.0; fNote = "B ทะลุจุดเริ่ม A และ C ทะลุปลาย A — เบรกหลอกทั้งสองทาง"; }
-    else if (bBeyondStart && !cBeyondEndA) { fLabel = "Flat — Running (เทรนด์เดิมแข็งมาก)"; fFit = 0.85; fNote = "B ทะลุจุดเริ่ม A แต่ C ไม่ถึงปลาย A — แรงเทรนด์เดิมสูง"; }
-    else if (similar) { fLabel = "Flat — Regular"; fFit = 0.95; fNote = "A ≈ B ≈ C — พักฐานออกข้าง"; }
-    else { fLabel = "Flat — ไม่สมมาตร"; fFit = 0.7; fNote = "รูปแบบ flat ไม่ชัด ตรวจจุด B / C อีกครั้ง"; }
-    cands.push({ label: fLabel, conf: clamp(Math.round(famFlat * fFit), 5, 95),
-      notes: [fNote, `B ย่อ A ${(bRetr * 100).toFixed(0)}% (≥90% = โซน flat)`] });
+    const scored = CORRECTION_RULES.map(scoreRule).sort((a, b) => b.conf - a.conf);
+    const best = scored[0];
 
-    cands.push({ label: "ที่จริงเป็นอิมพัลส์ (นับผิดโหมด)", conf: clamp(cDirOk ? 14 : 26, 5, 45),
-      notes: ["ถ้า A แบ่งเป็น 5 ขาได้ → น่าจะเป็นอิมพัลส์ ลองสลับโหมด"] });
+    const cands = scored.map(s => ({
+      label: s.r.subtype,
+      conf: s.conf,
+      notes: [
+        s.r.descTh,
+        "โน้ตเทรด: " + s.r.noteTh,
+        ...(s.hard ? [] : ["ไม่เข้าเกณฑ์: " + s.chk.filter(c => c.pass === false).map(c => c.t).join(" · ")]),
+      ],
+    }));
+    cands.push({
+      label: "ที่จริงเป็นอิมพัลส์ (นับผิดโหมด)",
+      conf: clamp(legs === 5 ? 30 : cDirOk ? 12 : 22, 5, 40),
+      notes: ["ถ้า A เป็น 5 ขาและ C ก็ 5 ขาต่อเนื่องกัน → ลองสลับไปโหมดอิมพัลส์"],
+    });
 
-    cands.sort((a, b) => b.conf - a.conf);
+    const verdict = best.hard
+      ? { name: `✓ เข้าเกณฑ์ทฤษฎีของ “${best.r.subtype}”`, pass: true }
+      : { name: `✗ ยังไม่มีรูปแบบไหนเข้าเกณฑ์เต็ม — ใกล้สุดคือ “${best.r.subtype}” (${best.conf}%)`, pass: false };
 
     const rules = [
-      { name: `ตัวแยกหลัก — B ย่อกลับ ${(bRetr * 100).toFixed(0)}% ของ A`, pass: true, info: true,
-        detail: bRetr < 0.618 ? "→ ตระกูล Zigzag" : bRetr < 0.9 ? "→ ก้ำกึ่ง ต้องดู sub-wave ของ A" : "→ ตระกูล Flat" },
-      { name: "B ทะลุจุดเริ่มของ A", pass: bBeyondStart, detail: bBeyondStart ? "ใช่ (เข้าเงื่อนไข expanded / running)" : "ไม่" },
-      { name: "C ทะลุปลายของ A", pass: cBeyondEndA, detail: cBeyondEndA ? "ใช่" : "ไม่ (อาจเป็น running / truncated)" },
-      { name: "C ต่อทิศเดียวกับ A", pass: cDirOk, detail: cDirOk ? "ใช่" : "ผิดทิศ — ตรวจจุด C" },
+      { name: `ตัวแยกหลัก — B ย่อกลับ ${(bRetr * 100).toFixed(0)}% ของ A`, pass: null, detail: zoneTxt },
+      verdict,
+      ...best.chk.map(c => ({ name: c.t, pass: c.pass })),
     ];
+
     const guides = [
-      { name: "sub-wave ของ A: 5 ขา → Zigzag · 3 ขา → Flat", pass: true, info: true },
-      { name: "ถ้าขาที่ 4 ของ A ทับขาที่ 1 = ต้องเป็น Flat (motive ไม่ได้)", pass: true, info: true },
+      { name: "sub-wave: A = 5 ขา → Zigzag · A = 3 ขา → Flat (เลือกด้านบนกราฟเพื่อให้ผลชัดขึ้น)", pass: null },
+      { name: "ถ้าขาที่ 4 ของ A ทับขาที่ 1 = เป็น Flat เท่านั้น", pass: null },
+      { name: zone === "ambiguous"
+          ? "อยู่โซนก้ำกึ่ง — ผลจะยังไม่ฟันธงจนกว่าจะระบุจำนวนขาของ A"
+          : `B อยู่ในโซน ${zone} ตามทฤษฎี`, pass: zone !== "ambiguous" ? true : null },
     ];
-    const t1 = P[2] + dirA * LA, t2 = P[2] + dirA * LA * 1.618;
+
+    const cT1 = P[2] + dirA * LA, cT2 = P[2] + dirA * LA * 1.272, cT3 = P[2] + dirA * LA * 1.618;
+    const nearestT = [["A×1.0", cT1], ["A×1.272", cT2], ["A×1.618", cT3]]
+      .map(x => [x[0], x[1], Math.abs(P[3] - x[1])]).sort((a, b) => a[2] - b[2])[0];
     const meas = [
       ["ความยาว A / B / C", `${LA.toFixed(1)} / ${LB.toFixed(1)} / ${LC.toFixed(1)}`],
       ["B ย่อ A", `${(bRetr * 100).toFixed(1)}%`],
       ["C เทียบ A", `${cExt.toFixed(2)}×`],
-      ["เป้า C (Fib)", `${fmt(t1)} = A×1.0  ·  ${fmt(t2)} = A×1.618`],
-      ["C ปัจจุบัน", `${fmt(P[3])}`],
+      ["B ทะลุจุดเริ่ม A", bBeyondStart ? "ใช่" : "ไม่"],
+      ["C ทะลุปลาย A", cBeyondEndA ? "ใช่" : "ไม่"],
+      ["เป้า C (Fib จากจุด B)", `${fmt(cT1)} · ${fmt(cT2)} · ${fmt(cT3)}`],
+      ["C ปัจจุบัน", `${fmt(P[3])} — ใกล้ ${nearestT[0]} สุด`],
     ];
+
     return { rules, guides, cands, meas };
   }
 
   /* ---------- render ---------- */
   function ruleRow(r) {
-    const ic = r.info ? '<span class="ic info">•</span>'
+    const ic = (r.info || r.pass == null) ? '<span class="ic info">•</span>'
       : (r.pass ? '<span class="ic ok">✓</span>' : '<span class="ic bad">✗</span>');
     return `<li>${ic}<div><div class="rn">${esc(r.name)}</div>${r.detail ? `<div class="rd">${esc(r.detail)}</div>` : ""}</div></li>`;
   }
@@ -822,8 +911,11 @@
     </div>`;
   }
 
+  function syncModeUI() { $("subHint").hidden = mode !== "corrective"; }
+
   let lastAnalysis = null;
   function renderAnalysis() {
+    syncModeUI();
     const n = need(), placed = points.length;
     if (placed < n) {
       lastAnalysis = null;
@@ -856,7 +948,7 @@
   const DRAFT_CAND_CAP = 2000;
   function saveDraft() {
     try {
-      const payload = { mode, points, snap, src, symbol, interval, barLimit, view };
+      const payload = { mode, points, snap, src, symbol, interval, barLimit, view, subALegs, subA4Overlap };
       if (candles) {
         let cs = candles, pts = points, v = view;
         if (candles.length > DRAFT_CAND_CAP) {
@@ -890,6 +982,8 @@
       if (d.barLimit) barLimit = clamp(d.barLimit | 0, 30, 1000);
       if (d.view && typeof d.view.i0 === "number") view = { i0: d.view.i0, n: d.view.n || 120 };
       else fitView(120);
+      subALegs = d.subALegs === 3 || d.subALegs === 5 ? d.subALegs : 0;
+      subA4Overlap = !!d.subA4Overlap;
       return true;
     } catch (e) {}
     return false;
@@ -946,6 +1040,8 @@
       view: s.view && typeof s.view.i0 === "number" ? { i0: s.view.i0, n: s.view.n || 120 } : null,
       matched: s.matched || s.top || null,
       candidates: Array.isArray(s.candidates) ? s.candidates : (s.top ? [s.top] : []),
+      subALegs: s.subALegs === 3 || s.subALegs === 5 ? s.subALegs : 0,
+      subA4Overlap: !!s.subA4Overlap,
       outcome: /^(correct|wrong)$/.test(s.outcome) ? s.outcome : "pending",
       outcomeNote: s.outcomeNote || "",
       verifiedAt: s.verifiedAt || null,
@@ -1065,11 +1161,16 @@
     points = c.points.map(p => ({ i: p.i, v: p.v }));
     if (c.view && typeof c.view.i0 === "number") view = { i0: c.view.i0, n: c.view.n || 120 };
     else fitView(120);
+    subALegs = c.subALegs === 3 || c.subALegs === 5 ? c.subALegs : 0;
+    subA4Overlap = !!c.subA4Overlap;
+    $("subALegs").value = String(subALegs);
+    $("subA4Overlap").checked = subA4Overlap;
     if (c.symbol) { symbol = c.symbol; $("symIn").value = c.symbol; }
     if (c.timeframe) { interval = c.timeframe; $("tfSel").value = c.timeframe; }
     [...$("srcSeg").children].forEach(b => b.classList.toggle("active", b.dataset.s === src));
     [...$("modeSeg").children].forEach(b => b.classList.toggle("active", b.dataset.m === mode));
     setTool("pan");
+    syncModeUI();
     update();
   }
 
@@ -1122,6 +1223,7 @@
       view: v,
       matched: cands[0] || null,
       candidates: cands,
+      subALegs, subA4Overlap,
       createdAt: Date.now(),
     }));
     $("scName").value = ""; $("scGuess").value = "";
@@ -1207,6 +1309,8 @@
     enterDraw();
   });
   $("drawBtn").addEventListener("click", () => { tool === "draw" ? setTool("pan") : enterDraw(); });
+  $("subALegs").addEventListener("change", (e) => { subALegs = parseInt(e.target.value, 10) || 0; renderAnalysis(); saveDraft(); });
+  $("subA4Overlap").addEventListener("change", (e) => { subA4Overlap = e.target.checked; renderAnalysis(); saveDraft(); });
   $("snapChk").addEventListener("change", (e) => { snap = e.target.checked; saveDraft(); });
   $("undoBtn").addEventListener("click", () => { points.pop(); update(); });
   $("clearBtn").addEventListener("click", () => { points = []; enterDraw(); });
@@ -1309,9 +1413,12 @@
   $("symIn").value = symbol;
   $("tfSel").value = interval;
   $("limIn").value = barLimit;
+  $("subALegs").value = String(subALegs);
+  $("subA4Overlap").checked = subA4Overlap;
   [...$("srcSeg").children].forEach(b => b.classList.toggle("active", b.dataset.s === src));
   [...$("modeSeg").children].forEach(b => b.classList.toggle("active", b.dataset.m === mode));
   setTool("pan");
+  syncModeUI();
   bootCounts();
   requestAnimationFrame(() => {
     draw();
