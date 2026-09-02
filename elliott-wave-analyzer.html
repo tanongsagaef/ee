@@ -1772,11 +1772,18 @@
   async function checkOutcome(c) {
     if (!c || !c.symbol || !c.timeframe || c.target == null || c.invalidation == null) return "ไม่มี symbol/เป้า — ตรวจเองไม่ได้";
     const sym = String(c.symbol).toUpperCase().replace(/[^A-Z0-9]/g, "");
-    const url = `https://data-api.binance.vision/api/v3/klines?symbol=${sym}&interval=${c.timeframe}&startTime=${c.createdAt}&limit=1000`;
+    // anchor the scan at the LAST pivot's bar (the count may have been drawn on past price),
+    // fall back to when it was saved
+    let anchor = c.createdAt;
+    const lastI = Array.isArray(c.points) && c.points.length ? c.points[c.points.length - 1].i : null;
+    if (Array.isArray(c.candles) && lastI != null && c.candles[lastI] && c.candles[lastI].t) {
+      anchor = c.candles[lastI].t + 1;
+    }
+    const url = `https://data-api.binance.vision/api/v3/klines?symbol=${sym}&interval=${c.timeframe}&startTime=${anchor}&limit=1000`;
     const r = await fetch(url);
     if (!r.ok) throw new Error("HTTP " + r.status);
     const raw = await r.json();
-    if (!Array.isArray(raw) || !raw.length) return "ยังไม่มีข้อมูลหลังบันทึก";
+    if (!Array.isArray(raw) || !raw.length) return "ยังไม่มีข้อมูลหลังจุดสุดท้าย";
     const d = c.dir || 1;
     let tgt = null, inv = null;
     for (const k of raw) {
@@ -1789,7 +1796,7 @@
     }
     if (tgt == null && inv == null) return "pending";
     if (tgt != null && inv != null) return "ambiguous";
-    const when = new Date(tgt != null ? tgt : inv).toLocaleDateString("th-TH", { day: "2-digit", month: "short" });
+    const when = new Date(tgt != null ? tgt : inv).toLocaleDateString("th-TH", { day: "2-digit", month: "short", year: "2-digit" });
     c.outcome = tgt != null ? "correct" : "wrong";
     c.verifiedAt = Date.now();
     c.outcomeNote = (tgt != null ? "แตะเป้า " : "แตะ invalidation ") + when + " (auto)";
