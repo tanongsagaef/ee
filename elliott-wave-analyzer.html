@@ -86,6 +86,10 @@
   .btn.solid { background: var(--accent); border-color: var(--accent); color: #fff; }
   .btn.solid:hover { background: var(--accent-hover); color: #fff; }
   label.chk { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); font-weight: 700; cursor: pointer; }
+  .toolbar input, .toolbar select {
+    background: var(--surface-alt); border: 1px solid var(--border); color: var(--text);
+    padding: 7px 9px; border-radius: 9px; font-size: 12.5px; font-family: inherit;
+  }
 
   .chart-wrap { width: 100%; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-alt); overflow: hidden; }
   svg.chart { width: 100%; height: clamp(360px, 56vh, 560px); display: block; touch-action: none; cursor: crosshair; }
@@ -170,6 +174,25 @@
     <div class="panel">
       <h2>กราฟ <span class="sub">คลิกบนกราฟเพื่อวางจุด · ลากจุดเพื่อปรับ</span></h2>
       <div class="toolbar">
+        <span class="seg" id="srcSeg">
+          <button data-s="binance" class="active">Binance</button>
+          <button data-s="sim">จำลอง</button>
+        </span>
+        <input id="symIn" list="symList" value="BTCUSDT" spellcheck="false" style="width:112px;text-transform:uppercase;">
+        <datalist id="symList">
+          <option>BTCUSDT</option><option>ETHUSDT</option><option>SOLUSDT</option>
+          <option>BNBUSDT</option><option>XRPUSDT</option><option>DOGEUSDT</option>
+        </datalist>
+        <select id="tfSel">
+          <option value="15m">15m</option><option value="1h" selected>1h</option>
+          <option value="4h">4h</option><option value="1d">1D</option><option value="1w">1W</option>
+        </select>
+        <input id="limIn" type="number" min="30" max="1000" step="10" value="200" style="width:74px;" title="จำนวนแท่ง">
+        <button class="btn solid" id="loadBtn">โหลดกราฟ</button>
+        <label class="chk"><input type="checkbox" id="liveChk"> สด</label>
+        <span class="muted-note" id="loadMsg"></span>
+      </div>
+      <div class="toolbar">
         <span class="seg" id="modeSeg">
           <button data-m="impulse" class="active">อิมพัลส์ 0-1-2-3-4-5</button>
           <button data-m="corrective">คลื่นแก้ตัว 0-A-B-C</button>
@@ -177,7 +200,6 @@
         <label class="chk"><input type="checkbox" id="snapChk" checked> สแนปเข้าราคา</label>
         <button class="btn" id="undoBtn">↶ ถอยจุด</button>
         <button class="btn" id="clearBtn">นับใหม่</button>
-        <button class="btn" id="regenBtn">สุ่มกราฟใหม่</button>
         <button class="btn" id="importBtn">นำเข้าข้อมูล</button>
       </div>
       <div class="importbox" id="importBox" hidden>
@@ -189,7 +211,7 @@
       </div>
       <div class="chart-wrap"><svg class="chart" id="chart"></svg></div>
       <div class="status" id="status"></div>
-      <div class="hint">Phase 1 — กราฟเป็นข้อมูลจำลองสำหรับฝึกนับ (ต่อ Binance ราคาจริงในเฟสถัดไป) ·
+      <div class="hint">ราคาจริงจาก Binance (คริปโต · ไม่ต้องใช้คีย์) — เลือก “จำลอง” หรือ “นำเข้าข้อมูล” สำหรับตลาดอื่น ·
         การวิเคราะห์ใช้ <b>ราคา + ลำดับจุด</b> ที่วาง ไม่ฟันธงคำตอบเดียว</div>
     </div>
 
@@ -264,7 +286,14 @@
 
   /* ---------- state ---------- */
   let mode = "impulse";           // "impulse" | "corrective"
-  let series = [];                // array of numbers (synthetic price)
+  let series = [];                // array of numbers = close price of each bar
+  let candles = null;             // [{ t, o, h, l, c }] when using Binance; null for sim / CSV
+  let src = "binance";            // "binance" | "sim"
+  let symbol = "BTCUSDT";
+  let interval = "1h";
+  let barLimit = 200;
+  let live = false;
+  let ws = null;
   let points = [];                // [{ i, v }]  wave pivots, in placed order
   let snap = true;
   let scales = null;
@@ -294,6 +323,75 @@
     return out;
   }
 
+  /* ---------- Binance market data (no API key, CORS-open host) ---------- */
+  async function fetchKlines() {
+    const sym = symbol.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    const lim = clamp(barLimit | 0, 30, 1000);
+    const url = `https://data-api.binance.vision/api/v3/klines?symbol=${sym}&interval=${interval}&limit=${lim}`;
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(r.status === 400 ? "ไม่พบสัญลักษณ์ " + sym : "HTTP " + r.status);
+    const raw = await r.json();
+    if (!Array.isArray(raw) || raw.length < 10) throw new Error("ข้อมูลไม่พอ");
+    return raw.map(k => ({ t: k[0], o: +k[1], h: +k[2], l: +k[3], c: +k[4] }));
+  }
+
+  function closeWS() {
+    if (ws) { try { ws.onclose = null; ws.close(); } catch (e) {} ws = null; }
+  }
+  function openWS() {
+    closeWS();
+    if (src !== "binance" || !candles) return;
+    const sym = symbol.toLowerCase().replace(/[^a-z0-9]/g, "");
+    let sock;
+    try { sock = new WebSocket(`wss://stream.binance.com:9443/ws/${sym}@kline_${interval}`); }
+    catch (e) { return; }
+    ws = sock;
+    sock.onmessage = (ev) => {
+      if (ws !== sock) return;
+      let k;
+      try { k = JSON.parse(ev.data).k; } catch (e) { return; }
+      if (!k) return;
+      const bar = { t: k.t, o: +k.o, h: +k.h, l: +k.l, c: +k.c };
+      const last = candles[candles.length - 1];
+      if (last && last.t === bar.t) {
+        candles[candles.length - 1] = bar;
+      } else if (!last || bar.t > last.t) {
+        candles.push(bar);
+        while (candles.length > barLimit) { candles.shift(); points.forEach(p => { p.i = Math.max(0, p.i - 1); }); }
+      }
+      series = candles.map(c => c.c);
+      draw(); renderAnalysis();
+    };
+    sock.onclose = () => { if (ws === sock && live) setTimeout(() => { if (live) openWS(); }, 3000); };
+  }
+  window.addEventListener("beforeunload", closeWS);
+
+  let loadSeq = 0;
+  async function doLoad() {
+    if (src === "sim") {
+      closeWS();
+      series = genSeries(); candles = null; points = [];
+      $("loadMsg").textContent = "กราฟจำลอง";
+      update();
+      return;
+    }
+    const seq = ++loadSeq;
+    $("loadMsg").textContent = "กำลังโหลด " + symbol.toUpperCase() + " " + interval + " …";
+    try {
+      const c = await fetchKlines();
+      if (seq !== loadSeq) return;
+      candles = c;
+      series = c.map(x => x.c);
+      points = [];
+      $("loadMsg").textContent = symbol.toUpperCase() + " " + interval + " · " + c.length + " แท่ง · ล่าสุด " + fmt(c[c.length - 1].c);
+      update();
+      if (live) openWS();
+    } catch (err) {
+      if (seq !== loadSeq) return;
+      $("loadMsg").textContent = "โหลดไม่สำเร็จ: " + err.message + " — ใช้กราฟเดิม";
+    }
+  }
+
   /* ---------- chart ---------- */
   const svg = $("chart");
   const PAD = { l: 54, r: 14, t: 12, b: 24 };
@@ -303,7 +401,11 @@
     const w = Math.max(320, rect.width), h = Math.max(300, rect.height);
     svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
     const N = series.length;
-    const vals = series.concat(points.map(p => p.v));
+    const hasC = candles && candles.length === N;
+    let dvals = [];
+    if (hasC) { for (const c of candles) { dvals.push(c.h, c.l); } }
+    else { dvals = series.slice(); }
+    const vals = dvals.concat(points.map(p => p.v));
     let lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
     const pad = (hi - lo) * 0.06 || 1;
     lo -= pad; hi += pad;
@@ -318,9 +420,24 @@
       grid += `<text class="axis" x="${PAD.l - 8}" y="${(y + 3).toFixed(1)}" text-anchor="end">${fmt(v)}</text>`;
     }
 
-    let d = "";
-    for (let i = 0; i < N; i++) d += (i ? "L" : "M") + xFor(i).toFixed(1) + " " + yFor(series[i]).toFixed(1) + " ";
-    const area = d + `L${xFor(N - 1).toFixed(1)} ${yFor(lo).toFixed(1)} L${xFor(0).toFixed(1)} ${yFor(lo).toFixed(1)} Z`;
+    let priceLayer;
+    if (hasC) {
+      const bw = Math.max(1, (w - PAD.l - PAD.r) / N * 0.62);
+      let cs = "";
+      for (let i = 0; i < N; i++) {
+        const c = candles[i], x = xFor(i);
+        const col = c.c >= c.o ? "var(--bull)" : "var(--bear)";
+        const yO = yFor(c.o), yC = yFor(c.c);
+        cs += `<line x1="${x.toFixed(1)}" y1="${yFor(c.h).toFixed(1)}" x2="${x.toFixed(1)}" y2="${yFor(c.l).toFixed(1)}" stroke="${col}" stroke-width="1"/>` +
+              `<rect x="${(x - bw / 2).toFixed(1)}" y="${Math.min(yO, yC).toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(1, Math.abs(yO - yC)).toFixed(1)}" fill="${col}"/>`;
+      }
+      priceLayer = `<g opacity="0.92">${cs}</g>`;
+    } else {
+      let d = "";
+      for (let i = 0; i < N; i++) d += (i ? "L" : "M") + xFor(i).toFixed(1) + " " + yFor(series[i]).toFixed(1) + " ";
+      const area = d + `L${xFor(N - 1).toFixed(1)} ${yFor(lo).toFixed(1)} L${xFor(0).toFixed(1)} ${yFor(lo).toFixed(1)} Z`;
+      priceLayer = `<path class="area" d="${area}"/><path class="ser" d="${d}"/>`;
+    }
 
     let wl = "", wm = "";
     points.forEach((p, idx) => {
@@ -331,9 +448,16 @@
             `<text x="${x.toFixed(1)}" y="${(y - 12).toFixed(1)}" text-anchor="middle">${labels()[idx]}</text></g>`;
     });
 
+    let xlab = "";
+    if (hasC) {
+      const fd = (ms) => new Date(ms).toLocaleDateString("th-TH", { day: "2-digit", month: "short" });
+      xlab = `<text class="axis" x="${PAD.l}" y="${(h - 8).toFixed(1)}">${fd(candles[0].t)}</text>` +
+             `<text class="axis" x="${(w - PAD.r).toFixed(1)}" y="${(h - 8).toFixed(1)}" text-anchor="end">${fd(candles[N - 1].t)}</text>`;
+    }
+
     svg.innerHTML =
-      `<path class="area" d="${area}"/><g>${grid}</g><path class="ser" d="${d}"/>` +
-      (points.length ? `<path class="wave" d="${wl}"/>` : "") + wm;
+      `<g>${grid}</g>` + priceLayer +
+      (points.length ? `<path class="wave" d="${wl}"/>` : "") + wm + xlab;
 
     scales = {
       iFromX: (x) => clamp(Math.round((x - PAD.l) / (w - PAD.l - PAD.r) * (N - 1)), 0, N - 1),
@@ -566,7 +690,9 @@
 
   /* ---------- draft persistence ---------- */
   function saveDraft() {
-    try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ mode, series, points, snap })); } catch (e) {}
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ mode, series, candles, points, snap, src, symbol, interval, barLimit }));
+    } catch (e) {}
   }
   function loadDraft() {
     try {
@@ -574,8 +700,13 @@
       if (d && Array.isArray(d.series) && d.series.length > 10) {
         mode = d.mode === "corrective" ? "corrective" : "impulse";
         series = d.series;
+        candles = Array.isArray(d.candles) && d.candles.length === d.series.length ? d.candles : null;
         points = Array.isArray(d.points) ? d.points.filter(p => p && typeof p.i === "number" && typeof p.v === "number") : [];
         snap = d.snap !== false;
+        src = d.src === "sim" ? "sim" : "binance";
+        if (d.symbol) symbol = String(d.symbol).toUpperCase();
+        if (d.interval) interval = d.interval;
+        if (d.barLimit) barLimit = clamp(d.barLimit | 0, 30, 1000);
         return true;
       }
     } catch (e) {}
@@ -599,7 +730,7 @@
       const top = s.top || { label: "—", conf: 0 };
       return `<tr>
         <td>${esc(s.name || "(ไม่มีชื่อ)")}</td>
-        <td>${s.mode === "corrective" ? "0-A-B-C" : "0-1-2-3-4-5"}</td>
+        <td>${s.mode === "corrective" ? "0-A-B-C" : "0-1-2-3-4-5"}${s.symbol ? `<br><span class="muted-note">${esc(s.symbol)} ${esc(s.interval || "")}</span>` : ""}</td>
         <td>${esc(top.label)}</td>
         <td style="text-align:right;" class="mono">${top.conf}%</td>
         <td>${esc(s.myGuess || "—")}</td>
@@ -616,9 +747,15 @@
     if (el.dataset.load != null) {
       const s = scenarios[+el.dataset.load];
       if (!s) return;
+      live = false; $("liveChk").checked = false; closeWS();
       mode = s.mode === "corrective" ? "corrective" : "impulse";
       series = s.series.slice();
+      candles = Array.isArray(s.candles) && s.candles.length === s.series.length ? s.candles.slice() : null;
       points = s.points.map(p => ({ i: p.i, v: p.v }));
+      src = candles ? "binance" : "sim";
+      if (s.symbol) { symbol = s.symbol; $("symIn").value = s.symbol; }
+      if (s.interval) { interval = s.interval; $("tfSel").value = s.interval; }
+      [...$("srcSeg").children].forEach(b => b.classList.toggle("active", b.dataset.s === src));
       [...$("modeSeg").children].forEach(b => b.classList.toggle("active", b.dataset.m === mode));
       update();
     } else {
@@ -632,7 +769,12 @@
     const top = lastAnalysis && lastAnalysis.cands[0] ? { label: lastAnalysis.cands[0].label, conf: lastAnalysis.cands[0].conf } : null;
     scenarios.unshift({
       id: Date.now(), name, myGuess: $("scGuess").value.trim(),
-      mode, series: series.slice(), points: points.map(p => ({ i: p.i, v: p.v })),
+      mode,
+      symbol: src === "binance" ? symbol : null,
+      interval: src === "binance" ? interval : null,
+      series: series.slice(),
+      candles: candles ? candles.slice() : null,
+      points: points.map(p => ({ i: p.i, v: p.v })),
       top, createdAt: Date.now(),
     });
     $("scName").value = ""; $("scGuess").value = "";
@@ -650,7 +792,28 @@
   $("snapChk").addEventListener("change", (e) => { snap = e.target.checked; saveDraft(); });
   $("undoBtn").addEventListener("click", () => { points.pop(); update(); });
   $("clearBtn").addEventListener("click", () => { points = []; update(); });
-  $("regenBtn").addEventListener("click", () => { series = genSeries(); points = []; update(); });
+
+  $("srcSeg").addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b || b.dataset.s === src) return;
+    src = b.dataset.s;
+    [...$("srcSeg").children].forEach(x => x.classList.toggle("active", x === b));
+    if (src === "sim") { live = false; $("liveChk").checked = false; }
+    doLoad();
+  });
+  $("loadBtn").addEventListener("click", doLoad);
+  $("symIn").addEventListener("change", () => { symbol = $("symIn").value.trim().toUpperCase(); });
+  $("symIn").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { symbol = $("symIn").value.trim().toUpperCase(); doLoad(); }
+  });
+  $("tfSel").addEventListener("change", () => { interval = $("tfSel").value; if (src === "binance") doLoad(); });
+  $("limIn").addEventListener("change", () => {
+    barLimit = clamp(parseInt($("limIn").value, 10) || 200, 30, 1000);
+    $("limIn").value = barLimit;
+  });
+  $("liveChk").addEventListener("change", (e) => {
+    live = e.target.checked;
+    if (live && src === "binance") openWS(); else closeWS();
+  });
 
   $("importBtn").addEventListener("click", () => { $("importBox").hidden = !$("importBox").hidden; });
   $("importCancel").addEventListener("click", () => { $("importBox").hidden = true; });
@@ -660,7 +823,12 @@
       return m ? parseFloat(m[0]) : NaN;
     }).filter(v => !isNaN(v));
     if (nums.length < 12) { alert("ต้องมีอย่างน้อย 12 ค่า"); return; }
-    series = nums; points = []; $("importBox").hidden = true; update();
+    src = "sim"; live = false; $("liveChk").checked = false; closeWS();
+    [...$("srcSeg").children].forEach(x => x.classList.toggle("active", x.dataset.s === "sim"));
+    series = nums; candles = null; points = [];
+    $("importBox").hidden = true;
+    $("loadMsg").textContent = "นำเข้า " + nums.length + " ค่า";
+    update();
   });
 
   /* ---------- Firebase: sync scenarios (users/{uid}/sync/elliottAnalyzer) ---------- */
@@ -679,8 +847,12 @@
     if (!window.FirebaseSync || !FirebaseSync.enabled || !FirebaseSync.getUser()) return;
     try {
       const db = FirebaseSync.getDb(), uid = FirebaseSync.getUser().uid;
+      let payload = scenarios;
+      try {
+        if (JSON.stringify(scenarios).length > 800000) payload = scenarios.map(s => ({ ...s, candles: null }));
+      } catch (e) {}
       await db.collection("users").doc(uid).collection("sync").doc("elliottAnalyzer")
-        .set({ scenarios, updatedAt: Date.now() }, { merge: true });
+        .set({ scenarios: payload, updatedAt: Date.now() }, { merge: true });
     } catch (err) { console.error("EWA cloud push failed", err); }
   }
   function wireSync() {
@@ -701,12 +873,23 @@
   }
 
   /* ---------- boot ---------- */
-  if (!loadDraft()) { series = genSeries(1); points = []; }
+  if (!loadDraft()) {
+    src = "binance"; symbol = "BTCUSDT"; interval = "1h"; barLimit = 200;
+    series = genSeries(1); candles = null; points = [];
+  }
   $("snapChk").checked = snap;
+  $("symIn").value = symbol;
+  $("tfSel").value = interval;
+  $("limIn").value = barLimit;
+  [...$("srcSeg").children].forEach(b => b.classList.toggle("active", b.dataset.s === src));
   [...$("modeSeg").children].forEach(b => b.classList.toggle("active", b.dataset.m === mode));
   loadScenarios();
   renderScenarios();
-  requestAnimationFrame(() => { draw(); renderAnalysis(); });
+  requestAnimationFrame(() => {
+    draw();
+    renderAnalysis();
+    if (src === "binance" && !candles) doLoad();
+  });
   wireSync();
 })();
 </script>
