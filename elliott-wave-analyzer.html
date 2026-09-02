@@ -372,6 +372,11 @@
   const $ = (id) => document.getElementById(id);
   const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
   const fmt = (n) => Number(n).toLocaleString("en-US", { maximumFractionDigits: 2 });
+  const fmtPx = (n) => {
+    const a = Math.abs(+n || 0);
+    const d = a >= 100 ? 2 : a >= 1 ? 3 : a >= 0.01 ? 5 : a >= 0.0001 ? 7 : 9;
+    return Number(n).toLocaleString("en-US", { maximumFractionDigits: d });
+  };
   const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const DRAFT_KEY = "ewa_draft_v1";
   const SC_KEY = "ewa_scenarios_v1";
@@ -1710,6 +1715,7 @@
       subALegs: s.subALegs === 3 || s.subALegs === 5 ? s.subALegs : 0,
       subA4Overlap: !!s.subA4Overlap,
       position: /^(continue|reverse)$/.test(s.position) ? s.position : "continue",
+      lastPivotT: typeof s.lastPivotT === "number" ? s.lastPivotT : null,
       dir: s.dir === 1 || s.dir === -1 ? s.dir : null,
       target: typeof s.target === "number" ? s.target : null,
       invalidation: typeof s.invalidation === "number" ? s.invalidation : null,
@@ -1733,7 +1739,9 @@
     if (!rev) {
       // correction done, prior trend (opposite of A) resumes
       const d = -aDir;
-      return { dir: d, target: +first.toFixed(4), invalidation: +(last - d * 0.6 * lastLeg).toFixed(4) };
+      const whole = Math.abs(last - first) || lastLeg;
+      const buf = Math.max(0.6 * lastLeg, 0.33 * whole);  // don't let a tiny last leg make invalidation trip on noise
+      return { dir: d, target: +first.toFixed(4), invalidation: +(last - d * buf).toFixed(4) };
     }
     // "reversal": the move was really a new impulse in A's direction -> it continues
     return { dir: aDir, target: +(last + aDir * 0.382 * lastLeg).toFixed(4), invalidation: +first.toFixed(4) };
@@ -1783,52 +1791,61 @@
   async function checkOutcome(c) {
     if (!c || !c.symbol || !c.timeframe || c.target == null || c.invalidation == null) return "ไม่มี symbol/เป้า — ตรวจเองไม่ได้";
     const sym = String(c.symbol).toUpperCase().replace(/[^A-Z0-9]/g, "");
-    // anchor the scan at the LAST pivot's bar (the count may have been drawn on past price),
-    // fall back to when it was saved
-    let anchor = c.createdAt;
-    const lastI = Array.isArray(c.points) && c.points.length ? c.points[c.points.length - 1].i : null;
-    if (Array.isArray(c.candles) && lastI != null && c.candles[lastI] && c.candles[lastI].t) {
-      anchor = c.candles[lastI].t + 1;
+    // anchor the scan at the LAST pivot's bar (a count is often drawn on past price)
+    let anchor;
+    if (typeof c.lastPivotT === "number") anchor = c.lastPivotT + 1;
+    else {
+      const lastI = Array.isArray(c.points) && c.points.length ? c.points[c.points.length - 1].i : null;
+      const bar = Array.isArray(c.candles) && lastI != null ? c.candles[lastI] : null;
+      anchor = bar && bar.t ? bar.t + 1 : c.createdAt;
     }
-    const url = `https://data-api.binance.vision/api/v3/klines?symbol=${sym}&interval=${c.timeframe}&startTime=${anchor}&limit=1000`;
-    const r = await fetch(url);
-    if (!r.ok) throw new Error("HTTP " + r.status);
-    const raw = await r.json();
-    if (!Array.isArray(raw) || !raw.length) return "ยังไม่มีข้อมูลหลังจุดสุดท้าย";
     const d = c.dir || 1;
-    let tgt = null, inv = null;
-    for (const k of raw) {
-      const hi = +k[2], lo = +k[3], t = k[0];
-      const tgtHit = d > 0 ? hi >= c.target : lo <= c.target;
-      const invHit = d > 0 ? lo <= c.invalidation : hi >= c.invalidation;
-      if (tgtHit && tgt == null) tgt = t;
-      if (invHit && inv == null) inv = t;
-      if (tgt != null || inv != null) break;
+    let tgt = null, inv = null, scanned = 0, gotBars = 0;
+    while (scanned < 6000 && tgt == null && inv == null) {
+      const url = `https://data-api.binance.vision/api/v3/klines?symbol=${sym}&interval=${c.timeframe}&startTime=${anchor}&limit=1000`;
+      const r = await fetch(url);
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const raw = await r.json();
+      if (!Array.isArray(raw) || !raw.length) break;
+      gotBars += raw.length;
+      for (const k of raw) {
+        const hi = +k[2], lo = +k[3], t = k[0];
+        if (tgt == null && (d > 0 ? hi >= c.target : lo <= c.target)) tgt = t;
+        if (inv == null && (d > 0 ? lo <= c.invalidation : hi >= c.invalidation)) inv = t;
+        if (tgt != null || inv != null) break;
+      }
+      if (raw.length < 1000) break;                 // reached the latest bar
+      anchor = raw[raw.length - 1][0] + 1;
+      scanned += raw.length;
     }
+    if (!gotBars) return "ยังไม่มีข้อมูลหลังจุดสุดท้าย";
     const m = levelMeaning(c.mode, c.position);
     const posTxt = c.position === "reverse" ? "ปลายเทรนด์/กลับตัว" : "คลื่นย่อย/ไปต่อ";
-    if (tgt == null && inv == null) return `pending: ราคายังไม่แตะเป้า ${fmt(c.target)} หรือ invalidation ${fmt(c.invalidation)}`;
-    if (tgt != null && inv != null) return `ambiguous: แท่งเดียวแตะทั้งเป้า ${fmt(c.target)} และ invalidation ${fmt(c.invalidation)} — ตรวจเอง`;
+    if (tgt == null && inv == null) return `pending: ${gotBars} แท่งหลังจุดสุดท้าย ราคายังไม่แตะเป้า ${fmtPx(c.target)} หรือ invalidation ${fmtPx(c.invalidation)}`;
+    if (tgt != null && inv != null) return `ambiguous: แท่งเดียวแตะทั้งเป้า ${fmtPx(c.target)} และ invalidation ${fmtPx(c.invalidation)} — ตรวจเอง`;
     const won = tgt != null;
     const when = new Date(won ? tgt : inv).toLocaleDateString("th-TH", { day: "2-digit", month: "short", year: "2-digit" });
     c.outcome = won ? "correct" : "wrong";
     c.verifiedAt = Date.now();
     c.outcomeNote = won
-      ? `นับถูก — [${posTxt}] ราคาแตะเป้า ${fmt(c.target)} (${m.t}) เมื่อ ${when} ก่อนแตะ invalidation ${fmt(c.invalidation)} · auto`
-      : `นับผิด — [${posTxt}] ราคาแตะ invalidation ${fmt(c.invalidation)} (${m.i}) เมื่อ ${when} ก่อนถึงเป้า ${fmt(c.target)} · auto`;
+      ? `นับถูก — [${posTxt}] ราคาแตะเป้า ${fmtPx(c.target)} (${m.t}) เมื่อ ${when} ก่อนแตะ invalidation ${fmtPx(c.invalidation)} · auto`
+      : `นับผิด — [${posTxt}] ราคาแตะ invalidation ${fmtPx(c.invalidation)} (${m.i}) เมื่อ ${when} ก่อนถึงเป้า ${fmtPx(c.target)} · auto`;
     return c.outcome;
   }
   async function checkAllOutcomes() {
     const pend = counts.filter(c => c.outcome === "pending" && c.symbol && c.target != null);
-    if (!pend.length) { alert("ไม่มีการนับที่รอผล + มี symbol"); return; }
-    let done = 0, changed = 0;
+    if (!pend.length) { alert("ไม่มีการนับที่รอผล + มี symbol Binance"); return; }
+    let done = 0, changed = 0, errs = 0, pendMsg = "";
     for (const c of pend) {
-      try { const res = await checkOutcome(c); if (res === "correct" || res === "wrong") changed++; }
-      catch (e) { /* skip */ }
+      try {
+        const res = await checkOutcome(c);
+        if (res === "correct" || res === "wrong") changed++;
+        else if (!pendMsg && typeof res === "string") pendMsg = res;
+      } catch (e) { errs++; }
       done++;
     }
     persistCounts();
-    alert(`ตรวจ ${done} รายการ · อัปเดตผล ${changed}`);
+    alert(`ตรวจ ${done} รายการ · อัปเดตผล ${changed}` + (errs ? ` · error ${errs}` : "") + (pendMsg && !changed ? `\n(${pendMsg})` : ""));
   }
   async function bootCounts() {
     const stored = await idbGet("counts");
@@ -1960,7 +1977,7 @@
         <option value="correct"${c.outcome === "correct" ? " selected" : ""}>ถูก</option>
         <option value="wrong"${c.outcome === "wrong" ? " selected" : ""}>ผิด</option></select>`;
       const posTxt = c.position === "reverse" ? "ปลายเทรนด์/กลับตัว" : "คลื่นย่อย/ไปต่อ";
-      const lvTip = c.target != null ? `${posTxt} · เป้า ${fmt(c.target)} · invalidation ${fmt(c.invalidation)}${c.outcomeNote ? " · " + esc(c.outcomeNote) : ""}` : "";
+      const lvTip = c.target != null ? `${posTxt} · เป้า ${fmtPx(c.target)} · invalidation ${fmtPx(c.invalidation)}${c.outcomeNote ? " · " + esc(c.outcomeNote) : ""}` : "";
       const autoLink = (c.symbol && c.target != null) ? ` <span class="link" data-check="${c.id}" title="เช็คผลอัตโนมัติ">🎯</span>` : "";
       return `<tr${lvTip ? ` title="${lvTip}"` : ""}>
         <td class="mono">${dd}</td>
@@ -2051,6 +2068,8 @@
     const cands = lastAnalysis ? lastAnalysis.cands.map(x => ({ label: x.label, conf: x.conf })) : [];
     const position = $("scPos").value === "reverse" ? "reverse" : "continue";
     const lv = countLevels(mode, points.map(p => p.v), position);
+    const lastBar = candles && points.length ? candles[points[points.length - 1].i] : null;
+    const lastPivotT = lastBar && lastBar.t ? lastBar.t : null;
     counts.unshift(normCount({
       name: $("scName").value.trim(),
       myGuess: $("scGuess").value.trim(),
@@ -2065,7 +2084,7 @@
       candidates: cands,
       subALegs, subA4Overlap,
       position,
-      dir: lv.dir, target: lv.target, invalidation: lv.invalidation,
+      dir: lv.dir, target: lv.target, invalidation: lv.invalidation, lastPivotT,
       createdAt: Date.now(),
     }));
     $("scName").value = ""; $("scGuess").value = "";
