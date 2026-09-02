@@ -226,6 +226,8 @@
         <button class="btn" id="importBtn">นำเข้าข้อมูล</button>
         <button class="btn" id="scanBtn" title="สแกนหา swing อัตโนมัติ">🔍 สแกน</button>
         <input type="range" id="scanSens" min="1" max="12" value="4" title="ความไว: น้อย=จับ swing ใหญ่" style="width:96px;vertical-align:middle;">
+        <button class="btn" id="proposeBtn" title="สแกนทั้งกราฟแล้วเสนอ count">🧩 เสนอ count</button>
+        <button class="btn" id="degreeBtn" title="ตรวจว่าแต่ละคลื่นย่อยครบตามทฤษฎีไหม">🔬 ตรวจซับเวฟ</button>
       </div>
       <div class="status" id="toolHint"></div>
       <div class="toolbar" id="subHint" hidden>
@@ -248,6 +250,11 @@
       </div>
       <div class="chart-wrap"><svg class="chart" id="chart"></svg></div>
       <div class="status" id="status"></div>
+      <div id="proposeBox" hidden style="margin-top:8px;">
+        <div class="muted-note" style="margin-bottom:4px;">เสนอ count จาก swing ที่สแกนได้ — กด “ใช้” แล้วปรับจุดเอง</div>
+        <div id="proposeList"></div>
+      </div>
+      <div class="muted-note" id="degreeOut" style="margin-top:8px;"></div>
       <div class="hint">ราคาจริงจาก Binance (คริปโต · ไม่ต้องใช้คีย์) — เลือก “จำลอง” หรือ “นำเข้าข้อมูล” สำหรับตลาดอื่น ·
         การวิเคราะห์ใช้ <b>ราคา + ลำดับจุด</b> ที่วาง ไม่ฟันธงคำตอบเดียว</div>
     </div>
@@ -383,7 +390,9 @@
   let subA4Overlap = false;       // wave-4 of A overlaps wave-1 of A → must be Flat
   let scanOn = false;             // Phase 4: auto zigzag/swing overlay
   let scanSens = 4;               // 1..12 sensitivity slider
-  let subScan = null;             // transient sub-wave pivots to draw over wave A: [{i,v}]
+  let subScan = null;             // transient sub-wave pivots over wave A: [{i,v}]
+  let proposals = [];             // Phase 4.3: auto-proposed counts
+  let degreeScan = null;          // Phase 4.4: per-leg finer pivots [{pivots:[{i,v}],count,exp,ok}]
   let press = null;               // active background press: { x0, y0, i00, moved }
   let loadingOlder = false, noMoreHistory = false;
 
@@ -679,6 +688,15 @@
       const dots = subScan.map((p, k) => `<circle class="subdot" cx="${xFor(p.i).toFixed(1)}" cy="${yFor(p.v).toFixed(1)}" r="3"/>` +
         `<text class="axis" x="${xFor(p.i).toFixed(1)}" y="${(yFor(p.v) - 6).toFixed(1)}" text-anchor="middle" fill="var(--bull)">${k}</text>`).join("");
       subLayer = `<path class="zz" style="stroke:var(--bull);stroke-dasharray:none" d="${d}"/>${dots}`;
+    }
+    if (degreeScan) {
+      degreeScan.forEach(d => {
+        if (d.pivots.length < 2) return;
+        const col = d.ok === false ? "var(--bear)" : "var(--bull)";
+        const path = d.pivots.map((p, k) => (k ? "L" : "M") + xFor(p.i).toFixed(1) + " " + yFor(p.v).toFixed(1)).join(" ");
+        const dots = d.pivots.map(p => `<circle cx="${xFor(p.i).toFixed(1)}" cy="${yFor(p.v).toFixed(1)}" r="2.4" fill="${col}"/>`).join("");
+        subLayer += `<path class="zz" style="stroke:${col};stroke-dasharray:none;opacity:.55" d="${path}"/>${dots}`;
+      });
     }
 
     svg.innerHTML =
@@ -1296,6 +1314,9 @@
 
   function update() {
     subScan = null;
+    degreeScan = null;
+    if ($("degreeOut")) $("degreeOut").textContent = "";
+    if ($("proposeBox")) $("proposeBox").hidden = true;
     draw();
     renderAnalysis();
     saveDraft();
@@ -1327,6 +1348,101 @@
     }
     $("subScanMsg").textContent = msg;
     draw(); renderAnalysis(); saveDraft();
+  }
+
+  /* Phase 4.3: scan the visible window and propose counts */
+  const SHAPES = [
+    { mode: "impulse", k: 6, label: "อิมพัลส์" },
+    { mode: "triangle", k: 6, label: "สามเหลี่ยม" },
+    { mode: "corrective", k: 4, label: "แก้ตัว A-B-C" },
+    { mode: "combination", k: 4, label: "ผสม W-X-Y" },
+  ];
+  function proposeCounts() {
+    const N = series.length;
+    clampView();
+    const a = view.i0, b = Math.min(N - 1, view.i0 + view.n - 1);
+    const pv = zigzagPivots(series.slice(a, b + 1), sensThr(scanSens)).map(p => ({ i: p.i + a, v: p.v }));
+    proposals = [];
+    if (pv.length < 4) {
+      $("proposeList").innerHTML = `<div class="muted-note">swing ที่จับได้น้อยไป — เพิ่มความไว หรือขยายกรอบกราฟ</div>`;
+      $("proposeBox").hidden = false;
+      return;
+    }
+    const seen = new Set();
+    for (const sh of SHAPES) {
+      for (const drop of [0, 1]) {                    // last window, and one pivot earlier
+        const end = pv.length - drop;
+        if (end < sh.k) continue;
+        const win = pv.slice(end - sh.k, end);
+        if (win.length !== sh.k) continue;
+        const P = win.map(p => p.v);
+        let res;
+        try {
+          res = sh.mode === "impulse" ? analyzeImpulse(P)
+            : sh.mode === "triangle" ? analyzeTriangle(P)
+            : sh.mode === "combination" ? analyzeCombination(P)
+            : analyzeCorrective(P);
+        } catch (e) { continue; }
+        const top = res.cands && res.cands[0];
+        if (!top) continue;
+        const key = sh.mode + "|" + win[0].i + "|" + win[win.length - 1].i;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        proposals.push({ shape: sh, win, label: sh.label + " · " + top.label, conf: top.conf });
+      }
+    }
+    proposals.sort((x, y) => y.conf - x.conf);
+    proposals = proposals.slice(0, 6);
+    $("proposeList").innerHTML = proposals.length
+      ? proposals.map((p, i) => `<div class="cand" style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+          <span><b>${p.conf}%</b> · ${esc(p.label)}</span>
+          <button class="btn" data-prop="${i}">ใช้</button></div>`).join("")
+      : `<div class="muted-note">ไม่พบรูปแบบที่เข้าเกณฑ์ในช่วงนี้</div>`;
+    $("proposeBox").hidden = false;
+  }
+  function applyProposal(i) {
+    const p = proposals[i]; if (!p) return;
+    live = false; $("liveChk").checked = false; closeWS();
+    mode = p.shape.mode;
+    points = p.win.map(w => ({ i: w.i, v: w.v }));
+    const iis = points.map(x => x.i), lo = Math.min(...iis), hi = Math.max(...iis);
+    const pad = Math.max(10, Math.round((hi - lo) * 0.3));
+    view.n = clamp(hi - lo + 2 * pad, 20, series.length);
+    view.i0 = clamp(lo - pad, 0, Math.max(0, series.length - view.n));
+    [...$("modeSeg").children].forEach(b => b.classList.toggle("active", b.dataset.m === mode));
+    setTool("pan");
+    syncModeUI();
+    update();
+  }
+
+  /* Phase 4.4: check every leg of the current count for its sub-wave count */
+  function checkAllSubwaves() {
+    if (points.length < need()) { $("degreeOut").textContent = "วางจุดให้ครบก่อน"; return; }
+    const expMap = {
+      impulse: [5, 3, 5, 3, 5],
+      triangle: [3, 3, 3, 3, 3],
+      corrective: [subALegs || 0, 3, 5],
+      combination: [0, 3, 0],
+    };
+    const exp = expMap[mode] || [];
+    const thr = sensThr(clamp(scanSens + 4, 1, 12));
+    degreeScan = [];
+    const lbl = labels();
+    for (let k = 0; k < points.length - 1; k++) {
+      const i0 = Math.min(points[k].i, points[k + 1].i), i1 = Math.max(points[k].i, points[k + 1].i);
+      const seg = series.slice(i0, i1 + 1);
+      const pv = seg.length >= 6 ? zigzagPivots(seg, thr) : [];
+      const count = Math.max(0, pv.length - 1);
+      const e = exp[k] || 0;
+      degreeScan.push({
+        name: `${lbl[k]}→${lbl[k + 1]}`, count, exp: e,
+        ok: e ? count === e : null,
+        pivots: pv.map(p => ({ i: p.i + i0, v: p.v })),
+      });
+    }
+    $("degreeOut").innerHTML = "ซับเวฟแต่ละคลื่น: " + degreeScan.map(d =>
+      `${d.name}=<b>${d.count}</b>${d.exp ? (d.ok ? " ✓" : `/${d.exp}✗`) : ""}`).join(" · ");
+    draw();
   }
   let saveT = 0;
   function saveDraftSoon() { clearTimeout(saveT); saveT = setTimeout(saveDraft, 400); }
@@ -1781,6 +1897,12 @@
     scanSens = clamp(parseInt(e.target.value, 10) || 4, 1, 12);
     if (scanOn) scheduleDraw();
     saveDraftSoon();
+  });
+  $("proposeBtn").addEventListener("click", proposeCounts);
+  $("degreeBtn").addEventListener("click", checkAllSubwaves);
+  $("proposeList").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-prop]");
+    if (b) applyProposal(+b.dataset.prop);
   });
   $("snapChk").addEventListener("change", (e) => { snap = e.target.checked; saveDraft(); });
   $("undoBtn").addEventListener("click", () => { points.pop(); update(); });
