@@ -133,7 +133,7 @@
   .cand-n li { margin: 2px 0; }
 
   .sc-form { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
-  .sc-form input {
+  .sc-form input, .sc-form select {
     background: var(--surface-alt); border: 1px solid var(--border); color: var(--text);
     padding: 7px 10px; border-radius: 9px; font-size: 12.5px; font-family: inherit;
   }
@@ -264,6 +264,10 @@
       <div class="sc-form">
         <input id="scName" placeholder="ชื่อ/โน้ตสั้น ๆ เช่น 'นับหลัก TF 4h'">
         <input id="scGuess" placeholder="ฉันเดาว่าเป็น (เช่น Zigzag)">
+        <select id="scPos" title="ตำแหน่งของ count นี้ — กำหนดเป้า/invalidation ที่ใช้ตรวจผล">
+          <option value="continue">คลื่นย่อย → เทรนด์ไปต่อ</option>
+          <option value="reverse">ปลายเทรนด์ → กลับตัว</option>
+        </select>
         <button class="btn solid" id="scSave">＋ บันทึกการนับนี้</button>
       </div>
       <div class="tr-filters">
@@ -1593,6 +1597,7 @@
       candidates: Array.isArray(s.candidates) ? s.candidates : (s.top ? [s.top] : []),
       subALegs: s.subALegs === 3 || s.subALegs === 5 ? s.subALegs : 0,
       subA4Overlap: !!s.subA4Overlap,
+      position: /^(continue|reverse)$/.test(s.position) ? s.position : "continue",
       dir: s.dir === 1 || s.dir === -1 ? s.dir : null,
       target: typeof s.target === "number" ? s.target : null,
       invalidation: typeof s.invalidation === "number" ? s.invalidation : null,
@@ -1601,16 +1606,25 @@
       verifiedAt: s.verifiedAt || null,
     };
   }
-  // levels that objectively confirm / kill a saved count
-  function countLevels(md, P) {
+  // levels that objectively confirm / kill a saved count; position = "continue" | "reverse"
+  function countLevels(md, P, position) {
     const first = P[0], last = P[P.length - 1], prev = P[P.length - 2];
     const lastLeg = Math.abs(last - prev) || Math.abs(last - first) || 1;
+    const rev = position === "reverse";
     if (md === "impulse") {
-      const d = Math.sign(last - first) || 1;
-      return { dir: d, target: +(last + d * 0.382 * lastLeg).toFixed(4), invalidation: +first.toFixed(4) };
+      const d = Math.sign(last - first) || 1;             // impulse direction
+      if (!rev) return { dir: d, target: +(last + d * 0.382 * lastLeg).toFixed(4), invalidation: +first.toFixed(4) };
+      // terminal impulse: expect a deep reversal of the whole move
+      return { dir: -d, target: +(last - d * 0.618 * Math.abs(last - first)).toFixed(4), invalidation: +(last + d * 0.382 * lastLeg).toFixed(4) };
     }
-    const d = -(Math.sign(P[1] - first) || 1);            // prior-trend direction
-    return { dir: d, target: +first.toFixed(4), invalidation: +(last - d * 0.6 * lastLeg).toFixed(4) };
+    const aDir = Math.sign(P[1] - first) || 1;            // wave A / W direction
+    if (!rev) {
+      // correction done, prior trend (opposite of A) resumes
+      const d = -aDir;
+      return { dir: d, target: +first.toFixed(4), invalidation: +(last - d * 0.6 * lastLeg).toFixed(4) };
+    }
+    // "reversal": the move was really a new impulse in A's direction -> it continues
+    return { dir: aDir, target: +(last + aDir * 0.382 * lastLeg).toFixed(4), invalidation: +first.toFixed(4) };
   }
   function mergeCounts(a, b) {
     const map = new Map();
@@ -1810,7 +1824,8 @@
         <option value="pending"${c.outcome === "pending" ? " selected" : ""}>รอผล</option>
         <option value="correct"${c.outcome === "correct" ? " selected" : ""}>ถูก</option>
         <option value="wrong"${c.outcome === "wrong" ? " selected" : ""}>ผิด</option></select>`;
-      const lvTip = c.target != null ? `เป้า ${fmt(c.target)} · invalidation ${fmt(c.invalidation)}${c.outcomeNote ? " · " + esc(c.outcomeNote) : ""}` : "";
+      const posTxt = c.position === "reverse" ? "ปลายเทรนด์/กลับตัว" : "คลื่นย่อย/ไปต่อ";
+      const lvTip = c.target != null ? `${posTxt} · เป้า ${fmt(c.target)} · invalidation ${fmt(c.invalidation)}${c.outcomeNote ? " · " + esc(c.outcomeNote) : ""}` : "";
       const autoLink = (c.symbol && c.target != null) ? ` <span class="link" data-check="${c.id}" title="เช็คผลอัตโนมัติ">🎯</span>` : "";
       return `<tr${lvTip ? ` title="${lvTip}"` : ""}>
         <td class="mono">${dd}</td>
@@ -1844,6 +1859,7 @@
     subA4Overlap = !!c.subA4Overlap;
     $("subALegs").value = String(subALegs);
     $("subA4Overlap").checked = subA4Overlap;
+    $("scPos").value = c.position === "reverse" ? "reverse" : "continue";
     if (c.symbol) { symbol = c.symbol; $("symIn").value = c.symbol; }
     if (c.timeframe) { interval = c.timeframe; $("tfSel").value = c.timeframe; }
     [...$("srcSeg").children].forEach(b => b.classList.toggle("active", b.dataset.s === src));
@@ -1898,7 +1914,8 @@
       v = { i0: Math.max(0, view.i0 - off), n: view.n };
     }
     const cands = lastAnalysis ? lastAnalysis.cands.map(x => ({ label: x.label, conf: x.conf })) : [];
-    const lv = countLevels(mode, points.map(p => p.v));
+    const position = $("scPos").value === "reverse" ? "reverse" : "continue";
+    const lv = countLevels(mode, points.map(p => p.v), position);
     counts.unshift(normCount({
       name: $("scName").value.trim(),
       myGuess: $("scGuess").value.trim(),
@@ -1912,6 +1929,7 @@
       matched: cands[0] || null,
       candidates: cands,
       subALegs, subA4Overlap,
+      position,
       dir: lv.dir, target: lv.target, invalidation: lv.invalidation,
       createdAt: Date.now(),
     }));
