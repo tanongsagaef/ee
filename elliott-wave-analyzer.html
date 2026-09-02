@@ -272,6 +272,7 @@
         <select id="fPat"><option value="">Pattern ทั้งหมด</option></select>
         <select id="fOut"><option value="">ผลทั้งหมด</option><option value="pending">รอผล</option><option value="correct">ถูก</option><option value="wrong">ผิด</option></select>
         <button class="btn" id="statsBtn">📊 สถิติ</button>
+        <button class="btn" id="checkAllBtn" title="ดึงราคา Binance มาตรวจว่าแตะเป้าหรือ invalidation">🎯 เช็คผลอัตโนมัติ</button>
         <button class="btn" id="exportBtn">⭳ Export</button>
         <button class="btn" id="importJsonBtn">⭱ Import</button>
         <input type="file" id="importFile" accept="application/json" hidden>
@@ -1565,10 +1566,24 @@
       candidates: Array.isArray(s.candidates) ? s.candidates : (s.top ? [s.top] : []),
       subALegs: s.subALegs === 3 || s.subALegs === 5 ? s.subALegs : 0,
       subA4Overlap: !!s.subA4Overlap,
+      dir: s.dir === 1 || s.dir === -1 ? s.dir : null,
+      target: typeof s.target === "number" ? s.target : null,
+      invalidation: typeof s.invalidation === "number" ? s.invalidation : null,
       outcome: /^(correct|wrong)$/.test(s.outcome) ? s.outcome : "pending",
       outcomeNote: s.outcomeNote || "",
       verifiedAt: s.verifiedAt || null,
     };
+  }
+  // levels that objectively confirm / kill a saved count
+  function countLevels(md, P) {
+    const first = P[0], last = P[P.length - 1], prev = P[P.length - 2];
+    const lastLeg = Math.abs(last - prev) || Math.abs(last - first) || 1;
+    if (md === "impulse") {
+      const d = Math.sign(last - first) || 1;
+      return { dir: d, target: +(last + d * 0.382 * lastLeg).toFixed(4), invalidation: +first.toFixed(4) };
+    }
+    const d = -(Math.sign(P[1] - first) || 1);            // prior-trend direction
+    return { dir: d, target: +first.toFixed(4), invalidation: +(last - d * 0.6 * lastLeg).toFixed(4) };
   }
   function mergeCounts(a, b) {
     const map = new Map();
@@ -1597,6 +1612,46 @@
     writeSummary();
     renderCounts();
     pushCloudSoon();
+  }
+
+  /* Round 1: objective outcome — scan klines since createdAt for first touch of target vs invalidation */
+  async function checkOutcome(c) {
+    if (!c || !c.symbol || !c.timeframe || c.target == null || c.invalidation == null) return "ไม่มี symbol/เป้า — ตรวจเองไม่ได้";
+    const sym = String(c.symbol).toUpperCase().replace(/[^A-Z0-9]/g, "");
+    const url = `https://data-api.binance.vision/api/v3/klines?symbol=${sym}&interval=${c.timeframe}&startTime=${c.createdAt}&limit=1000`;
+    const r = await fetch(url);
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const raw = await r.json();
+    if (!Array.isArray(raw) || !raw.length) return "ยังไม่มีข้อมูลหลังบันทึก";
+    const d = c.dir || 1;
+    let tgt = null, inv = null;
+    for (const k of raw) {
+      const hi = +k[2], lo = +k[3], t = k[0];
+      const tgtHit = d > 0 ? hi >= c.target : lo <= c.target;
+      const invHit = d > 0 ? lo <= c.invalidation : hi >= c.invalidation;
+      if (tgtHit && tgt == null) tgt = t;
+      if (invHit && inv == null) inv = t;
+      if (tgt != null || inv != null) break;
+    }
+    if (tgt == null && inv == null) return "pending";
+    if (tgt != null && inv != null) return "ambiguous";
+    const when = new Date(tgt != null ? tgt : inv).toLocaleDateString("th-TH", { day: "2-digit", month: "short" });
+    c.outcome = tgt != null ? "correct" : "wrong";
+    c.verifiedAt = Date.now();
+    c.outcomeNote = (tgt != null ? "แตะเป้า " : "แตะ invalidation ") + when + " (auto)";
+    return c.outcome;
+  }
+  async function checkAllOutcomes() {
+    const pend = counts.filter(c => c.outcome === "pending" && c.symbol && c.target != null);
+    if (!pend.length) { alert("ไม่มีการนับที่รอผล + มี symbol"); return; }
+    let done = 0, changed = 0;
+    for (const c of pend) {
+      try { const res = await checkOutcome(c); if (res === "correct" || res === "wrong") changed++; }
+      catch (e) { /* skip */ }
+      done++;
+    }
+    persistCounts();
+    alert(`ตรวจ ${done} รายการ · อัปเดตผล ${changed}`);
   }
   async function bootCounts() {
     const stored = await idbGet("counts");
@@ -1727,13 +1782,15 @@
         <option value="pending"${c.outcome === "pending" ? " selected" : ""}>รอผล</option>
         <option value="correct"${c.outcome === "correct" ? " selected" : ""}>ถูก</option>
         <option value="wrong"${c.outcome === "wrong" ? " selected" : ""}>ผิด</option></select>`;
-      return `<tr>
+      const lvTip = c.target != null ? `เป้า ${fmt(c.target)} · invalidation ${fmt(c.invalidation)}${c.outcomeNote ? " · " + esc(c.outcomeNote) : ""}` : "";
+      const autoLink = (c.symbol && c.target != null) ? ` <span class="link" data-check="${c.id}" title="เช็คผลอัตโนมัติ">🎯</span>` : "";
+      return `<tr${lvTip ? ` title="${lvTip}"` : ""}>
         <td class="mono">${dd}</td>
         <td>${mkt}${c.name ? `<br><span class="muted-note">${esc(c.name)}</span>` : ""}</td>
         <td>${mk}</td>
         <td style="text-align:right;" class="mono">${conf}</td>
         <td>${esc(c.myGuess || "—")}</td>
-        <td style="white-space:nowrap;">${sel} <span class="link" data-note="${c.id}" title="โน้ตผล">📝</span></td>
+        <td style="white-space:nowrap;">${sel} <span class="link" data-note="${c.id}" title="โน้ตผล">📝</span>${autoLink}</td>
         <td style="white-space:nowrap;">
           <span class="link" data-open="${c.id}">เปิด</span> ·
           <span class="link" data-del="${c.id}" style="color:var(--bear);">ลบ</span>
@@ -1777,13 +1834,20 @@
     c.verifiedAt = s.value === "pending" ? null : Date.now();
     persistCounts();
   });
-  $("scTbl").addEventListener("click", (e) => {
-    const el = e.target.closest("[data-open],[data-del],[data-note]");
+  $("scTbl").addEventListener("click", async (e) => {
+    const el = e.target.closest("[data-open],[data-del],[data-note],[data-check]");
     if (!el) return;
-    const id = el.dataset.open || el.dataset.del || el.dataset.note;
+    const id = el.dataset.open || el.dataset.del || el.dataset.note || el.dataset.check;
     const c = counts.find(x => String(x.id) === id);
     if (!c) return;
-    if (el.dataset.note != null) {
+    if (el.dataset.check != null) {
+      el.textContent = "…";
+      try {
+        const res = await checkOutcome(c);
+        if (res === "correct" || res === "wrong") { persistCounts(); }
+        else { el.textContent = "🎯"; alert("ผล: " + res); }
+      } catch (err) { el.textContent = "🎯"; alert("เช็คไม่สำเร็จ: " + err.message); }
+    } else if (el.dataset.note != null) {
       const v = prompt("โน้ตผลการนับนี้:", c.outcomeNote || "");
       if (v != null) { c.outcomeNote = v.trim(); persistCounts(); }
     } else if (el.dataset.del != null) {
@@ -1792,6 +1856,7 @@
       loadCountToChart(c);
     }
   });
+  $("checkAllBtn").addEventListener("click", checkAllOutcomes);
   ["fSym", "fTf", "fPat", "fOut"].forEach(id => $(id).addEventListener("input", renderCounts));
 
   $("scSave").addEventListener("click", () => {
@@ -1805,6 +1870,7 @@
       v = { i0: Math.max(0, view.i0 - off), n: view.n };
     }
     const cands = lastAnalysis ? lastAnalysis.cands.map(x => ({ label: x.label, conf: x.conf })) : [];
+    const lv = countLevels(mode, points.map(p => p.v));
     counts.unshift(normCount({
       name: $("scName").value.trim(),
       myGuess: $("scGuess").value.trim(),
@@ -1818,6 +1884,7 @@
       matched: cands[0] || null,
       candidates: cands,
       subALegs, subA4Overlap,
+      dir: lv.dir, target: lv.target, invalidation: lv.invalidation,
       createdAt: Date.now(),
     }));
     $("scName").value = ""; $("scGuess").value = "";
