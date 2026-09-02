@@ -98,6 +98,9 @@
   svg.chart .area { fill: var(--accent); opacity: .06; }
   svg.chart .ser { fill: none; stroke: var(--muted); stroke-width: 1.5; opacity: .55; }
   svg.chart .wave { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-linejoin: round; }
+  svg.chart .zz { fill: none; stroke: var(--warn); stroke-width: 1.4; stroke-dasharray: 4 3; opacity: .85; }
+  svg.chart .zzdot { fill: var(--warn); opacity: .9; }
+  svg.chart .subdot { fill: var(--bull); }
   svg.chart .mk circle { fill: var(--surface); stroke: var(--accent); stroke-width: 2.5; cursor: grab; }
   svg.chart .mk text { fill: var(--text); font: 800 12px "Sarabun", system-ui, sans-serif; }
 
@@ -221,6 +224,8 @@
         <button class="btn" id="zoomOutBtn" title="ซูมออก">－</button>
         <button class="btn" id="fitBtn" title="กลับไปแท่งล่าสุด">⟲ ล่าสุด</button>
         <button class="btn" id="importBtn">นำเข้าข้อมูล</button>
+        <button class="btn" id="scanBtn" title="สแกนหา swing อัตโนมัติ">🔍 สแกน</button>
+        <input type="range" id="scanSens" min="1" max="12" value="4" title="ความไว: น้อย=จับ swing ใหญ่" style="width:96px;vertical-align:middle;">
       </div>
       <div class="status" id="toolHint"></div>
       <div class="toolbar" id="subHint" hidden>
@@ -231,6 +236,8 @@
           <option value="5">A = 5 ขา (motive)</option>
         </select>
         <label class="chk"><input type="checkbox" id="subA4Overlap"> ขา 4 ของ A ทับขา 1</label>
+        <button class="btn" id="subScanBtn">นับ A อัตโนมัติ</button>
+        <span class="muted-note" id="subScanMsg"></span>
       </div>
       <div class="importbox" id="importBox" hidden>
         <textarea id="importTa" placeholder="วางราคาปิดบรรทัดละค่า หรือ &quot;วันที่,ราคา&quot; ต่อบรรทัด (อย่างน้อย 12 ค่า)"></textarea>
@@ -374,6 +381,9 @@
   let tool = "pan";               // "pan" (drag = scroll history) | "draw" (tap = place pivot)
   let subALegs = 0;               // corrective sub-wave hint: 0 unknown / 3 / 5 legs in wave A
   let subA4Overlap = false;       // wave-4 of A overlaps wave-1 of A → must be Flat
+  let scanOn = false;             // Phase 4: auto zigzag/swing overlay
+  let scanSens = 4;               // 1..12 sensitivity slider
+  let subScan = null;             // transient sub-wave pivots to draw over wave A: [{i,v}]
   let press = null;               // active background press: { x0, y0, i00, moved }
   let loadingOlder = false, noMoreHistory = false;
 
@@ -422,6 +432,33 @@
     }
     while (out.length < N) out.push(+(out[out.length - 1] + (rnd() - 0.5) * 6).toFixed(2));
     return out;
+  }
+
+  /* ---------- Phase 4: zigzag / swing engine ---------- */
+  const sensThr = (s) => 0.10 * (13 - clamp(s, 1, 12)) / 12;   // slider 1 -> 10%, 12 -> ~0.8%
+  function zigzagPivots(vals, thr) {
+    const n = vals.length;
+    if (n < 2) return n ? [{ i: 0, v: vals[0] }] : [];
+    const piv = [{ i: 0, v: vals[0] }];
+    let extI = 0, extV = vals[0], dir = 0;
+    for (let i = 1; i < n; i++) {
+      const v = vals[i];
+      const base = Math.abs(extV) || 1;
+      if (dir === 0) {
+        const c = (v - vals[0]) / (Math.abs(vals[0]) || 1);
+        if (c >= thr) { dir = 1; extV = v; extI = i; }
+        else if (c <= -thr) { dir = -1; extV = v; extI = i; }
+        else if (Math.abs(v - vals[0]) >= Math.abs(extV - vals[0])) { extV = v; extI = i; }
+      } else if (dir === 1) {
+        if (v > extV) { extV = v; extI = i; }
+        else if ((extV - v) / base >= thr) { piv.push({ i: extI, v: extV }); dir = -1; extV = v; extI = i; }
+      } else {
+        if (v < extV) { extV = v; extI = i; }
+        else if ((v - extV) / base >= thr) { piv.push({ i: extI, v: extV }); dir = 1; extV = v; extI = i; }
+      }
+    }
+    if (extI !== piv[piv.length - 1].i) piv.push({ i: extI, v: extV });
+    return piv;
   }
 
   /* ---------- Binance market data (no API key, CORS-open host) ---------- */
@@ -626,9 +663,27 @@
              `<text class="axis" x="${(w - PAD.r).toFixed(1)}" y="${(h - 8).toFixed(1)}" text-anchor="end">${fd(candles[b].t)}</text>`;
     }
 
+    let zzLayer = "";
+    if (scanOn && b - a > 4) {
+      const seg = series.slice(a, b + 1);
+      const pv = zigzagPivots(seg, sensThr(scanSens));
+      if (pv.length > 1) {
+        const d = pv.map((p, k) => (k ? "L" : "M") + xFor(p.i + a).toFixed(1) + " " + yFor(p.v).toFixed(1)).join(" ");
+        const dots = pv.map(p => `<circle class="zzdot" cx="${xFor(p.i + a).toFixed(1)}" cy="${yFor(p.v).toFixed(1)}" r="2.6"/>`).join("");
+        zzLayer = `<path class="zz" d="${d}"/>${dots}`;
+      }
+    }
+    let subLayer = "";
+    if (subScan && subScan.length > 1) {
+      const d = subScan.map((p, k) => (k ? "L" : "M") + xFor(p.i).toFixed(1) + " " + yFor(p.v).toFixed(1)).join(" ");
+      const dots = subScan.map((p, k) => `<circle class="subdot" cx="${xFor(p.i).toFixed(1)}" cy="${yFor(p.v).toFixed(1)}" r="3"/>` +
+        `<text class="axis" x="${xFor(p.i).toFixed(1)}" y="${(yFor(p.v) - 6).toFixed(1)}" text-anchor="middle" fill="var(--bull)">${k}</text>`).join("");
+      subLayer = `<path class="zz" style="stroke:var(--bull);stroke-dasharray:none" d="${d}"/>${dots}`;
+    }
+
     svg.innerHTML =
-      `<g>${grid}</g>` + priceLayer +
-      (points.length ? `<path class="wave" d="${wl}"/>` : "") + wm + xlab;
+      `<g>${grid}</g>` + priceLayer + zzLayer +
+      (points.length ? `<path class="wave" d="${wl}"/>` : "") + wm + subLayer + xlab;
 
     scales = {
       iFromX: (x) => clamp(Math.round(view.i0 + (x - PAD.l) / iw * (view.n - 1)), 0, N - 1),
@@ -1240,9 +1295,38 @@
   }
 
   function update() {
+    subScan = null;
     draw();
     renderAnalysis();
     saveDraft();
+  }
+
+  /* Phase 4: auto-count sub-waves of wave A from the zigzag engine */
+  function autoScanWaveA() {
+    if (mode !== "corrective" || points.length < 2) { $("subScanMsg").textContent = "วางจุด 0 กับ A ก่อน"; return; }
+    const i0 = Math.min(points[0].i, points[1].i), i1 = Math.max(points[0].i, points[1].i);
+    const seg = series.slice(i0, i1 + 1);
+    if (seg.length < 8) { $("subScanMsg").textContent = "ช่วงคลื่น A สั้นเกินไป — ซูม/ลด TF"; return; }
+    // finer sensitivity for sub-waves (about half the chart threshold)
+    let pv = zigzagPivots(seg, sensThr(clamp(scanSens + 3, 1, 12)));
+    // strip a tiny leading/trailing stub if the engine tacked on the running extreme
+    const legs = pv.length - 1;
+    subScan = pv.map(p => ({ i: p.i + i0, v: p.v }));
+    let msg = `จับได้ ${legs} ขา`;
+    if (legs === 5 || legs === 3) {
+      subALegs = legs; $("subALegs").value = String(legs);
+      msg += ` → A = ${legs} ขา (${legs === 5 ? "motive/Zigzag" : "corrective/Flat"})`;
+      if (legs === 5) {
+        const d = Math.sign(pv[1].v - pv[0].v) || 1;
+        const ov = d * (pv[4].v - pv[1].v) <= 0;   // leg-4 low vs leg-1 end
+        subA4Overlap = ov; $("subA4Overlap").checked = ov;
+        if (ov) msg += " · ขา 4 ทับขา 1";
+      }
+    } else {
+      msg += " — ปรับสไลเดอร์ความไวแล้วลองใหม่";
+    }
+    $("subScanMsg").textContent = msg;
+    draw(); renderAnalysis(); saveDraft();
   }
   let saveT = 0;
   function saveDraftSoon() { clearTimeout(saveT); saveT = setTimeout(saveDraft, 400); }
@@ -1251,7 +1335,7 @@
   const DRAFT_CAND_CAP = 2000;
   function saveDraft() {
     try {
-      const payload = { mode, points, snap, src, symbol, interval, barLimit, view, subALegs, subA4Overlap };
+      const payload = { mode, points, snap, src, symbol, interval, barLimit, view, subALegs, subA4Overlap, scanOn, scanSens };
       if (candles) {
         let cs = candles, pts = points, v = view;
         if (candles.length > DRAFT_CAND_CAP) {
@@ -1287,6 +1371,8 @@
       else fitView(120);
       subALegs = d.subALegs === 3 || d.subALegs === 5 ? d.subALegs : 0;
       subA4Overlap = !!d.subA4Overlap;
+      scanOn = !!d.scanOn;
+      scanSens = clamp(d.scanSens | 0 || 4, 1, 12);
       return true;
     } catch (e) {}
     return false;
@@ -1685,6 +1771,17 @@
   $("drawBtn").addEventListener("click", () => { tool === "draw" ? setTool("pan") : enterDraw(); });
   $("subALegs").addEventListener("change", (e) => { subALegs = parseInt(e.target.value, 10) || 0; renderAnalysis(); saveDraft(); });
   $("subA4Overlap").addEventListener("change", (e) => { subA4Overlap = e.target.checked; renderAnalysis(); saveDraft(); });
+  $("subScanBtn").addEventListener("click", autoScanWaveA);
+  $("scanBtn").addEventListener("click", () => {
+    scanOn = !scanOn;
+    $("scanBtn").classList.toggle("solid", scanOn);
+    scheduleDraw(); saveDraft();
+  });
+  $("scanSens").addEventListener("input", (e) => {
+    scanSens = clamp(parseInt(e.target.value, 10) || 4, 1, 12);
+    if (scanOn) scheduleDraw();
+    saveDraftSoon();
+  });
   $("snapChk").addEventListener("change", (e) => { snap = e.target.checked; saveDraft(); });
   $("undoBtn").addEventListener("click", () => { points.pop(); update(); });
   $("clearBtn").addEventListener("click", () => { points = []; enterDraw(); });
@@ -1790,6 +1887,8 @@
   $("limIn").value = barLimit;
   $("subALegs").value = String(subALegs);
   $("subA4Overlap").checked = subA4Overlap;
+  $("scanSens").value = String(scanSens);
+  $("scanBtn").classList.toggle("solid", scanOn);
   [...$("srcSeg").children].forEach(b => b.classList.toggle("active", b.dataset.s === src));
   [...$("modeSeg").children].forEach(b => b.classList.toggle("active", b.dataset.m === mode));
   setTool("pan");
