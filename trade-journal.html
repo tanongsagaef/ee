@@ -528,7 +528,8 @@
 
     <div class="row" id="tfForexFields">
       <div class="field"><label class="small">ขนาดล็อต (Lot Size)</label><input type="number" id="tfLot" step="0.01" placeholder="เช่น 0.10"></div>
-      <div class="field"><label class="small">จำนวน Pips</label><input type="number" id="tfPips" step="0.1" placeholder="เช่น 25"></div>
+      <div class="field"><label class="small">จำนวน Pips (คำนวณอัตโนมัติ)</label><input type="number" id="tfPips" step="0.1" placeholder="จากราคาเข้า/ออก"></div>
+      <div class="field" style="min-width:96px; flex:0 0 auto;"><label class="small">ขนาด 1 pip</label><input type="number" id="tfPipSize" step="any" placeholder="0.0001"></div>
     </div>
 
     <div class="row hidden" id="tfFuturesFields">
@@ -538,8 +539,10 @@
 
     <div class="row">
       <div class="field"><label class="small">ราคาเข้า</label><input type="number" id="tfEntry" step="any"></div>
+      <div class="field"><label class="small">ราคา SL (Stop Loss)</label><input type="number" id="tfSl" step="any"></div>
       <div class="field"><label class="small">ราคาออก</label><input type="number" id="tfExit" step="any"></div>
     </div>
+    <div id="tfCalcHint" class="small" style="text-transform:none; letter-spacing:0; font-weight:400; color:var(--muted); margin:-2px 0 12px; min-height:15px;"></div>
 
     <div class="field">
       <label class="small">กำไร/ขาดทุน ($)</label>
@@ -993,7 +996,12 @@
       if (t.points != null) details.push(["Points", t.points]);
     }
     if (t.entry != null) details.push(["ราคาเข้า", t.entry]);
+    if (t.sl != null) details.push(["ราคา SL", t.sl]);
     if (t.exit != null) details.push(["ราคาออก", t.exit]);
+    if (t.entry != null && t.sl != null && t.exit != null) {
+      const risk = Math.abs(t.entry - t.sl);
+      if (risk > 0) details.push(["R:R", (Math.abs(t.exit - t.entry) / risk).toFixed(2)]);
+    }
     if (t.session) details.push(["Session", t.session]);
     if (t.model) details.push(["Model", t.model]);
     if (t.account) details.push(["Account", t.account]);
@@ -1472,6 +1480,7 @@
       type === "forex" ? "คู่เงิน" : type === "futures" ? "สัญญา / Ticker" : "สัญลักษณ์";
     document.getElementById("tfSymbol").placeholder =
       type === "forex" ? "เช่น EUR/USD" : type === "futures" ? "เช่น ES, NQ, GC" : "เช่น AAPL, BTC/USD";
+    if (typeof updateTradeCalc === "function") updateTradeCalc();
   }
   tfMarketType.addEventListener("change", toggleMarketFields);
 
@@ -1484,7 +1493,62 @@
     btn.addEventListener("click", () => {
       currentSide = btn.dataset.side;
       updateSideToggle();
+      updateTradeCalc();
     });
+  });
+
+  /* ---------- SL distance + pip auto-calc in the trade form ---------- */
+  let tfPipsDirty = false, tfPointsDirty = false, tfPipSizeDirty = false;
+  function guessPipSize(sym) {
+    const s = (sym || "").toUpperCase();
+    if (/JPY/.test(s)) return 0.01;
+    if (/XAU|GOLD/.test(s)) return 0.1;
+    if (/XAG|SILVER/.test(s)) return 0.01;
+    if (/BTC|ETH/.test(s)) return 1;
+    return 0.0001;
+  }
+  function tfNum(id) {
+    const v = document.getElementById(id).value;
+    return (v === "" || isNaN(Number(v))) ? null : Number(v);
+  }
+  function updateTradeCalc() {
+    const market = tfMarketType.value;
+    const entry = tfNum("tfEntry"), exit = tfNum("tfExit"), sl = tfNum("tfSl");
+    const pipSizeEl = document.getElementById("tfPipSize");
+    if (!tfPipSizeDirty && pipSizeEl.value === "") pipSizeEl.value = guessPipSize(document.getElementById("tfSymbol").value);
+    const pipSize = tfNum("tfPipSize") || guessPipSize(document.getElementById("tfSymbol").value);
+    const dir = currentSide === "short" ? -1 : 1;
+
+    if (entry != null && exit != null) {
+      const moved = (exit - entry) * dir;
+      if (market === "forex" && !tfPipsDirty) document.getElementById("tfPips").value = +(moved / pipSize).toFixed(1);
+      if (market === "futures" && !tfPointsDirty) document.getElementById("tfPoints").value = +moved.toFixed(2);
+    }
+
+    const unit = market === "forex" ? "pips" : "จุด";
+    const den = market === "forex" ? pipSize : 1;
+    const dp = market === "forex" ? 1 : 2;
+    const parts = [];
+    if (entry != null && sl != null) {
+      parts.push("ระยะ SL ≈ " + (Math.abs(entry - sl) / den).toFixed(dp) + " " + unit);
+      const wrong = (currentSide === "short") ? (sl <= entry) : (sl >= entry);
+      if (wrong) parts.push("⚠️ SL ผิดฝั่งกับทิศทางเทรด");
+    }
+    if (entry != null && exit != null) parts.push("ระยะเข้า→ออก ≈ " + (Math.abs(exit - entry) / den).toFixed(dp) + " " + unit);
+    if (entry != null && sl != null && exit != null) {
+      const risk = Math.abs(entry - sl);
+      if (risk > 0) parts.push("R:R ≈ " + (Math.abs(exit - entry) / risk).toFixed(2));
+    }
+    document.getElementById("tfCalcHint").textContent = parts.join("   ·   ");
+  }
+  ["tfEntry", "tfExit", "tfSl"].forEach(id =>
+    document.getElementById(id).addEventListener("input", updateTradeCalc));
+  document.getElementById("tfPipSize").addEventListener("input", () => { tfPipSizeDirty = true; updateTradeCalc(); });
+  document.getElementById("tfPips").addEventListener("input", () => { tfPipsDirty = true; });
+  document.getElementById("tfPoints").addEventListener("input", () => { tfPointsDirty = true; });
+  document.getElementById("tfSymbol").addEventListener("input", () => {
+    if (!tfPipSizeDirty) document.getElementById("tfPipSize").value = guessPipSize(document.getElementById("tfSymbol").value);
+    updateTradeCalc();
   });
 
   function updateGradeToggle() {
@@ -1544,7 +1608,12 @@
     document.getElementById("tfContracts").value = t && t.contracts != null ? t.contracts : "";
     document.getElementById("tfPoints").value = t && t.points != null ? t.points : "";
     document.getElementById("tfEntry").value = t && t.entry != null ? t.entry : "";
+    document.getElementById("tfSl").value = t && t.sl != null ? t.sl : "";
     document.getElementById("tfExit").value = t && t.exit != null ? t.exit : "";
+    document.getElementById("tfPipSize").value = t && t.pipSize != null ? t.pipSize : "";
+    tfPipsDirty = !!(t && t.pips != null);
+    tfPointsDirty = !!(t && t.points != null);
+    tfPipSizeDirty = !!(t && t.pipSize != null);
     document.getElementById("tfPnl").value = (t && t.pnl != null) ? t.pnl : "";
     document.getElementById("tfSession").value = t ? (t.session || "") : "";
     document.getElementById("tfAccount").value = t ? (t.account || "") : "";
@@ -1568,6 +1637,7 @@
     updateGradeToggle();
 
     toggleMarketFields();
+    updateTradeCalc();
     tradeModal.classList.add("open");
   }
   function closeTradeModal() {
@@ -1699,6 +1769,8 @@
       points: marketType === "futures" && document.getElementById("tfPoints").value !== "" ? Number(document.getElementById("tfPoints").value) : null,
       entry: document.getElementById("tfEntry").value !== "" ? Number(document.getElementById("tfEntry").value) : null,
       exit: document.getElementById("tfExit").value !== "" ? Number(document.getElementById("tfExit").value) : null,
+      sl: document.getElementById("tfSl").value !== "" ? Number(document.getElementById("tfSl").value) : null,
+      pipSize: marketType === "forex" && document.getElementById("tfPipSize").value !== "" ? Number(document.getElementById("tfPipSize").value) : null,
       pnl,
       session: document.getElementById("tfSession").value,
       account: document.getElementById("tfAccount").value.trim(),
