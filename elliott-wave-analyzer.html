@@ -1769,6 +1769,17 @@
   }
 
   /* Round 1: objective outcome — scan klines since createdAt for first touch of target vs invalidation */
+  // plain-language meaning of the target / invalidation levels for a count
+  function levelMeaning(md, position) {
+    const rev = position === "reverse";
+    if (md === "impulse") return rev
+      ? { t: "ราคาย้อน 61.8% ของทั้งอิมพัลส์ (กลับตัวตาม terminal)", i: "ราคาทำ new extreme เกินคลื่น 5 → ยังไม่ terminal" }
+      : { t: "ราคาทำ new extreme เกินคลื่น 5 (+38.2% ของขาสุดท้าย)", i: "ราคาย้อนทะลุจุดเริ่มคลื่น 1" };
+    return rev
+      ? { t: "ราคาวิ่งต่อทิศคลื่น A (+38.2%) → จริง ๆ เป็น impulse ใหม่", i: "ราคากลับไปจุดเริ่ม correction → เป็นแค่คลื่นแก้ตัว" }
+      : { t: "ราคากลับไปจุดเริ่ม correction (เทรนด์เดิมกลับมา)", i: "correction ยืดต่ออีก 60% ของขาสุดท้าย" };
+  }
+
   async function checkOutcome(c) {
     if (!c || !c.symbol || !c.timeframe || c.target == null || c.invalidation == null) return "ไม่มี symbol/เป้า — ตรวจเองไม่ได้";
     const sym = String(c.symbol).toUpperCase().replace(/[^A-Z0-9]/g, "");
@@ -1794,12 +1805,17 @@
       if (invHit && inv == null) inv = t;
       if (tgt != null || inv != null) break;
     }
-    if (tgt == null && inv == null) return "pending";
-    if (tgt != null && inv != null) return "ambiguous";
-    const when = new Date(tgt != null ? tgt : inv).toLocaleDateString("th-TH", { day: "2-digit", month: "short", year: "2-digit" });
-    c.outcome = tgt != null ? "correct" : "wrong";
+    const m = levelMeaning(c.mode, c.position);
+    const posTxt = c.position === "reverse" ? "ปลายเทรนด์/กลับตัว" : "คลื่นย่อย/ไปต่อ";
+    if (tgt == null && inv == null) return `pending: ราคายังไม่แตะเป้า ${fmt(c.target)} หรือ invalidation ${fmt(c.invalidation)}`;
+    if (tgt != null && inv != null) return `ambiguous: แท่งเดียวแตะทั้งเป้า ${fmt(c.target)} และ invalidation ${fmt(c.invalidation)} — ตรวจเอง`;
+    const won = tgt != null;
+    const when = new Date(won ? tgt : inv).toLocaleDateString("th-TH", { day: "2-digit", month: "short", year: "2-digit" });
+    c.outcome = won ? "correct" : "wrong";
     c.verifiedAt = Date.now();
-    c.outcomeNote = (tgt != null ? "แตะเป้า " : "แตะ invalidation ") + when + " (auto)";
+    c.outcomeNote = won
+      ? `นับถูก — [${posTxt}] ราคาแตะเป้า ${fmt(c.target)} (${m.t}) เมื่อ ${when} ก่อนแตะ invalidation ${fmt(c.invalidation)} · auto`
+      : `นับผิด — [${posTxt}] ราคาแตะ invalidation ${fmt(c.invalidation)} (${m.i}) เมื่อ ${when} ก่อนถึงเป้า ${fmt(c.target)} · auto`;
     return c.outcome;
   }
   async function checkAllOutcomes() {
@@ -1948,7 +1964,7 @@
       const autoLink = (c.symbol && c.target != null) ? ` <span class="link" data-check="${c.id}" title="เช็คผลอัตโนมัติ">🎯</span>` : "";
       return `<tr${lvTip ? ` title="${lvTip}"` : ""}>
         <td class="mono">${dd}</td>
-        <td>${mkt}${c.name ? `<br><span class="muted-note">${esc(c.name)}</span>` : ""}</td>
+        <td>${mkt}${c.name ? `<br><span class="muted-note">${esc(c.name)}</span>` : ""}${c.outcome !== "pending" && c.outcomeNote ? `<br><span class="muted-note">${esc(c.outcomeNote)}</span>` : ""}</td>
         <td>${mk}</td>
         <td style="text-align:right;" class="mono">${conf}</td>
         <td>${esc(c.myGuess || "—")}</td>
