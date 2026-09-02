@@ -218,7 +218,7 @@
         <div class="gloss-desc">วัดความเร็ว/ขนาดของการขึ้นลงราคาในช่วง 14 วัน มีค่า 0-100</div>
         <div class="gloss-row bad">RSI &gt; 70: ซื้อมากเกินไป (overbought) — ราคาอาจวิ่งเร็วเกินไป เสี่ยงพักตัว/ย่อตัว</div>
         <div class="gloss-row good">RSI &lt; 30: ขายมากเกินไป (oversold) — อาจเป็นจุดหวะสะสมของ ใช้เอาระวัง เพื่ออาจกลับตัว</div>
-        <div class="gloss-row warn">ข้อควรระวัง: สูตรที่ใช้เป็นเวอร์ชันแบบง่าย ไม่ใช้ Wilder's smoothing แบบมาตรฐานที่เว็บออนไลน์บางแห่งใช้ ค่าที่ได้อาจต่างจากที่เห็นใน TradingView เล็กน้อย</div>
+        <div class="gloss-row good">ใช้สูตร Wilder's smoothing มาตรฐาน คำนวณต่อเนื่องจากข้อมูลย้อนหลังทั้งชุด (~100 วัน) — ค่าจะใกล้เคียงกับ TradingView</div>
       </div>
 
       <div class="gloss-item">
@@ -263,9 +263,11 @@
       </div>
 
       <div class="gloss-item">
-        <div class="gloss-title">SMA20/SMA50 และ EMA12/EMA26</div>
-        <div class="gloss-desc">เส้นค่าเฉลี่ยเคลื่อนที่แบบธรรมดา (SMA) และแบบถ่วงน้ำหนักให้ราคาล่าสุด (EMA) ใช้ยืนยันทิศทางเทรนด์และจุดตัดกัน (crossover)</div>
-        <div class="gloss-row warn">EMA เน้นที่คำนวณจากข้อมูลจำนวนจำกัด (ไม่ warm-up เต็มช่วง) ค่าที่ได้จึงอาจคลาดเคลื่อนจากตัวเลขที่แพลตฟอร์มมาตรฐานให้เล็กน้อย โดยเฉพาะ EMA26</div>
+        <div class="gloss-title">SMA20/SMA50, EMA12/EMA26, MACD, ATR</div>
+        <div class="gloss-desc">SMA/EMA = เส้นค่าเฉลี่ยเคลื่อนที่ ใช้ยืนยันทิศทางเทรนด์และจุดตัด (crossover) — EMA คำนวณแบบ warm-up เต็มช่วง (seed ด้วย SMA แล้วไล่ทั้งชุดข้อมูล)</div>
+        <div class="gloss-row good">MACD (12/26/9): ค่าที่แสดงคือ histogram = MACD − Signal. บวก = โมเมนตัมขาขึ้น, ลบ = ขาลง, ตัดผ่าน 0 = สัญญาณเปลี่ยนโมเมนตัม</div>
+        <div class="gloss-row good">ATR (14): ช่วงราคาที่หุ้นแกว่งเฉลี่ยต่อวัน (Wilder) ใช้กะระยะ Stop Loss — ทั่วไปตั้งที่ 1.5–2 เท่าของ ATR จากจุดเข้า</div>
+        <div class="gloss-row good">ตำแหน่งในกรอบ 52 สัปดาห์: 0% = ราคาต่ำสุดของปี, 100% = สูงสุดของปี</div>
       </div>
 
       <div class="gloss-item">
@@ -404,8 +406,9 @@
   <div class="panel">
     <div class="row" style="justify-content:space-between;align-items:center;">
       <h3 style="margin:0;">บันทึกการตัดสินใจ</h3>
-      <div class="row" style="gap:8px;">
-        <input type="text" id="logSearchInput" placeholder="ค้นหาสัญลักษณ์..." style="width:180px;">
+      <div class="row" style="gap:8px;flex-wrap:wrap;">
+        <button class="ghost" id="logRefreshPricesBtn" title="ดึงราคาปัจจุบันของทุกสัญลักษณ์ในบันทึก (ใช้ Twelve Data 1 credit ต่อสัญลักษณ์)">↻ อัปเดตราคาปัจจุบัน</button>
+        <input type="text" id="logSearchInput" placeholder="ค้นหาสัญลักษณ์..." style="width:160px;">
         <select id="logDecisionFilter" style="width:auto;">
           <option value="">ทุกการตัดสินใจ</option>
           <option value="ซื้อ">ซื้อ</option>
@@ -413,6 +416,7 @@
         </select>
       </div>
     </div>
+    <div id="trackRecord" style="margin-top:14px;"></div>
     <div id="logContent" style="margin-top:12px;"></div>
   </div>
 </div>
@@ -589,11 +593,13 @@
 
   function parseDailySeries(json) {
     const values = json.values;
-    if (!values || !values.length) return { closes: [], volumes: [] };
+    if (!values || !values.length) return { closes: [], volumes: [], highs: [], lows: [] };
     // Twelve Data ส่งข้อมูลเรียงจากล่าสุด -> เก่าสุด (descending) อยู่แล้ว
     return {
       closes: values.map((v) => parseFloat(v.close)),
       volumes: values.map((v) => parseFloat(v.volume || 0)),
+      highs: values.map((v) => parseFloat(v.high)),
+      lows: values.map((v) => parseFloat(v.low)),
     };
   }
 
@@ -795,28 +801,78 @@
 
   function sma(closesDesc, period) {
     const s = closesDesc.slice(0, period);
+    if (!s.length) return null;
     return s.reduce((a, b) => a + b, 0) / s.length;
   }
-  function ema(closesDesc, period) {
-    const w = closesDesc.slice(0, period * 3).reverse();
-    if (w.length === 0) return 0;
+  // EMA with full warm-up: seed with the SMA of the oldest `period` points, iterate forward over ALL data.
+  // Input is ascending (oldest first); returns the ascending EMA series.
+  function emaSeriesAsc(asc, period) {
+    if (asc.length < period) return [];
     const k = 2 / (period + 1);
-    let val = w[0];
-    for (let i = 1; i < w.length; i++) val = (w[i] - val) * k + val;
-    return val;
+    let prev = asc.slice(0, period).reduce((a, b) => a + b, 0) / period;
+    const out = [prev];
+    for (let i = period; i < asc.length; i++) { prev = (asc[i] - prev) * k + prev; out.push(prev); }
+    return out;
   }
+  function ema(closesDesc, period) {
+    const s = emaSeriesAsc(closesDesc.slice().reverse(), period);
+    return s.length ? s[s.length - 1] : null;
+  }
+  // Wilder's RSI over all available history
   function rsi(closesDesc, period) {
     period = period || 14;
-    if (closesDesc.length < period + 1) return null;
-    let gains = 0, losses = 0;
-    for (let i = 0; i < period; i++) {
-      const diff = closesDesc[i] - closesDesc[i + 1];
-      if (diff >= 0) gains += diff; else losses -= diff;
+    const asc = closesDesc.slice().reverse();
+    if (asc.length < period + 1) return null;
+    let gain = 0, loss = 0;
+    for (let i = 1; i <= period; i++) {
+      const d = asc[i] - asc[i - 1];
+      if (d >= 0) gain += d; else loss -= d;
     }
-    const avgGain = gains / period, avgLoss = losses / period;
+    let avgGain = gain / period, avgLoss = loss / period;
+    for (let i = period + 1; i < asc.length; i++) {
+      const d = asc[i] - asc[i - 1];
+      avgGain = (avgGain * (period - 1) + (d > 0 ? d : 0)) / period;
+      avgLoss = (avgLoss * (period - 1) + (d < 0 ? -d : 0)) / period;
+    }
     if (avgLoss === 0) return 100;
-    const rs = avgGain / avgLoss;
-    return 100 - 100 / (1 + rs);
+    return 100 - 100 / (1 + avgGain / avgLoss);
+  }
+  // MACD (default 12/26/9) — returns { macd, signal, hist } or null
+  function macd(closesDesc, fast, slow, signal) {
+    fast = fast || 12; slow = slow || 26; signal = signal || 9;
+    const asc = closesDesc.slice().reverse();
+    if (asc.length < slow + signal) return null;
+    const ef = emaSeriesAsc(asc, fast);
+    const es = emaSeriesAsc(asc, slow);
+    const off = ef.length - es.length;
+    const macdLine = es.map((v, i) => ef[i + off] - v);
+    const sig = emaSeriesAsc(macdLine, signal);
+    if (!sig.length) return null;
+    const m = macdLine[macdLine.length - 1], s = sig[sig.length - 1];
+    return { macd: m, signal: s, hist: m - s };
+  }
+  // Wilder's ATR(14) — needs highs/lows/closes (descending)
+  function atr(highsDesc, lowsDesc, closesDesc, period) {
+    period = period || 14;
+    if (!highsDesc || !lowsDesc || !highsDesc.length) return null;
+    const h = highsDesc.slice().reverse(), l = lowsDesc.slice().reverse(), c = closesDesc.slice().reverse();
+    if (h.length < period + 1) return null;
+    const tr = [];
+    for (let i = 1; i < h.length; i++) {
+      tr.push(Math.max(h[i] - l[i], Math.abs(h[i] - c[i - 1]), Math.abs(l[i] - c[i - 1])));
+    }
+    let a = tr.slice(0, period).reduce((x, y) => x + y, 0) / period;
+    for (let i = period; i < tr.length; i++) a = (a * (period - 1) + tr[i]) / period;
+    return a;
+  }
+  // Position within the ~52-week (252 bar) range, 0-100%
+  function range52w(closesDesc, highsDesc, lowsDesc) {
+    const n = Math.min(252, closesDesc.length);
+    const hs = (highsDesc && highsDesc.length ? highsDesc : closesDesc).slice(0, n);
+    const ls = (lowsDesc && lowsDesc.length ? lowsDesc : closesDesc).slice(0, n);
+    const hi = Math.max.apply(null, hs), lo = Math.min.apply(null, ls);
+    const pos = hi > lo ? ((closesDesc[0] - lo) / (hi - lo)) * 100 : 50;
+    return { high: hi, low: lo, pos: Math.max(0, Math.min(100, pos)) };
   }
   function annualizedVolatility(closesDesc, lookback) {
     lookback = lookback || 30;
@@ -838,13 +894,16 @@
     return ((closesDesc[0] - closesDesc[idx]) / closesDesc[idx]) * 100;
   }
 
-  function analyzeStock(closesDesc, volumesDesc, spyClosesDesc, overview) {
+  function analyzeStock(closesDesc, volumesDesc, spyClosesDesc, overview, highsDesc, lowsDesc) {
     const price = closesDesc[0];
     const upFromLow = pctUpFromRecentLow(closesDesc);
     const volSpike = volumeSpikeRatio(volumesDesc);
     const sma20 = sma(closesDesc, 20), sma50 = sma(closesDesc, 50);
     const ema12 = ema(closesDesc, 12), ema26 = ema(closesDesc, 26);
     const rsi14 = rsi(closesDesc, 14);
+    const macdV = macd(closesDesc);
+    const atr14 = atr(highsDesc, lowsDesc, closesDesc, 14);
+    const r52 = range52w(closesDesc, highsDesc, lowsDesc);
     const vol = annualizedVolatility(closesDesc);
     const drawdown = drawdownFrom52wHigh(closesDesc);
     const stockReturn3m = periodReturn(closesDesc, 63);
@@ -888,6 +947,7 @@
 
     return {
       price, sma20, sma50, ema12, ema26, rsi14, vol, drawdown, relStrength, pe,
+      macd: macdV, atr14, atrPct: (atr14 != null && price) ? (atr14 / price) * 100 : null, range52w: r52,
       trendLabel, momentumFlag, riskLevel, valuationFlag, verdict,
       extendedFromHigh: drawdown, name: (overview && overview.Name) || null,
       upFromLow, volSpike, score: scoreResult.score, scoreBreakdown: scoreResult.breakdown,
@@ -967,7 +1027,7 @@
         note: (r.rsi14 !== null && r.rsi14 >= 70 ? "RSI " + r.rsi14.toFixed(1) + " เข้าเขต overbought แล้ว " : "") +
           (r.upFromLow > 80 ? "และราคาขึ้นมาแล้ว " + r.upFromLow.toFixed(0) + "% จากจุดต่ำสุดในกรอบข้อมูล " : "") +
           "เสี่ยงไล่ราคาสูงเกินไป แนะนำรอราคาย่อลงมาใกล้ SMA20 ก่อนพิจารณาเข้า",
-        zoneLow, zoneHigh, stopRef: r.sma50,
+        zoneLow, zoneHigh, stopRef: (r.atr14 != null ? r.price - 2 * r.atr14 : r.sma50),
       };
     }
 
@@ -978,7 +1038,7 @@
         status: "now",
         title: "อยู่ในโซนที่พิจารณาเข้าได้",
         note: "เทรนด์เป็นขาขึ้นและราคายังไม่ยืนตัวมากเกินไป ราคาปัจจุบันอยู่ใกล้เหนือ SMA20 ซึ่งมักถูกใช้เป็นแนวรับของเทรนด์ ถือเป็นจุดที่ความเสี่ยงเทียบผลตอบแทนมักคุ้มค่ากว่าไล่ราคาสูง",
-        zoneLow, zoneHigh, stopRef: r.sma50,
+        zoneLow, zoneHigh, stopRef: (r.atr14 != null ? r.price - 2 * r.atr14 : r.sma50),
       };
     }
 
@@ -1368,7 +1428,7 @@
 
       const overview = await fetchOverview(sym);
 
-      const analysis = analyzeStock(closes, volumes, state.spyCache, overview);
+      const analysis = analyzeStock(closes, volumes, state.spyCache, overview, parsed.highs, parsed.lows);
       state.result = Object.assign({ symbol: sym.toUpperCase() }, analysis);
       renderResult();
       document.getElementById("addWatchlistBtn").classList.remove("hidden");
@@ -1491,6 +1551,13 @@
       metricHtml("P/E", r.pe !== null ? r.pe.toFixed(1) : "ไม่มีข้อมูล", r.valuationFlag, r.pe === null ? "" : (r.pe < 0 || r.pe > 40) ? "neg" : r.pe > 15 ? "neu" : "pos"),
       metricHtml("SMA20 / SMA50", "$" + r.sma20.toFixed(2) + " / $" + r.sma50.toFixed(2)),
       metricHtml("EMA12 / EMA26", "$" + r.ema12.toFixed(2) + " / $" + r.ema26.toFixed(2)),
+      metricHtml("MACD (12/26/9)", r.macd ? (r.macd.hist >= 0 ? "+" : "") + r.macd.hist.toFixed(3) : "—",
+        r.macd ? (r.macd.hist >= 0 ? "MACD เหนือ Signal — โมเมนตัมบวก" : "MACD ใต้ Signal — โมเมนตัมลบ") : "ข้อมูลไม่พอ",
+        r.macd ? (r.macd.hist >= 0 ? "pos" : "neg") : ""),
+      metricHtml("ATR (14)", r.atr14 != null ? "$" + r.atr14.toFixed(2) + (r.atrPct != null ? " · " + r.atrPct.toFixed(1) + "%/วัน" : "") : "—",
+        "ช่วงแกว่งเฉลี่ยต่อวัน — ใช้กะระยะ SL (เช่น 1.5–2×ATR)", "neu"),
+      metricHtml("ตำแหน่งในกรอบ 52 สัปดาห์", r.range52w ? r.range52w.pos.toFixed(0) + "%" : "—",
+        r.range52w ? "ต่ำสุด $" + r.range52w.low.toFixed(2) + " · สูงสุด $" + r.range52w.high.toFixed(2) : "", "neu"),
     ].join("");
     document.getElementById("resMetrics").innerHTML = metrics;
 
@@ -1694,7 +1761,11 @@
       price: state.result.price,
       verdict: state.result.verdict,
       riskLevel: state.result.riskLevel,
+      score: state.result.score != null ? state.result.score : null,
+      rsi14: state.result.rsi14 != null ? Math.round(state.result.rsi14 * 10) / 10 : null,
       decision: decision,
+      acted: decision === "ซื้อ",
+      curPrice: null, curAt: null, exitPrice: null, closedAt: null,
       notes: notes,
     };
     state.log.unshift(entry);
@@ -1705,8 +1776,126 @@
   document.getElementById("logBuyBtn").addEventListener("click", function () { logDecision("ซื้อ"); });
   document.getElementById("logSkipBtn").addEventListener("click", function () { logDecision("ไม่ซื้อ"); });
 
+  // outcome helpers — evaluate a logged decision against a later price
+  function logEntryRefPrice(e) {
+    return e.exitPrice != null ? e.exitPrice : (e.curPrice != null ? e.curPrice : null);
+  }
+  function logEntryReturn(e) {
+    const ref = logEntryRefPrice(e);
+    if (ref == null || !e.price) return null;
+    return ((ref - e.price) / e.price) * 100;
+  }
+  function logEntryDays(e) {
+    const start = Date.parse(e.date + "T00:00:00Z");
+    const end = e.closedAt || e.curAt || Date.now();
+    if (isNaN(start)) return 0;
+    return (end - start) / 86400000;
+  }
+  function verdictHit(e) {
+    // returns true/false/null (null = not directional or not evaluable)
+    const r = logEntryReturn(e);
+    if (r == null || logEntryDays(e) < 5) return null;
+    if (e.verdict === "ขาขึ้น") return r > 1;
+    if (e.verdict === "ขาลง") return r < -1;
+    return null; // "เท่าตัวกลาง" makes no directional claim
+  }
+
+  async function refreshLogPrices() {
+    if (!state.apiKey) { Swal.fire({ icon: "info", title: "ใส่ Twelve Data API key ก่อน (มุมบนขวา)" }); return; }
+    const syms = Array.from(new Set(state.log.map(function (e) { return e.symbol; }).filter(Boolean)));
+    if (!syms.length) return;
+    const btn = document.getElementById("logRefreshPricesBtn");
+    btn.disabled = true; btn.textContent = "กำลังดึงราคา… (" + syms.length + " ตัว)";
+    try {
+      const priceMap = {};
+      // Twelve Data /price accepts a comma list; single symbol returns {price}, multi returns {SYM:{price}}
+      const CHUNK = 60;
+      for (let i = 0; i < syms.length; i += CHUNK) {
+        const part = syms.slice(i, i + CHUNK);
+        const j = await tdFetch("/price", { symbol: part.join(",") });
+        if (part.length === 1) {
+          if (j && j.price != null) priceMap[part[0]] = parseFloat(j.price);
+        } else {
+          part.forEach(function (s) { if (j[s] && j[s].price != null) priceMap[s] = parseFloat(j[s].price); });
+        }
+      }
+      const now = Date.now();
+      state.log.forEach(function (e) {
+        if (priceMap[e.symbol] != null && !isNaN(priceMap[e.symbol])) {
+          e.curPrice = priceMap[e.symbol];
+          e.curAt = now;
+        }
+      });
+      saveLog();
+      renderLog();
+    } catch (err) {
+      Swal.fire({ icon: "error", title: "อัปเดตราคาไม่สำเร็จ", text: err.message || "" });
+    } finally {
+      btn.disabled = false; btn.textContent = "↻ อัปเดตราคาปัจจุบัน";
+    }
+  }
+
+  function renderTrackRecord() {
+    const el = document.getElementById("trackRecord");
+    const ev26 = state.log.filter(function (e) { return logEntryReturn(e) != null; });
+    if (ev26.length < 3) {
+      el.innerHTML = '<div class="empty" style="padding:14px;">Track record: บันทึก ' + state.log.length + ' รายการ · มีราคาอัปเดต ' + ev26.length +
+        ' รายการ — กด "↻ อัปเดตราคาปัจจุบัน" แล้วรอผลสัก 1-2 สัปดาห์ ระบบจะสรุปว่าสัญญาณแม่นแค่ไหน</div>';
+      return;
+    }
+    const dir = ev26.filter(function (e) { return verdictHit(e) !== null; });
+    const hits = dir.filter(function (e) { return verdictHit(e) === true; }).length;
+    const acc = dir.length ? (hits / dir.length) * 100 : null;
+    const avg = function (arr) { return arr.length ? arr.reduce(function (s, x) { return s + x; }, 0) / arr.length : null; };
+    const rets = ev26.map(logEntryReturn);
+
+    function bucket(name, filterFn) {
+      const es = ev26.filter(filterFn);
+      const rs = es.map(logEntryReturn);
+      return { name: name, n: es.length, avg: avg(rs), win: rs.length ? (rs.filter(function (x) { return x > 0; }).length / rs.length) * 100 : null };
+    }
+    const byScore = [
+      bucket("คะแนน < 45", function (e) { return e.score != null && e.score < 45; }),
+      bucket("คะแนน 45–69", function (e) { return e.score != null && e.score >= 45 && e.score < 70; }),
+      bucket("คะแนน ≥ 70", function (e) { return e.score != null && e.score >= 70; }),
+    ].filter(function (b) { return b.n > 0; });
+
+    const buy = ev26.filter(function (e) { return e.decision === "ซื้อ"; });
+    const buyRets = buy.map(logEntryReturn);
+    const fmtPct = function (v) { return v == null ? "—" : (v >= 0 ? "+" : "") + v.toFixed(1) + "%"; };
+    const colorPct = function (v) { return v == null ? "" : v >= 0 ? "pos" : "neg"; };
+
+    const lo = byScore.find(function (b) { return b.name === "คะแนน < 45"; });
+    const hi = byScore.find(function (b) { return b.name === "คะแนน ≥ 70"; });
+    let edge = "เก็บข้อมูลเพิ่มเพื่อดูว่าคะแนนสูงให้ผลดีกว่าจริงไหม";
+    if (lo && hi && lo.avg != null && hi.avg != null) {
+      edge = hi.avg - lo.avg >= 3
+        ? "✓ คะแนนสูง (≥70) ให้ผลตอบแทนเฉลี่ยดีกว่าคะแนนต่ำ (<45) อยู่ " + (hi.avg - lo.avg).toFixed(1) + " จุด% — สัญญาณมีความหมาย"
+        : "ยังไม่เห็นว่าคะแนนสูงได้เปรียบคะแนนต่ำชัดเจน (ต่างกัน " + (hi.avg - lo.avg).toFixed(1) + " จุด%)";
+    }
+
+    let html = '<div class="metrics-grid">' +
+      metricHtml("ความแม่นสัญญาณทิศทาง", acc == null ? "—" : acc.toFixed(0) + "%", hits + "/" + dir.length + " ครั้ง (นับเฉพาะที่ผ่านไป ≥ 5 วัน)", acc == null ? "" : acc >= 55 ? "pos" : acc < 45 ? "neg" : "neu") +
+      metricHtml("ผลเฉลี่ยหลังบันทึก", fmtPct(avg(rets)), ev26.length + " รายการที่มีราคา", colorPct(avg(rets))) +
+      metricHtml("ตามสัญญาณ 'ขาขึ้น'", (function () { var e = ev26.filter(function (x) { return x.verdict === "ขาขึ้น"; }); return fmtPct(avg(e.map(logEntryReturn))); })(), (function () { var e = ev26.filter(function (x) { return x.verdict === "ขาขึ้น"; }); return e.length + " รายการ"; })(), "") +
+      metricHtml("ตัดสินใจ 'ซื้อ' (ผลเฉลี่ย)", fmtPct(avg(buyRets)), buy.length ? buy.length + " ครั้ง · กำไร " + (buyRets.filter(function (x) { return x > 0; }).length) + " ครั้ง" : "ยังไม่มี", colorPct(avg(buyRets))) +
+      '</div>';
+
+    if (byScore.length) {
+      html += '<div class="table-scroll" style="margin-top:10px;"><table><thead><tr><th>ช่วงคะแนน</th><th>จำนวน</th><th>ผลเฉลี่ย</th><th>% ที่กำไร</th></tr></thead><tbody>';
+      byScore.forEach(function (b) {
+        html += '<tr><td>' + b.name + '</td><td class="mono">' + b.n + '</td><td class="mono ' + colorPct(b.avg) + '">' + fmtPct(b.avg) +
+          '</td><td class="mono">' + (b.win == null ? "—" : b.win.toFixed(0) + "%") + '</td></tr>';
+      });
+      html += '</tbody></table></div>';
+    }
+    html += '<div class="gloss-row ' + (lo && hi && lo.avg != null && hi.avg != null && hi.avg - lo.avg >= 3 ? "good" : "warn") + '" style="margin-top:8px;">' + edge + '</div>';
+    el.innerHTML = html;
+  }
+
   function renderLog() {
     const el = document.getElementById("logContent");
+    renderTrackRecord();
     if (state.log.length === 0) { el.innerHTML = '<div class="empty">ยังไม่มีบันทึก — วิเคราะห์หุ้นแล้วกดบันทึกการตัดสินใจเข้าที่นี่</div>'; return; }
 
     const searchQuery = (document.getElementById("logSearchInput").value || "").trim().toUpperCase();
@@ -1716,18 +1905,51 @@
     if (decisionFilter) rows = rows.filter(function (entry) { return entry.decision === decisionFilter; });
     if (rows.length === 0) { el.innerHTML = '<div class="empty">ไม่มีบันทึกที่ตรงเงื่อนไข</div>'; return; }
 
-    let html = '<div class="table-scroll"><table><thead><tr><th>วันที่</th><th>สัญลักษณ์</th><th>ราคา</th><th>สัญญาณ</th><th>ความเสี่ยง</th><th>ตัดสินใจ</th><th></th></tr></thead><tbody>';
+    let html = '<div class="table-scroll"><table><thead><tr><th>วันที่</th><th>สัญลักษณ์</th><th>ราคาบันทึก</th><th>คะแนน</th><th>สัญญาณ</th><th>ตัดสินใจ</th><th>ราคาล่าสุด/ปิด</th><th>ผล %</th><th>ถูก?</th><th></th></tr></thead><tbody>';
     rows.forEach(function (entry) {
       const badgeClass = entry.verdict === "ขาขึ้น" ? "up" : entry.verdict === "ขาลง" ? "down" : "flat";
+      const ref = logEntryRefPrice(entry);
+      const ret = logEntryReturn(entry);
+      const hit = verdictHit(entry);
+      const retCls = ret == null ? "" : ret >= 0 ? "pos" : "neg";
+      const idx = state.log.indexOf(entry);
       html += '<tr><td class="mono">' + entry.date + '</td><td class="mono">' + entry.symbol + '</td>' +
         '<td class="mono">$' + entry.price.toFixed(2) + '</td>' +
+        '<td class="mono">' + (entry.score != null ? entry.score : "—") + '</td>' +
         '<td><span class="badge ' + badgeClass + '">' + entry.verdict + '</span></td>' +
-        '<td>' + entry.riskLevel + '</td><td>' + entry.decision + '</td>' +
-        '<td><button type="button" class="link-btn del-log-entry" data-idx="' + state.log.indexOf(entry) + '">ลบ</button></td></tr>';
+        '<td>' + entry.decision + '</td>' +
+        '<td class="mono">' + (ref != null ? "$" + ref.toFixed(2) + (entry.exitPrice != null ? " (ปิด)" : "") : "—") + '</td>' +
+        '<td class="mono ' + retCls + '">' + (ret == null ? "—" : (ret >= 0 ? "+" : "") + ret.toFixed(1) + "%") + '</td>' +
+        '<td>' + (hit == null ? "–" : hit ? "✓" : "✗") + '</td>' +
+        '<td><button type="button" class="link-btn set-log-exit" data-idx="' + idx + '">ปิดผล</button> · ' +
+        '<button type="button" class="link-btn del-log-entry" data-idx="' + idx + '">ลบ</button></td></tr>';
     });
     html += '</tbody></table></div>';
     el.innerHTML = html;
 
+    el.querySelectorAll(".set-log-exit").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        const idx = Number(btn.dataset.idx);
+        const entry = state.log[idx];
+        if (!entry) return;
+        Swal.fire({
+          title: "ปิดผล " + entry.symbol,
+          input: "number",
+          inputLabel: "ราคาที่ขาย/ปิด (เว้นว่าง = ล้างผลที่ปิดไว้)",
+          inputValue: entry.exitPrice != null ? entry.exitPrice : "",
+          showCancelButton: true,
+          confirmButtonText: "บันทึก",
+          cancelButtonText: "ยกเลิก",
+        }).then(function (r) {
+          if (!r.isConfirmed) return;
+          const v = r.value === "" || r.value == null ? null : Number(r.value);
+          entry.exitPrice = (v != null && !isNaN(v) && v > 0) ? v : null;
+          entry.closedAt = entry.exitPrice != null ? Date.now() : null;
+          saveLog();
+          renderLog();
+        });
+      });
+    });
     el.querySelectorAll(".del-log-entry").forEach(function (btn) {
       btn.addEventListener("click", function () {
         const idx = Number(btn.dataset.idx);
@@ -1752,6 +1974,7 @@
   }
   document.getElementById("logSearchInput").addEventListener("input", renderLog);
   document.getElementById("logDecisionFilter").addEventListener("change", renderLog);
+  document.getElementById("logRefreshPricesBtn").addEventListener("click", refreshLogPrices);
 
   // ---------- bulk scan ----------
   const BULK_PRESET = ["AAPL","MSFT","NVDA","AMZN","GOOGL","META","TSLA","AVGO","COST","PEP",
@@ -1820,7 +2043,7 @@
           } catch (e) { state.spyCache = null; }
         }
 
-        const analysis = analyzeStock(parsed.closes, parsed.volumes, state.spyCache, null);
+        const analysis = analyzeStock(parsed.closes, parsed.volumes, state.spyCache, null, parsed.highs, parsed.lows);
         state.bulkResults.push(Object.assign({ symbol: sym, error: null }, analysis));
       } catch (e) {
         state.bulkResults.push({ symbol: sym, error: e.message || "เกิดข้อผิดพลาด" });
@@ -1855,7 +2078,7 @@
         state.spyCache = parseDailySeries(spyJson).closes;
       } catch (e) { state.spyCache = null; }
     }
-    const analysis = analyzeStock(parsed.closes, parsed.volumes, state.spyCache, null);
+    const analysis = analyzeStock(parsed.closes, parsed.volumes, state.spyCache, null, parsed.highs, parsed.lows);
     const return1m = periodReturn(parsed.closes, 21);
     const return3m = periodReturn(parsed.closes, 63);
     return Object.assign({ symbol: sym, error: null, return1m: return1m, return3m: return3m }, analysis);
