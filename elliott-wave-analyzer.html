@@ -1198,20 +1198,19 @@
       softMax += 3;
       if (legs === 3 || legs === 5) {
         const ok = legs === famSubA;
-        chk.push({ t: `A นับได้ ${legs} ขา -> ต้องเป็น ${legs === 5 ? "motive (Zigzag)" : "corrective (Flat)"}`, pass: ok });
-        soft += ok ? 3 : 0;
-        if (!ok) hard = false;
+        chk.push({ t: `A นับได้ ${legs} ขา -> ${legs === 5 ? "motive (Zigzag)" : "corrective (Flat)"}` + (ok ? "" : " — ขัดกับรูปแบบนี้"), pass: ok });
+        soft += ok ? 3 : -3.5;                 // wrong/stale sub-wave hint = heavy penalty, not a silent kill
       } else {
         chk.push({ t: "ยังไม่ระบุจำนวนขาของ A (ตัวชี้ขาด)", pass: null });
         soft += 1.3;
       }
       if (overlap && fam === "zigzag") {
-        chk.push({ t: "ขา 4 ของ A ทับขา 1 -> เป็น motive ไม่ได้ -> ต้อง Flat", pass: false });
-        hard = false;
+        chk.push({ t: "ขา 4 ของ A ทับขา 1 -> ควรเป็น Flat", pass: false });
+        soft -= 3.5;
       }
       if (s.bStruct) chk.push({ t: `ต้องยืนยัน: คลื่น b เป็น ${s.bStruct}`, pass: null });
 
-      const ratio = softMax ? soft / softMax : 0;
+      const ratio = softMax ? clamp(soft, 0, softMax) / softMax : 0;
       const conf = hard ? clamp(Math.round(34 + ratio * 63), 8, 97) : clamp(Math.round(ratio * 28), 4, 30);
       return { fam, s, chk, hard, conf };
     }
@@ -2246,6 +2245,8 @@
     mode = b.dataset.m;
     [...$("modeSeg").children].forEach(x => x.classList.toggle("active", x === b));
     points = [];
+    subALegs = 0; subA4Overlap = false;                 // clear stale sub-wave hints on a new pattern
+    $("subALegs").value = "0"; $("subA4Overlap").checked = false;
     enterDraw();
   });
   $("drawBtn").addEventListener("click", () => { tool === "draw" ? setTool("pan") : enterDraw(); });
