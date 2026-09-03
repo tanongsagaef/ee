@@ -406,6 +406,7 @@
   let tool = "pan";               // "pan" (drag = scroll history) | "draw" (tap = place pivot)
   let subALegs = 0;               // corrective sub-wave hint: 0 unknown / 3 / 5 legs in wave A
   let subA4Overlap = false;       // wave-4 of A overlaps wave-1 of A → must be Flat
+  let posHint = "continue";       // from #scPos: "continue" (leading-ish) | "reverse" (ending/terminal)
   let scanOn = false;             // Phase 4: auto zigzag/swing overlay
   let scanSens = 4;               // 1..12 sensitivity slider
   let chanOn = false;             // channel trendline overlay (0-2 / 2-4 / 1-3 / B-D ...)
@@ -827,7 +828,7 @@
   window.addEventListener("resize", scheduleDraw);
 
   /* ---------- analysis: impulse 1-2-3-4-5 + diagonal, driven by THEORY ---------- */
-  function analyzeImpulse(P) {
+  function analyzeImpulse(P, I) {
     const G = THEORY.impulse.guide, D = THEORY.diagonal;
     const dir = Math.sign(P[1] - P[0]) || 1;
     const L = [0, Math.abs(P[1] - P[0]), Math.abs(P[2] - P[1]), Math.abs(P[3] - P[2]), Math.abs(P[4] - P[3]), Math.abs(P[5] - P[4])];
@@ -884,23 +885,47 @@
         notes: ["ผิดกฎ: " + why.join(", ") + " -> count นี้ใช้ไม่ได้"] });
     }
 
-    // diagonal (wave 4 overlaps wave 1)
+    // --- diagonal: wave 4 overlaps wave 1 (leading = wave 1/A, ending/terminal = wave 5/C) ---
     if (rule1 && rule2) {
-      const contracting = L[1] >= L[3] && L[3] >= L[5] && L[2] >= L[4];
-      const expanding = L[3] >= L[1] && L[5] >= L[3];
-      let dc = overlap ? 55 : 20;
-      if (overlap && (contracting || expanding)) dc += 12;
-      if (overlap && retr2 >= 0.6) dc += 4;
-      const shape = contracting ? "Contracting" : expanding ? "Expanding" : "ไม่ชัด";
-      cands.push({
-        label: `Diagonal - ${shape} (leading / ending)`,
-        conf: clamp(Math.round(dc), 6, 82),
-        notes: [
-          ...D.rules,
-          overlap ? "คลื่น 4 ทับคลื่น 1 = เข้าเงื่อนไข diagonal" : "ยังไม่เห็นการทับเขตแบบ diagonal",
-          "ending: " + D.endingNote, "leading: " + D.leadingNote,
-        ],
-      });
+      const w4olap = overlap;
+      // shape by leg pattern (loosened) — contracting: each same-dir leg shrinks; expanding: grows
+      const shrink = (L[3] <= L[1] * 1.08 ? 1 : 0) + (L[5] <= L[3] * 1.08 ? 1 : 0) + (L[4] <= L[2] * 1.08 ? 1 : 0);
+      const grow = (L[3] >= L[1] * 0.92 ? 1 : 0) + (L[5] >= L[3] * 0.92 ? 1 : 0) + (L[4] >= L[2] * 0.92 ? 1 : 0);
+      // trendline convergence from bar indices: the 1-3 line vs the 2-4 line
+      let conv = null, throwover = null;
+      if (Array.isArray(I) && I.length === 6) {
+        const s13 = (P[3] - P[1]) / ((I[3] - I[1]) || 1);
+        const s24 = (P[4] - P[2]) / ((I[4] - I[2]) || 1);
+        conv = Math.abs(s13) - Math.abs(s24) > 1e-6 ? "contract"
+          : Math.abs(s24) - Math.abs(s13) > 1e-6 ? "expand" : null;
+        throwover = dir * (P[5] - (P[1] + s13 * (I[5] - I[1]))) > 0;
+      }
+      let shape = "ไม่ชัด";
+      if (conv === "contract" || (shrink >= 2 && grow < 3)) shape = "Contracting";
+      else if (conv === "expand" || (grow >= 2 && shrink < 2)) shape = "Expanding";
+
+      let dc = w4olap ? 60 : 16;
+      if (w4olap && shape !== "ไม่ชัด") dc += 15;
+      if (w4olap && conv) dc += 6;
+      if (w4olap && retr2 >= 0.5 && retr4 >= 0.5) dc += 4;   // deep 2 & 4 typical of diagonals
+      dc = clamp(Math.round(dc), 6, 92);
+
+      const lean = posHint === "reverse" ? "ending" : posHint === "continue" ? "leading" : "?";
+      const label = lean === "ending" ? "Ending Diagonal (Terminal) — คลื่น 5 / C"
+        : lean === "leading" ? "Leading Diagonal — คลื่น 1 / A"
+        : "Diagonal (leading / ending)";
+      const notes = [
+        w4olap ? "คลื่น 4 ทับเขตราคาคลื่น 1 ✓ — ตัวชี้ขาดของ diagonal" : "คลื่น 4 ยังไม่ทับคลื่น 1 — ยังไม่เข้าเงื่อนไข diagonal เต็มตัว",
+        shape === "Contracting"
+          ? "รูปลิ่มบีบเข้า: L1>L3>L5, L2>L4" + (throwover === true ? " · คลื่น 5 throw-over เลยเส้น 1-3 (คลาสสิก)" : throwover === false ? " · คลื่น 5 ไม่ถึงเส้น 1-3 (อาจ truncate)" : "")
+          : shape === "Expanding" ? "รูปลิ่มกางออก: L3>L1, L5>L3 · คลื่น 5 ยาวสุด"
+          : "รูปทรงก้ำกึ่ง — เปิด 📏 แชนเนล ดูว่าเส้น 1-3 กับ 2-4 ลู่เข้า (contracting) หรือกางออก (expanding)",
+        lean === "ending" ? "Ending/Terminal: อยู่ปลายคลื่น 5 หรือ C · ราคาแกว่งเบรกหลอกรอบเส้น 2-4 แบบไม่สะดุด · หลังจบพุ่งย้อนทั้ง diagonal เร็ว ๆ ไปจุดเริ่ม"
+          : lean === "leading" ? "Leading: อยู่คลื่น 1 หรือ A · เริ่มเทรนด์ใหม่ · คลื่น 2 มักลึก 0.618-0.786"
+          : "ตั้ง dropdown ตำแหน่งใน 'บันทึกการนับ' เป็น 'ปลายเทรนด์/กลับตัว' → ประเมินเป็น Ending/Terminal",
+        "ยืนยันด้วย sub-wave: ending = 3-3-3-3-3 · leading = 5-3-5-3-5 (กด 🔬 ตรวจซับเวฟ)",
+      ];
+      cands.push({ label: `${label}${shape !== "ไม่ชัด" ? " — " + shape : ""}`, conf: dc, notes });
     }
 
     let mc = 14;
@@ -1467,7 +1492,7 @@
     }
     $("status").textContent = `ครบ ${n} จุดแล้ว · ลากจุดเพื่อปรับ แล้วผลจะอัปเดตทันที`;
     const P = points.map(p => p.v);
-    const a = mode === "impulse" ? analyzeImpulse(P)
+    const a = mode === "impulse" ? analyzeImpulse(P, points.map(p => p.i))
       : mode === "triangle" ? analyzeTriangle(P)
       : mode === "combination" ? analyzeCombination(P)
       : analyzeCorrective(P);
@@ -1549,7 +1574,7 @@
         const P = win.map(p => p.v);
         let res;
         try {
-          res = sh.mode === "impulse" ? analyzeImpulse(P)
+          res = sh.mode === "impulse" ? analyzeImpulse(P, win.map(p => p.i))
             : sh.mode === "triangle" ? analyzeTriangle(P)
             : sh.mode === "combination" ? analyzeCombination(P)
             : analyzeCorrective(P);
@@ -2034,6 +2059,7 @@
     $("subALegs").value = String(subALegs);
     $("subA4Overlap").checked = subA4Overlap;
     $("scPos").value = c.position === "reverse" ? "reverse" : "continue";
+    posHint = c.position === "reverse" ? "reverse" : "continue";
     if (c.symbol) { symbol = c.symbol; $("symIn").value = c.symbol; }
     if (c.timeframe) { interval = c.timeframe; $("tfSel").value = c.timeframe; }
     [...$("srcSeg").children].forEach(b => b.classList.toggle("active", b.dataset.s === src));
@@ -2223,6 +2249,7 @@
     enterDraw();
   });
   $("drawBtn").addEventListener("click", () => { tool === "draw" ? setTool("pan") : enterDraw(); });
+  $("scPos").addEventListener("change", (e) => { posHint = e.target.value === "reverse" ? "reverse" : "continue"; renderAnalysis(); });
   $("subALegs").addEventListener("change", (e) => { subALegs = parseInt(e.target.value, 10) || 0; renderAnalysis(); saveDraft(); });
   $("subA4Overlap").addEventListener("change", (e) => { subA4Overlap = e.target.checked; renderAnalysis(); saveDraft(); });
   $("subScanBtn").addEventListener("click", autoScanWaveA);
@@ -2353,6 +2380,7 @@
   $("subALegs").value = String(subALegs);
   $("subA4Overlap").checked = subA4Overlap;
   $("scanSens").value = String(scanSens);
+  posHint = $("scPos").value === "reverse" ? "reverse" : "continue";
   $("scanBtn").classList.toggle("solid", scanOn);
   $("chanBtn").classList.toggle("solid", chanOn);
   [...$("srcSeg").children].forEach(b => b.classList.toggle("active", b.dataset.s === src));
