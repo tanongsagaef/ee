@@ -139,6 +139,9 @@
     background: var(--surface-alt); border: 1px solid var(--border); color: var(--text);
     padding: 7px 10px; border-radius: 9px; font-size: 12.5px; font-family: inherit;
   }
+  .sc-form .fld { display: flex; flex-direction: column; gap: 3px; }
+  .sc-form .fld > span { font-size: 10px; letter-spacing: .3px; color: var(--muted); font-weight: 800; text-transform: uppercase; }
+  #scEdit .sc-form input, #scEdit .sc-form select { background: var(--surface); }
   .sc-form input#scName { flex: 1 1 160px; }
   .sc-form input#scGuess { flex: 1 1 160px; }
   .sc-wrap { overflow: auto; max-height: 48vh; border: 1px solid var(--border); border-radius: 10px; }
@@ -268,13 +271,15 @@
     <div class="panel">
       <h2>บันทึกการนับ · Track Record <span class="sub" id="trSummary"></span></h2>
       <div class="sc-form">
-        <input id="scName" placeholder="ชื่อ/โน้ตสั้น ๆ เช่น 'นับหลัก TF 4h'">
-        <input id="scGuess" placeholder="ฉันเดาว่าเป็น (เช่น Zigzag)">
-        <select id="scPos" title="ตำแหน่งของ count นี้ — กำหนดเป้า/invalidation ที่ใช้ตรวจผล">
-          <option value="continue">คลื่นย่อย → เทรนด์ไปต่อ</option>
-          <option value="reverse">ปลายเทรนด์ → กลับตัว</option>
-        </select>
-        <button class="btn solid" id="scSave">＋ บันทึกการนับนี้</button>
+        <label class="fld"><span>ชื่อ / โน้ต</span><input id="scName" placeholder="เช่น นับหลัก TF 4h"></label>
+        <label class="fld"><span>ฉันเดาว่าเป็น</span><input id="scGuess" placeholder="เช่น Zigzag"></label>
+        <label class="fld"><span>ตำแหน่ง (กำหนดเป้า/invalidation)</span>
+          <select id="scPos">
+            <option value="continue">คลื่นย่อย → เทรนด์ไปต่อ</option>
+            <option value="reverse">ปลายเทรนด์ → กลับตัว</option>
+          </select>
+        </label>
+        <button class="btn solid" id="scSave" style="align-self:flex-end;">＋ บันทึกการนับนี้</button>
       </div>
       <div class="tr-filters">
         <input id="fSearch" placeholder="ค้นหา (ชื่อ / ฉันเดา / pattern / โน้ต)" style="width:210px;">
@@ -296,6 +301,29 @@
       </div>
       <div class="muted-note" id="scEmpty">ยังไม่มีบันทึก — วางจุดให้ครบแล้วกด “บันทึกการนับนี้”</div>
       <div style="margin-top:6px;"><button class="btn" id="scMoreBtn" hidden></button></div>
+
+      <div id="scEdit" hidden style="margin-top:10px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface-alt);">
+        <div class="muted-note" style="margin-bottom:8px;">แก้ไขการนับ <span id="edWhich" class="mono"></span></div>
+        <div class="sc-form">
+          <label class="fld"><span>ชื่อ / โน้ต</span><input id="edName"></label>
+          <label class="fld"><span>ฉันเดาว่าเป็น</span><input id="edGuess"></label>
+          <label class="fld"><span>ตำแหน่ง</span>
+            <select id="edPos">
+              <option value="continue">คลื่นย่อย → เทรนด์ไปต่อ</option>
+              <option value="reverse">ปลายเทรนด์ → กลับตัว</option>
+            </select>
+          </label>
+          <label class="fld"><span>ผล</span>
+            <select id="edOut"><option value="pending">รอผล</option><option value="correct">ถูก</option><option value="wrong">ผิด</option></select>
+          </label>
+          <label class="fld" style="flex:1 1 220px;"><span>โน้ตผล</span><input id="edNote"></label>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+          <button class="btn solid" id="edSave">บันทึกการแก้ไข</button>
+          <button class="btn" id="edCancel">ยกเลิก</button>
+          <button class="btn" id="edOpen">เปิดบนกราฟ</button>
+        </div>
+      </div>
 
       <div id="statsBox" hidden>
         <h2 style="margin-top:16px;">สถิติความแม่น <span class="sub">เฉพาะที่ตรวจผลแล้ว</span></h2>
@@ -2047,6 +2075,7 @@
         <td style="white-space:nowrap;">${sel} <span class="link" data-note="${c.id}" title="โน้ตผล">📝</span>${autoLink}</td>
         <td style="white-space:nowrap;">
           <span class="link" data-open="${c.id}">เปิด</span> ·
+          <span class="link" data-edit="${c.id}">แก้ไข</span> ·
           <span class="link" data-del="${c.id}" style="color:var(--bear);">ลบ</span>
         </td>
       </tr>`;
@@ -2091,9 +2120,9 @@
     persistCounts();
   });
   $("scTbl").addEventListener("click", async (e) => {
-    const el = e.target.closest("[data-open],[data-del],[data-note],[data-check]");
+    const el = e.target.closest("[data-open],[data-del],[data-note],[data-check],[data-edit]");
     if (!el) return;
-    const id = el.dataset.open || el.dataset.del || el.dataset.note || el.dataset.check;
+    const id = el.dataset.open || el.dataset.del || el.dataset.note || el.dataset.check || el.dataset.edit;
     const c = counts.find(x => String(x.id) === id);
     if (!c) return;
     if (el.dataset.check != null) {
@@ -2103,6 +2132,8 @@
         if (res === "correct" || res === "wrong") { persistCounts(); }
         else { el.textContent = "🎯"; alert("ผล: " + res); }
       } catch (err) { el.textContent = "🎯"; alert("เช็คไม่สำเร็จ: " + err.message); }
+    } else if (el.dataset.edit != null) {
+      openEditCount(c);
     } else if (el.dataset.note != null) {
       const v = prompt("โน้ตผลการนับนี้:", c.outcomeNote || "");
       if (v != null) { c.outcomeNote = v.trim(); persistCounts(); }
@@ -2111,6 +2142,43 @@
     } else {
       loadCountToChart(c);
     }
+  });
+
+  let editingId = null;
+  function openEditCount(c) {
+    editingId = String(c.id);
+    $("edWhich").textContent = (c.symbol ? c.symbol + " " + (c.timeframe || "") + " · " : "") +
+      new Date(c.createdAt).toLocaleDateString("th-TH", { day: "2-digit", month: "short", year: "2-digit" });
+    $("edName").value = c.name || "";
+    $("edGuess").value = c.myGuess || "";
+    $("edPos").value = c.position === "reverse" ? "reverse" : "continue";
+    $("edOut").value = /^(correct|wrong)$/.test(c.outcome) ? c.outcome : "pending";
+    $("edNote").value = c.outcomeNote || "";
+    $("scEdit").hidden = false;
+    $("scEdit").scrollIntoView({ block: "nearest" });
+  }
+  $("edCancel").addEventListener("click", () => { $("scEdit").hidden = true; editingId = null; });
+  $("edOpen").addEventListener("click", () => {
+    const c = counts.find(x => String(x.id) === editingId);
+    if (c) { $("scEdit").hidden = true; editingId = null; loadCountToChart(c); }
+  });
+  $("edSave").addEventListener("click", () => {
+    const c = counts.find(x => String(x.id) === editingId);
+    if (!c) return;
+    c.name = $("edName").value.trim();
+    c.myGuess = $("edGuess").value.trim();
+    const np = $("edPos").value === "reverse" ? "reverse" : "continue";
+    if (np !== c.position && Array.isArray(c.points) && c.points.length) {
+      const lv = countLevels(c.mode, c.points.map(p => p.v), np);
+      c.dir = lv.dir; c.target = lv.target; c.invalidation = lv.invalidation;
+    }
+    c.position = np;
+    const no = $("edOut").value;
+    if (no !== c.outcome) c.verifiedAt = no === "pending" ? null : Date.now();
+    c.outcome = no;
+    c.outcomeNote = $("edNote").value.trim();
+    $("scEdit").hidden = true; editingId = null;
+    persistCounts(); refreshPatFilter();
   });
   $("checkAllBtn").addEventListener("click", checkAllOutcomes);
   $("scMoreBtn").addEventListener("click", () => { scShowAll = !scShowAll; renderCounts(); });
