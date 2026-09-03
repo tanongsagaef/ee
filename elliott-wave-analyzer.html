@@ -277,6 +277,7 @@
         <button class="btn solid" id="scSave">＋ บันทึกการนับนี้</button>
       </div>
       <div class="tr-filters">
+        <input id="fSearch" placeholder="ค้นหา (ชื่อ / ฉันเดา / pattern / โน้ต)" style="width:210px;">
         <input id="fSym" placeholder="เหรียญ" style="width:88px;text-transform:uppercase;">
         <select id="fTf"><option value="">TF ทั้งหมด</option><option>15m</option><option>1h</option><option>4h</option><option>1d</option><option>1w</option></select>
         <select id="fPat"><option value="">Pattern ทั้งหมด</option></select>
@@ -1956,11 +1957,17 @@
   function filteredCounts() {
     const sym = ($("fSym").value || "").trim().toUpperCase();
     const tf = $("fTf").value, pat = $("fPat").value, out = $("fOut").value;
+    const q = ($("fSearch").value || "").trim().toLowerCase();
     return counts.filter(c => {
       if (sym && (c.symbol || "").toUpperCase().indexOf(sym) < 0) return false;
       if (tf && c.timeframe !== tf) return false;
       if (pat && patternFamily(c.matched && c.matched.label) !== pat) return false;
       if (out && c.outcome !== out) return false;
+      if (q) {
+        const hay = [c.name, c.myGuess, c.matched && c.matched.label, c.symbol, c.timeframe, c.outcomeNote, c.mode]
+          .filter(Boolean).join(" ").toLowerCase();
+        if (hay.indexOf(q) < 0) return false;
+      }
       return true;
     });
   }
@@ -2069,7 +2076,7 @@
   });
   $("checkAllBtn").addEventListener("click", checkAllOutcomes);
   $("scMoreBtn").addEventListener("click", () => { scShowAll = !scShowAll; renderCounts(); });
-  ["fSym", "fTf", "fPat", "fOut"].forEach(id => $(id).addEventListener("input", () => { scShowAll = false; renderCounts(); }));
+  ["fSearch", "fSym", "fTf", "fPat", "fOut"].forEach(id => $(id).addEventListener("input", () => { scShowAll = false; renderCounts(); }));
 
   // make sure a count actually carries the drawn chart + points before we save it
   function validateCountForSave(c) {
