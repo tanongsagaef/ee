@@ -2208,10 +2208,16 @@
     const CAP = 800;
     let cs = candles, pts = points.map(p => ({ i: p.i, v: p.v })), v = { i0: view.i0, n: view.n };
     if (candles && candles.length > CAP) {
-      const off = candles.length - CAP;
-      cs = candles.slice(off);
-      pts = pts.map(p => ({ i: p.i - off, v: p.v }));
-      v = { i0: Math.max(0, view.i0 - off), n: view.n };
+      // keep a window that CONTAINS every pivot (drawn on history or on the live edge), not just the last CAP bars
+      const iis = points.map(p => p.i);
+      const lo = Math.min.apply(null, iis), hi = Math.max.apply(null, iis);
+      const width = Math.max(CAP, (hi - lo) + 60);
+      let start = Math.max(0, Math.round(lo - (width - (hi - lo)) / 2));
+      start = Math.min(start, Math.max(0, candles.length - width));
+      const end = Math.min(candles.length, start + width);
+      cs = candles.slice(start, end);
+      pts = pts.map(p => ({ i: p.i - start, v: p.v }));
+      v = { i0: Math.max(0, view.i0 - start), n: view.n };
     }
     const cands = lastAnalysis ? lastAnalysis.cands.map(x => ({ label: x.label, conf: x.conf })) : [];
     const position = $("scPos").value === "reverse" ? "reverse" : "continue";
