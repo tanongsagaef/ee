@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="color-scheme" content="light dark" />
+<title>เครื่องมือเทรด · Position Calc + Session</title>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f4f6fb; --surface: #ffffff; --surface-alt: #f3f4f9; --border: #e5e7f0;
+    --text: #14162a; --muted: #6b7080;
+    --accent: #4f46e5; --accent-hover: #4338ca; --accent-soft: #eef0fe;
+    --bull: #16a34a; --bull-soft: rgba(22,163,74,0.10);
+    --bear: #dc2626; --bear-soft: rgba(220,38,38,0.10);
+    --warn: #d97706; --warn-soft: rgba(217,119,6,0.12);
+    --shadow: 0 1px 2px rgba(16,24,40,.04), 0 6px 16px rgba(16,24,40,.06);
+    --radius: 14px;
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #0f1117; --surface: #171923; --surface-alt: #1e2029; --border: #2a2d3a;
+    --text: #eceefb; --muted: #9a9db3;
+    --accent: #8386ff; --accent-hover: #9a9dff; --accent-soft: #262a52;
+    --bull: #34c77b; --bull-soft: rgba(52,199,123,0.14);
+    --bear: #ff6f68; --bear-soft: rgba(255,111,104,0.14);
+    --warn: #f0a54a; --warn-soft: rgba(240,165,74,0.16);
+    --shadow: 0 1px 3px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 20px 20px 60px;
+    font-family: "Sarabun", "Noto Sans Thai", "Segoe UI", system-ui, sans-serif;
+    background: var(--bg); color: var(--text);
+  }
+  .mono { font-family: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", monospace; }
+  a { color: inherit; }
+
+  .header {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 14px 20px; box-shadow: var(--shadow); margin-bottom: 18px;
+  }
+  .brand { font-size: 20px; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+  .brand .dot { color: var(--accent); }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .navlink {
+    background: var(--accent-soft); border: 1px solid transparent; color: var(--accent);
+    padding: 9px 14px; border-radius: 10px; font-size: 13px; text-decoration: none; font-weight: 700;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .navlink:hover { background: var(--accent); color: #fff; }
+  .navlink.plain { background: var(--surface); border-color: var(--border); color: var(--text); }
+  .icon-btn {
+    background: var(--surface); border: 1px solid var(--border); color: var(--text);
+    width: 34px; height: 34px; border-radius: 8px; cursor: pointer; font-size: 15px;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .icon-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .layout { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+  .panel {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 16px 18px; box-shadow: var(--shadow); margin-bottom: 16px;
+  }
+  .panel h2 {
+    margin: 0 0 12px; font-size: 12px; letter-spacing: .5px; color: var(--muted);
+    text-transform: uppercase; font-weight: 800;
+  }
+  .panel h2 .sub { text-transform: none; letter-spacing: 0; font-weight: 600; color: var(--muted); margin-left: 8px; }
+
+  .seg { display: inline-flex; gap: 4px; background: var(--surface-alt); border-radius: 10px; padding: 4px; margin-bottom: 12px; }
+  .seg button {
+    border: none; background: transparent; color: var(--muted); font-weight: 700; font-size: 12.5px;
+    padding: 7px 16px; border-radius: 7px; cursor: pointer; font-family: inherit;
+  }
+  .seg button.active { background: var(--surface); color: var(--accent); box-shadow: var(--shadow); }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .fld { display: flex; flex-direction: column; gap: 3px; }
+  .fld > span { font-size: 10px; letter-spacing: .3px; color: var(--muted); font-weight: 800; text-transform: uppercase; }
+  .fld input, .fld select {
+    background: var(--surface-alt); border: 1px solid var(--border); color: var(--text);
+    padding: 8px 10px; border-radius: 9px; font-size: 13px; font-family: inherit; width: 100%;
+  }
+  .fld input:focus, .fld select:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+  .riskrow { display: flex; gap: 6px; align-items: flex-end; }
+  .riskrow .fld { flex: 1; }
+  .mini-seg { display: inline-flex; border: 1px solid var(--border); border-radius: 9px; overflow: hidden; }
+  .mini-seg button { border: none; background: var(--surface-alt); color: var(--muted); font-weight: 800; font-size: 12px; padding: 8px 10px; cursor: pointer; font-family: inherit; }
+  .mini-seg button.active { background: var(--accent); color: #fff; }
+
+  .result { margin-top: 14px; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .result .big { background: var(--accent-soft); padding: 14px 16px; }
+  .result .big .lbl { font-size: 10.5px; text-transform: uppercase; letter-spacing: .4px; color: var(--muted); font-weight: 800; }
+  .result .big .num { font-size: 30px; font-weight: 900; line-height: 1.1; color: var(--accent); }
+  .result .big .sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .result table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .result td { padding: 8px 16px; border-top: 1px solid var(--border); }
+  .result td:last-child { text-align: right; font-weight: 700; }
+  .flag { margin-top: 8px; font-size: 12px; padding: 8px 10px; border-radius: 9px; }
+  .flag.warn { background: var(--warn-soft); color: var(--warn); }
+  .flag.ok { background: var(--bull-soft); color: var(--bull); }
+
+  /* session clock */
+  .clock-now { font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+  .clock-now b { color: var(--text); font-size: 15px; }
+  .tl { position: relative; height: 132px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-alt); overflow: hidden; }
+  .tl .lane { position: absolute; height: 24px; border-radius: 5px; font-size: 10.5px; font-weight: 800; color: #fff;
+    display: flex; align-items: center; padding-left: 7px; white-space: nowrap; overflow: hidden; }
+  .tl .hr { position: absolute; top: 0; bottom: 18px; border-left: 1px solid var(--border); font-size: 8.5px; color: var(--muted); padding-left: 2px; }
+  .tl .now { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--bear); z-index: 5; }
+  .tl .now::after { content: "now"; position: absolute; top: 2px; left: 3px; font-size: 8.5px; color: var(--bear); font-weight: 800; }
+  .sess-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap: 8px; margin-top: 10px; }
+  .sess { border: 1px solid var(--border); border-radius: 9px; padding: 8px 10px; font-size: 12px; }
+  .sess .nm { font-weight: 800; }
+  .sess .st { font-size: 11px; }
+  .sess.open { border-color: var(--bull); background: var(--bull-soft); }
+  .sess.open .st { color: var(--bull); font-weight: 800; }
+
+  /* news */
+  .ev { display: flex; justify-content: space-between; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .ev:last-child { border-bottom: none; }
+  .ev .when { color: var(--muted); font-size: 12px; white-space: nowrap; }
+  .ev.soon { color: var(--bear); font-weight: 700; }
+  .newsflag { background: var(--bear-soft); color: var(--bear); padding: 8px 12px; border-radius: 10px; font-weight: 800; font-size: 13px; margin-bottom: 10px; }
+  .btn { background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 7px 12px; border-radius: 9px; font-size: 12.5px; font-weight: 700; cursor: pointer; font-family: inherit; }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn.solid { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .muted-note { color: var(--muted); font-size: 12px; }
+  @media (max-width: 560px) { body { padding: 12px 12px 50px; } .grid2 { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="brand"><span class="dot">◆</span> เครื่องมือเทรด <span class="mono" style="font-size:12px;color:var(--muted);font-weight:600;">Position + Session</span></div>
+  <div class="row">
+    <a class="navlink plain" href="index.html">◂ ห้องนักบิน</a>
+    <a class="navlink" href="trade-journal.html">📓 Trade Journal</a>
+    <a class="navlink" href="stock-decision-terminal.html">📊 Stock / Decide</a>
+    <a class="navlink" href="elliott-wave-analyzer.html">📐 EW Analyzer</a>
+    <button class="icon-btn" id="themeToggle" title="สลับโหมดสว่าง/มืด">◐</button>
+  </div>
+</div>
+
+<div class="layout">
+  <div class="col">
+
+    <div class="panel">
+      <h2>เครื่องคิดขนาดโพสิชัน <span class="sub">คำนวณจากความเสี่ยงที่รับได้</span></h2>
+      <div class="seg" id="calcMode">
+        <button data-m="forex" class="active">Forex</button>
+        <button data-m="futures">Futures</button>
+      </div>
+
+      <div class="grid2">
+        <label class="fld"><span>พอร์ต ($)</span><input id="cBal" type="number" step="any" value="1000"></label>
+        <div class="fld"><span>ความเสี่ยงต่อไม้</span>
+          <div class="riskrow">
+            <input id="cRisk" type="number" step="any" value="1" style="flex:1;">
+            <span class="mini-seg" id="riskUnit"><button data-u="pct" class="active">%</button><button data-u="usd">$</button></span>
+          </div>
+        </div>
+        <label class="fld"><span>ราคาเข้า</span><input id="cEntry" type="number" step="any"></label>
+        <label class="fld"><span>ราคา SL</span><input id="cSl" type="number" step="any"></label>
+        <label class="fld"><span>ราคาเป้า (ไม่ใส่ก็ได้)</span><input id="cTp" type="number" step="any"></label>
+        <label class="fld" id="fxPairWrap"><span>คู่เงิน / สินค้า</span>
+          <select id="cInst"></select>
+        </label>
+      </div>
+
+      <div class="grid2" style="margin-top:10px;">
+        <label class="fld" id="pipSizeWrap"><span>ขนาด 1 pip</span><input id="cPipSize" type="number" step="any"></label>
+        <label class="fld" id="pipValWrap"><span>มูลค่า/pip ต่อ 1.00 lot ($)</span><input id="cPipVal" type="number" step="any"></label>
+        <label class="fld" id="tickSizeWrap" hidden><span>ขนาด 1 tick</span><input id="cTickSize" type="number" step="any"></label>
+        <label class="fld" id="tickValWrap" hidden><span>มูลค่า/tick ต่อ 1 สัญญา ($)</span><input id="cTickVal" type="number" step="any"></label>
+      </div>
+
+      <div class="result" id="cResult"></div>
+      <div class="muted-note" style="margin-top:8px;">แก้ค่า pip/tick ได้ถ้าโบรกเกอร์คุณต่างจากค่ามาตรฐาน (เช่น JPY pairs ปรับตามเรทปัจจุบัน)</div>
+    </div>
+
+  </div>
+  <div class="col">
+
+    <div class="panel">
+      <h2>นาฬิกา Session <span class="sub" id="clkTz"></span></h2>
+      <div class="clock-now" id="clkNow"></div>
+      <div class="tl" id="clkTl"></div>
+      <div class="sess-list" id="sessList"></div>
+      <div class="muted-note" style="margin-top:8px;">เวลาโดยประมาณ (ไม่ปรับ DST) · โซนทองคำ = London × New York ทับกัน</div>
+    </div>
+
+    <div class="panel">
+      <h2>ข่าวแรง <span class="sub">FOMC / NFP + ที่คุณเพิ่มเอง</span></h2>
+      <div id="newsBanner"></div>
+      <div id="newsList"></div>
+      <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end;">
+        <label class="fld" style="flex:2 1 140px;"><span>ชื่อข่าว</span><input id="evName" placeholder="เช่น CPI, ECB"></label>
+        <label class="fld" style="flex:2 1 170px;"><span>วัน–เวลา (เวลาคุณ)</span><input id="evAt" type="datetime-local"></label>
+        <button class="btn solid" id="evAdd">＋ เพิ่ม</button>
+      </div>
+      <div class="muted-note" style="margin-top:8px;">
+        ปฏิทินเต็มดูที่ <a href="https://www.forexfactory.com/calendar" target="_blank" rel="noopener">ForexFactory</a> ·
+        <button class="btn" id="newsFetch" style="padding:3px 8px;">ลองโหลดสัปดาห์นี้</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const root = document.documentElement;
+  function applyTheme(t) { root.setAttribute("data-theme", t); try { localStorage.setItem("tj_theme", t); } catch (e) {} }
+  applyTheme((function () { try { return localStorage.getItem("tj_theme"); } catch (e) { return null; } })() ||
+    (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
+  $("themeToggle").addEventListener("click", () => applyTheme(root.getAttribute("data-theme") === "dark" ? "light" : "dark"));
+
+  const fmt = (n, d = 2) => (n == null || !isFinite(n)) ? "—" : Number(n).toLocaleString("en-US", { maximumFractionDigits: d, minimumFractionDigits: d > 2 ? 0 : 0 });
+  const money = (n) => (n == null || !isFinite(n)) ? "—" : "$" + Number(n).toLocaleString("en-US", { maximumFractionDigits: 2 });
+
+  /* ================= position calculator ================= */
+  const FX = [
+    { k: "EUR/USD", pip: 0.0001, val: 10 }, { k: "GBP/USD", pip: 0.0001, val: 10 },
+    { k: "AUD/USD", pip: 0.0001, val: 10 }, { k: "NZD/USD", pip: 0.0001, val: 10 },
+    { k: "USD/JPY", pip: 0.01, val: 6.7 }, { k: "EUR/JPY", pip: 0.01, val: 6.7 },
+    { k: "GBP/JPY", pip: 0.01, val: 6.7 }, { k: "AUD/JPY", pip: 0.01, val: 6.7 },
+    { k: "USD/CAD", pip: 0.0001, val: 7.3 }, { k: "USD/CHF", pip: 0.0001, val: 12 },
+    { k: "EUR/GBP", pip: 0.0001, val: 13.5 },
+    { k: "XAU/USD (ทอง, 100oz/lot)", pip: 0.1, val: 10 },
+    { k: "XAG/USD (เงิน, 5000oz/lot)", pip: 0.01, val: 50 },
+    { k: "US30 / DJ30 (CFD)", pip: 1, val: 1 },
+    { k: "NAS100 (CFD)", pip: 1, val: 1 },
+    { k: "กำหนดเอง", pip: 0.0001, val: 10 },
+  ];
+  const FUT = [
+    { k: "ES  E-mini S&P", ts: 0.25, tv: 12.5 }, { k: "MES Micro S&P", ts: 0.25, tv: 1.25 },
+    { k: "NQ  E-mini Nasdaq", ts: 0.25, tv: 5 }, { k: "MNQ Micro Nasdaq", ts: 0.25, tv: 0.5 },
+    { k: "YM  E-mini Dow", ts: 1, tv: 5 }, { k: "MYM Micro Dow", ts: 1, tv: 0.5 },
+    { k: "RTY E-mini Russell", ts: 0.1, tv: 5 }, { k: "M2K Micro Russell", ts: 0.1, tv: 0.5 },
+    { k: "GC  Gold (100oz)", ts: 0.1, tv: 10 }, { k: "MGC Micro Gold (10oz)", ts: 0.1, tv: 1 },
+    { k: "SI  Silver (5000oz)", ts: 0.005, tv: 25 }, { k: "CL  Crude (1000bbl)", ts: 0.01, tv: 10 },
+    { k: "MCL Micro Crude (100bbl)", ts: 0.01, tv: 1 }, { k: "6E  Euro FX", ts: 0.00005, tv: 6.25 },
+    { k: "6B  British Pound", ts: 0.0001, tv: 6.25 }, { k: "6J  Japanese Yen", ts: 0.0000005, tv: 6.25 },
+    { k: "กำหนดเอง", ts: 0.25, tv: 12.5 },
+  ];
+  let calcMode = "forex", riskUnit = "pct";
+
+  function fillInst() {
+    const sel = $("cInst"); const list = calcMode === "forex" ? FX : FUT;
+    sel.innerHTML = list.map((o, i) => `<option value="${i}">${o.k}</option>`).join("");
+    onInst();
+  }
+  function onInst() {
+    const i = +$("cInst").value || 0;
+    if (calcMode === "forex") {
+      const o = FX[i]; $("cPipSize").value = o.pip; $("cPipVal").value = o.val;
+    } else {
+      const o = FUT[i]; $("cTickSize").value = o.ts; $("cTickVal").value = o.tv;
+    }
+    calc();
+  }
+  function setMode(m) {
+    calcMode = m;
+    [...$("calcMode").children].forEach(b => b.classList.toggle("active", b.dataset.m === m));
+    const fx = m === "forex";
+    $("pipSizeWrap").hidden = !fx; $("pipValWrap").hidden = !fx;
+    $("tickSizeWrap").hidden = fx; $("tickValWrap").hidden = fx;
+    $("fxPairWrap").querySelector("span").textContent = fx ? "คู่เงิน / สินค้า" : "สินค้า Futures";
+    fillInst();
+  }
+
+  function calc() {
+    const bal = parseFloat($("cBal").value), risk = parseFloat($("cRisk").value);
+    const entry = parseFloat($("cEntry").value), sl = parseFloat($("cSl").value), tp = parseFloat($("cTp").value);
+    const R = $("cResult");
+    const riskAmt = riskUnit === "pct" ? (bal * risk / 100) : risk;
+    if (!isFinite(riskAmt) || riskAmt <= 0 || !isFinite(entry) || !isFinite(sl) || entry === sl) {
+      R.innerHTML = `<div class="big"><div class="lbl">ขนาดโพสิชัน</div><div class="num">—</div><div class="sub">กรอก พอร์ต · ความเสี่ยง · ราคาเข้า · ราคา SL</div></div>`;
+      return;
+    }
+    let rows = [], bigNum, bigSub, flags = [];
+    if (calcMode === "forex") {
+      const pipSize = parseFloat($("cPipSize").value), pipVal = parseFloat($("cPipVal").value);
+      if (!(pipSize > 0) || !(pipVal > 0)) { R.innerHTML = `<div class="big"><div class="num">—</div><div class="sub">ตรวจค่า pip</div></div>`; return; }
+      const stopPips = Math.abs(entry - sl) / pipSize;
+      const lots = riskAmt / (stopPips * pipVal);
+      const units = lots * 100000;
+      bigNum = fmt(lots, 2) + " lot";
+      bigSub = fmt(units, 0) + " units · SL " + fmt(stopPips, 1) + " pips";
+      rows.push(["$ ที่เสี่ยงจริง", money(stopPips * pipVal * lots)]);
+      rows.push(["มูลค่า/pip (โพสิชันนี้)", money(pipVal * lots)]);
+      rows.push(["Mini / Micro", fmt(lots * 10, 1) + " / " + fmt(lots * 100, 0)]);
+      if (isFinite(tp) && tp !== entry) {
+        const tpPips = Math.abs(tp - entry) / pipSize, rr = tpPips / stopPips;
+        rows.push(["ระยะเป้า", fmt(tpPips, 1) + " pips"]);
+        rows.push(["R:R", "1 : " + fmt(rr, 2)]);
+        rows.push(["กำไรที่เป้า", money(tpPips * pipVal * lots)]);
+      }
+      if (lots < 0.01) flags.push(["warn", "ขนาด < 0.01 lot — SL ไกลไป หรือความเสี่ยงน้อยไป"]);
+    } else {
+      const ts = parseFloat($("cTickSize").value), tv = parseFloat($("cTickVal").value);
+      if (!(ts > 0) || !(tv > 0)) { R.innerHTML = `<div class="big"><div class="num">—</div><div class="sub">ตรวจค่า tick</div></div>`; return; }
+      const stopPts = Math.abs(entry - sl);
+      const ticks = stopPts / ts;
+      const riskPerC = ticks * tv;
+      const contracts = Math.floor(riskAmt / riskPerC);
+      const actual = contracts * riskPerC;
+      bigNum = contracts + " สัญญา";
+      bigSub = "SL " + fmt(stopPts, 2) + " จุด (" + fmt(ticks, 0) + " ticks) · $" + fmt(riskPerC, 2) + "/สัญญา";
+      rows.push(["$ ที่เสี่ยงจริง", contracts ? money(actual) : "—"]);
+      rows.push(["ความเสี่ยงที่ตั้งไว้", money(riskAmt)]);
+      if (isFinite(tp) && tp !== entry) {
+        const tpPts = Math.abs(tp - entry), rr = tpPts / stopPts;
+        rows.push(["ระยะเป้า", fmt(tpPts, 2) + " จุด"]);
+        rows.push(["R:R", "1 : " + fmt(rr, 2)]);
+        rows.push(["กำไรที่เป้า", contracts ? money((tpPts / ts) * tv * contracts) : "—"]);
+      }
+      if (contracts < 1) flags.push(["warn", "ได้ 0 สัญญา — 1 สัญญาเสี่ยง " + money(riskPerC) + " เกินความเสี่ยงที่รับได้ · ลด SL หรือใช้ Micro"]);
+      else if (Math.abs(actual - riskAmt) / riskAmt > 0.2) flags.push(["warn", "ปัดจำนวนสัญญาแล้วเสี่ยงจริงต่างจากที่ตั้ง " + fmt(Math.abs(actual - riskAmt) / riskAmt * 100, 0) + "%"]);
+    }
+    R.innerHTML =
+      `<div class="big"><div class="lbl">ขนาดโพสิชัน</div><div class="num">${bigNum}</div><div class="sub">${bigSub}</div></div>` +
+      `<table>${rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join("")}</table>` +
+      flags.map(f => `<div class="flag ${f[0]}">${f[1]}</div>`).join("");
+  }
+
+  $("calcMode").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) setMode(b.dataset.m); });
+  $("riskUnit").addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    riskUnit = b.dataset.u;
+    [...$("riskUnit").children].forEach(x => x.classList.toggle("active", x === b));
+    calc();
+  });
+  $("cInst").addEventListener("change", onInst);
+  ["cBal", "cRisk", "cEntry", "cSl", "cTp", "cPipSize", "cPipVal", "cTickSize", "cTickVal"].forEach(id => $(id).addEventListener("input", calc));
+
+  /* ================= session clock ================= */
+  const SESS = [
+    { nm: "Sydney", s: 22, e: 7, col: "#8b5cf6" },
+    { nm: "Tokyo", s: 0, e: 9, col: "#0ea5e9" },
+    { nm: "London", s: 8, e: 17, col: "#16a34a" },
+    { nm: "New York", s: 13, e: 22, col: "#f59e0b" },
+  ];
+  const KZ = [
+    { nm: "London KZ", s: 7, e: 10 }, { nm: "NY KZ", s: 12, e: 15 },
+  ];
+  const inWin = (h, s, e) => s <= e ? (h >= s && h < e) : (h >= s || h < e);
+
+  function renderClock() {
+    const now = new Date();
+    const uh = now.getUTCHours() + now.getUTCMinutes() / 60;
+    $("clkTz").textContent = "UTC " + String(now.getUTCHours()).padStart(2, "0") + ":" + String(now.getUTCMinutes()).padStart(2, "0");
+    $("clkNow").innerHTML = "เวลาคุณ <b>" + now.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" }) + "</b>" +
+      " · UTC <b>" + now.toISOString().slice(11, 16) + "</b>";
+
+    const W = 100;
+    let lanes = "";
+    const y0 = 6;
+    SESS.forEach((s, i) => {
+      const draw = (from, to) => {
+        const L = from / 24 * W, wd = (to - from) / 24 * W;
+        lanes += `<div class="lane" style="left:${L}%;width:${wd}%;top:${y0 + i * 27}px;background:${s.col}">${s.nm}</div>`;
+      };
+      if (s.s <= s.e) draw(s.s, s.e); else { draw(s.s, 24); draw(0, s.e); }
+    });
+    // gold zone (London x NY = 13-17 UTC)
+    lanes += `<div class="lane" style="left:${13 / 24 * W}%;width:${4 / 24 * W}%;top:${y0 + 4 * 27}px;height:16px;background:repeating-linear-gradient(45deg,#eab308,#eab308 4px,#ca8a04 4px,#ca8a04 8px);font-size:9px">โซนทองคำ</div>`;
+    let hrs = "";
+    for (let h = 0; h <= 24; h += 3) hrs += `<div class="hr" style="left:${h / 24 * W}%">${String(h % 24).padStart(2, "0")}</div>`;
+    $("clkTl").innerHTML = hrs + lanes + `<div class="now" style="left:${uh / 24 * W}%"></div>`;
+
+    const uhi = now.getUTCHours();
+    $("sessList").innerHTML = SESS.map(s => {
+      const open = inWin(uhi, s.s, s.e);
+      let msg;
+      if (open) {
+        let toE = (s.e - uh + 24) % 24;
+        msg = "เปิด · ปิดใน " + Math.floor(toE) + "ชม " + Math.round((toE % 1) * 60) + "น";
+      } else {
+        let toS = (s.s - uh + 24) % 24;
+        msg = "ปิด · เปิดใน " + Math.floor(toS) + "ชม " + Math.round((toS % 1) * 60) + "น";
+      }
+      return `<div class="sess ${open ? "open" : ""}"><div class="nm">${s.nm}</div><div class="st">${msg}</div></div>`;
+    }).join("") + KZ.map(k => {
+      const on = inWin(uhi, k.s, k.e);
+      return `<div class="sess ${on ? "open" : ""}"><div class="nm">${k.nm}</div><div class="st">${on ? "อยู่ในช่วง" : String(k.s).padStart(2, "0") + ":00–" + String(k.e).padStart(2, "0") + ":00 UTC"}</div></div>`;
+    }).join("");
+  }
+  renderClock();
+  setInterval(renderClock, 20000);
+
+  /* ================= news ================= */
+  const EV_KEY = "tt_events_v1";
+  // US Eastern offset (hours) for a given Date — DST 2nd Sun Mar .. 1st Sun Nov
+  function etOffset(d) {
+    const y = d.getUTCFullYear();
+    const marSun = new Date(Date.UTC(y, 2, 1)); marSun.setUTCDate(1 + (7 - marSun.getUTCDay()) % 7 + 7); // 2nd Sunday
+    const novSun = new Date(Date.UTC(y, 10, 1)); novSun.setUTCDate(1 + (7 - novSun.getUTCDay()) % 7);      // 1st Sunday
+    return (d >= marSun && d < novSun) ? -4 : -5;
+  }
+  function etToUtc(y, m, day, hh, mm) {
+    let guess = new Date(Date.UTC(y, m, day, hh, mm));
+    const off = etOffset(guess);
+    return new Date(Date.UTC(y, m, day, hh - off, mm));
+  }
+  // FOMC decision days 2026 (day-2 of each meeting), 14:00 ET
+  const FOMC_2026 = [[0, 28], [2, 18], [3, 29], [5, 17], [6, 29], [8, 16], [9, 28], [11, 9]];
+  function nfpFor(y, m) { // first Friday, 08:30 ET
+    const d = new Date(Date.UTC(y, m, 1));
+    d.setUTCDate(1 + (5 - d.getUTCDay() + 7) % 7);
+    return etToUtc(y, m, d.getUTCDate(), 8, 30);
+  }
+  function loadEv() { try { return JSON.parse(localStorage.getItem(EV_KEY) || "[]"); } catch (e) { return []; } }
+  function saveEv(a) { try { localStorage.setItem(EV_KEY, JSON.stringify(a)); } catch (e) {} }
+
+  let liveEv = [];
+  function renderNews() {
+    const now = Date.now();
+    const evs = [];
+    const y = new Date().getUTCFullYear();
+    FOMC_2026.forEach(([m, day]) => evs.push({ t: etToUtc(y, m, day, 14, 0).getTime(), n: "FOMC (มติดอกเบี้ย)", src: "auto" }));
+    [0, 1, 2].forEach(k => { const dt = new Date(); const nx = new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth() + k, 1)); evs.push({ t: nfpFor(nx.getUTCFullYear(), nx.getUTCMonth()).getTime(), n: "NFP (จ้างงานสหรัฐ)", src: "auto" }); });
+    loadEv().forEach(e => evs.push({ t: new Date(e.at).getTime(), n: e.name, src: "user", raw: e }));
+    liveEv.forEach(e => evs.push(e));
+    const up = evs.filter(e => isFinite(e.t) && e.t > now - 36e5).sort((a, b) => a.t - b.t).slice(0, 14);
+
+    const soonest = up.find(e => e.t > now);
+    $("newsBanner").innerHTML = (soonest && soonest.t - now < 2 * 36e5)
+      ? `<div class="newsflag">⚠ ${soonest.n} อีก ${Math.round((soonest.t - now) / 6e4)} นาที — ระวังสภาพคล่อง/สวิง</div>` : "";
+
+    $("newsList").innerHTML = up.length ? up.map(e => {
+      const d = new Date(e.t);
+      const soon = e.t > now && e.t - now < 6 * 36e5;
+      const rel = e.t < now ? "ผ่านไปแล้ว" : relTime(e.t - now);
+      const del = e.src === "user" ? ` <span class="btn" style="padding:1px 6px;cursor:pointer;" data-del="${e.raw.id}">✕</span>` : "";
+      return `<div class="ev ${soon ? "soon" : ""}"><span>${e.n}${e.src === "user" ? " ·เพิ่มเอง" : e.src === "live" ? " ·live" : ""}${del}</span>` +
+        `<span class="when">${d.toLocaleDateString("th-TH", { day: "2-digit", month: "short" })} ${d.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })} · ${rel}</span></div>`;
+    }).join("") : `<div class="muted-note">ไม่มีข่าวใกล้ ๆ</div>`;
+  }
+  function relTime(ms) {
+    const h = ms / 36e5;
+    if (h < 1) return Math.round(ms / 6e4) + " นาที";
+    if (h < 48) return Math.round(h) + " ชม";
+    return Math.round(h / 24) + " วัน";
+  }
+  $("newsList").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-del]"); if (!b) return;
+    saveEv(loadEv().filter(x => String(x.id) !== b.dataset.del)); renderNews();
+  });
+  $("evAdd").addEventListener("click", () => {
+    const n = $("evName").value.trim(), at = $("evAt").value;
+    if (!n || !at) return;
+    const a = loadEv(); a.push({ id: Date.now(), name: n, at: new Date(at).toISOString() });
+    saveEv(a); $("evName").value = ""; $("evAt").value = ""; renderNews();
+  });
+  $("newsFetch").addEventListener("click", async () => {
+    $("newsFetch").textContent = "กำลังโหลด…";
+    const urls = [
+      "https://api.allorigins.win/raw?url=" + encodeURIComponent("https://nfs.faireconomy.media/ff_calendar_thisweek.json"),
+      "https://corsproxy.io/?url=" + encodeURIComponent("https://nfs.faireconomy.media/ff_calendar_thisweek.json"),
+    ];
+    for (const u of urls) {
+      try {
+        const r = await fetch(u); if (!r.ok) continue;
+        const raw = await r.json();
+        liveEv = (Array.isArray(raw) ? raw : []).filter(x => x.impact === "High")
+          .map(x => ({ t: new Date(x.date).getTime(), n: x.title + " (" + x.country + ")", src: "live" }))
+          .filter(x => isFinite(x.t));
+        if (liveEv.length) { $("newsFetch").textContent = "โหลดแล้ว (" + liveEv.length + ")"; renderNews(); return; }
+      } catch (e) {}
+    }
+    $("newsFetch").textContent = "โหลดไม่ได้ (CORS) — เพิ่มเอง/ดู FF";
+  });
+  renderNews();
+  setInterval(renderNews, 60000);
+
+  setMode("forex");
+})();
+</script>
+</body>
+</html>
