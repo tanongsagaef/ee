@@ -236,6 +236,9 @@
 
   /* table */
   .table-scroll { overflow-x: auto; }
+  .edge-block { margin-bottom: 18px; }
+  .edge-block h4 { margin: 0 0 6px; font-size: 13px; font-weight: 800; }
+  .edge-insight { font-size: 12.5px; color: var(--text); background: var(--accent-soft); border-radius: 8px; padding: 7px 10px; margin-bottom: 8px; }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border); }
   th { color: var(--muted); font-size: 11px; text-transform: uppercase; font-weight: 700; }
@@ -380,6 +383,10 @@
   <div class="panel">
     <h3>ผลตอบแทนตามแท็ก</h3>
     <div id="tagStatsWrap"></div>
+  </div>
+  <div class="panel">
+    <h3>รายงาน Edge — จุดที่ได้เงิน / เสียเงิน</h3>
+    <div id="edgeReportWrap"></div>
   </div>
 </div>
 
@@ -1189,6 +1196,82 @@
       .sort((a, b) => b.totalPnl - a.totalPnl);
   }
 
+  const DOW_FULL = ["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัส", "ศุกร์", "เสาร์"];
+  function edgeR(t) {
+    if (t.entry == null || t.sl == null || t.exit == null) return null;
+    const risk = Math.abs(t.entry - t.sl);
+    if (!(risk > 0)) return null;
+    return ((t.exit - t.entry) * (t.side === "short" ? -1 : 1)) / risk;
+  }
+  function renderEdgeReport() {
+    const wrap = document.getElementById("edgeReportWrap");
+    const closed = trades.filter(t => !isPending(t));
+    if (closed.length < 4) { wrap.innerHTML = '<div class="empty">ต้องมีเทรดที่ปิดแล้วอย่างน้อย 4 ไม้</div>'; return; }
+
+    const groupTable = (title, keyFn, minN) => {
+      const m = new Map();
+      closed.forEach(t => {
+        const k = keyFn(t); if (k == null || k === "") return;
+        if (!m.has(k)) m.set(k, []);
+        m.get(k).push(t);
+      });
+      if (!m.size) return "";
+      const rows = [...m.entries()].map(([k, arr]) => {
+        const w = arr.filter(t => Number(t.pnl) > 0).length;
+        const pnl = arr.reduce((s, t) => s + Number(t.pnl), 0);
+        const rs = arr.map(edgeR).filter(x => x != null);
+        return {
+          k, n: arr.length, w, wr: arr.length ? w / arr.length * 100 : 0,
+          pnl, avg: pnl / arr.length,
+          r: rs.length ? rs.reduce((s, x) => s + x, 0) / rs.length : null,
+        };
+      }).sort((a, b) => b.pnl - a.pnl);
+      const elig = rows.filter(r => r.n >= (minN || 3));
+      let insight = "";
+      if (elig.length >= 2) {
+        const best = elig[0], worst = elig[elig.length - 1];
+        if (best.pnl > 0 && worst.pnl < 0)
+          insight = `<div class="edge-insight">💡 ได้เงินจาก <b>${escapeHtml(String(best.k))}</b> (${fmtMoney(best.pnl)}) · เสียเงินกับ <b>${escapeHtml(String(worst.k))}</b> (${fmtMoney(worst.pnl)})</div>`;
+        else if (worst.pnl < 0)
+          insight = `<div class="edge-insight">💡 กลุ่มที่ฉุดพอร์ต: <b>${escapeHtml(String(worst.k))}</b> (${fmtMoney(worst.pnl)}, ${worst.n} ไม้)</div>`;
+      }
+      return `<div class="edge-block"><h4>${title}</h4>${insight}
+        <div class="table-scroll"><table>
+        <thead><tr><th>กลุ่ม</th><th>ไม้</th><th>Win%</th><th>R เฉลี่ย</th><th>P/L เฉลี่ย</th><th>P/L รวม</th></tr></thead>
+        <tbody>${rows.map(r => `<tr>
+          <td>${escapeHtml(String(r.k))}</td><td>${r.n}</td><td>${r.wr.toFixed(0)}%</td>
+          <td class="mono ${r.r == null ? "" : r.r >= 0 ? "pos" : "neg"}">${r.r == null ? "—" : (r.r >= 0 ? "+" : "") + r.r.toFixed(2) + "R"}</td>
+          <td class="mono ${r.avg >= 0 ? "pos" : "neg"}">${fmtMoney(r.avg)}</td>
+          <td class="mono ${r.pnl >= 0 ? "pos" : "neg"}">${fmtMoney(r.pnl)}</td>
+        </tr>`).join("")}</tbody></table></div></div>`;
+    };
+
+    // rule-break cost
+    const ruled = closed.filter(t => t.followedRules === true || t.followedRules === false);
+    let ruleHtml = "";
+    if (ruled.length >= 4) {
+      const y = ruled.filter(t => t.followedRules), n = ruled.filter(t => !t.followedRules);
+      const sum = (a) => a.reduce((s, t) => s + Number(t.pnl), 0);
+      ruleHtml = `<div class="edge-block"><h4>ต้นทุนการแหกกฎ</h4>
+        <div class="table-scroll"><table>
+        <thead><tr><th></th><th>ไม้</th><th>Win%</th><th>P/L เฉลี่ย</th><th>P/L รวม</th></tr></thead>
+        <tbody>
+          <tr><td>ทำตามแผน ✓</td><td>${y.length}</td><td>${y.length ? (y.filter(t => t.pnl > 0).length / y.length * 100).toFixed(0) : 0}%</td><td class="mono ${y.length && sum(y) / y.length >= 0 ? "pos" : "neg"}">${y.length ? fmtMoney(sum(y) / y.length) : "—"}</td><td class="mono ${sum(y) >= 0 ? "pos" : "neg"}">${fmtMoney(sum(y))}</td></tr>
+          <tr><td>แหกกฎ ✗</td><td>${n.length}</td><td>${n.length ? (n.filter(t => t.pnl > 0).length / n.length * 100).toFixed(0) : 0}%</td><td class="mono ${n.length && sum(n) / n.length >= 0 ? "pos" : "neg"}">${n.length ? fmtMoney(sum(n) / n.length) : "—"}</td><td class="mono ${sum(n) >= 0 ? "pos" : "neg"}">${fmtMoney(sum(n))}</td></tr>
+        </tbody></table></div>
+        ${n.length ? `<div class="edge-insight">💡 ไม้ที่แหกกฎรวม ${fmtMoney(sum(n))} — ${sum(n) < 0 ? "ถ้าไม่เทรดพวกนี้ พอร์ตดีขึ้น " + fmtMoney(-sum(n)) : "บังเอิญยังบวก แต่คือการเสี่ยงที่ไม่ควรทำ"}</div>` : ""}</div>`;
+    }
+
+    wrap.innerHTML =
+      groupTable("วันในสัปดาห์", t => DOW_FULL[new Date(t.date + "T00:00:00").getDay()], 3) +
+      groupTable("Session", t => t.session, 3) +
+      groupTable("โมเดล / กลยุทธ์", t => t.model, 3) +
+      groupTable("เกรด", t => t.grade, 3) +
+      groupTable("ตลาด", t => MARKET_LABEL[t.marketType] || t.marketType, 3) +
+      groupTable("ทิศทาง", t => t.side === "long" ? "BUY" : "SELL", 3) +
+      ruleHtml;
+  }
+
   function renderTagStats() {
     const wrap = document.getElementById("tagStatsWrap");
     const rows = computeTagStats();
@@ -1352,6 +1435,7 @@
     document.getElementById("equityChartWrap").innerHTML = buildEquityCurveSvg();
     document.getElementById("monthlyChartWrap").innerHTML = buildMonthlyBarChart();
     renderTagStats();
+    renderEdgeReport();
   }
 
   function buildEquityCurveSvg() {
