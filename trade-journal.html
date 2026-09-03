@@ -1428,20 +1428,82 @@
       Swal.fire({ icon: "info", title: "ไม่มีรายการเทรดที่ตรงเงื่อนไขให้ส่งออก" });
       return;
     }
-    const headers = ["วันที่", "ตลาด", "สัญลักษณ์", "ทิศทาง", "กำไร/ขาดทุน", "แท็กบวก", "แท็กลบ", "โน้ต"];
-    const rows = lastLogList.map(t => [
-      t.date,
-      MARKET_LABEL[t.marketType] || t.marketType,
-      t.symbol || "",
-      t.side === "long" ? "BUY" : "SELL",
-      isPending(t) ? "" : Number(t.pnl).toFixed(2),
-      (t.tags || []).join("; "),
-      (t.negTags || []).join("; "),
-      t.notes || "",
-    ]);
-    const csv = "﻿" + [headers, ...rows].map(r => r.map(csvEscape).join(",")).join("\r\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    triggerDownload(blob, `trade-journal-log-${todayKey()}.csv`);
+    const L = lastLogList.slice().sort((a, b) =>
+      (a.date || "").localeCompare(b.date || "") || (a.createdAt || 0) - (b.createdAt || 0));
+    const num = (n, d = 2) => (n == null || isNaN(n)) ? "" : Number(n).toFixed(d);
+    const rMult = (t) => {
+      if (t.entry == null || t.sl == null || t.exit == null) return null;
+      const risk = Math.abs(t.entry - t.sl);
+      if (!(risk > 0)) return null;
+      return ((t.exit - t.entry) * (t.side === "short" ? -1 : 1)) / risk;
+    };
+    const weekStart = (ds) => {
+      if (!ds) return "";
+      const d = new Date(ds + "T00:00:00");
+      d.setDate(d.getDate() - ((d.getDay() + 6) % 7));   // back to Monday
+      return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+    };
+
+    /* ---- detail rows (เนื้อ ๆ ไม่มี AI) ---- */
+    const detHead = ["วันที่", "ตลาด", "สัญลักษณ์", "ทิศทาง", "เข้า", "SL", "ออก", "ขนาด", "กำไร/ขาดทุน", "R", "เสี่ยง %", "Session", "บัญชี", "โมเดล", "เกรด", "ทำตามแผน", "แผน", "แท็กบวก", "แท็กลบ", "โน้ต"];
+    const detRows = L.map(t => {
+      const size = t.lot != null ? t.lot : (t.contracts != null ? t.contracts : "");
+      const chk = (Array.isArray(t.checklistDone) && t.checklistTotal) ? (t.checklistDone.length + "/" + t.checklistTotal) : "";
+      const r = rMult(t);
+      return [
+        t.date || "", MARKET_LABEL[t.marketType] || t.marketType || "", t.symbol || "", t.side === "long" ? "BUY" : "SELL",
+        t.entry != null ? t.entry : "", t.sl != null ? t.sl : "", t.exit != null ? t.exit : "", size,
+        isPending(t) ? "" : num(t.pnl), r == null ? "" : num(r, 2),
+        t.riskPct != null ? t.riskPct : "", t.session || "", t.account || "", t.model || "", t.grade || "",
+        t.followedRules == null ? "" : (t.followedRules ? "ใช่" : "ไม่"),
+        chk, (t.tags || []).join("; "), (t.negTags || []).join("; "), (t.notes || "").replace(/\s+/g, " ").trim(),
+      ];
+    });
+
+    /* ---- aggregates ---- */
+    const agg = (arr) => {
+      const c = arr.filter(t => !isPending(t));
+      const w = c.filter(t => Number(t.pnl) > 0), l = c.filter(t => Number(t.pnl) < 0);
+      const gW = w.reduce((s, t) => s + Number(t.pnl), 0), gL = Math.abs(l.reduce((s, t) => s + Number(t.pnl), 0));
+      const rs = c.map(rMult).filter(x => x != null);
+      return {
+        n: arr.length, win: w.length, loss: l.length,
+        wr: (w.length + l.length) ? w.length / (w.length + l.length) * 100 : 0,
+        pnl: c.reduce((s, t) => s + Number(t.pnl), 0),
+        pf: gL > 0 ? gW / gL : (gW > 0 ? Infinity : 0),
+        rSum: rs.reduce((s, x) => s + x, 0),
+        avgW: w.length ? gW / w.length : 0, avgL: l.length ? -gL / l.length : 0,
+      };
+    };
+    const groupBy = (keyFn) => {
+      const m = new Map();
+      L.forEach(t => { const k = keyFn(t); if (!k) return; (m.get(k) || m.set(k, []).get(k)).push(t); });
+      return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+    };
+    const perHead = ["ช่วง", "เทรด", "ชนะ", "แพ้", "Win%", "กำไร/ขาดทุน", "R"];
+    const perRow = ([k, arr]) => { const a = agg(arr); return [k, a.n, a.win, a.loss, num(a.wr, 0) + "%", num(a.pnl), num(a.rSum, 2)]; };
+
+    const O = agg(L);
+    const overall = [
+      ["ช่วงข้อมูล", ((L[0] && L[0].date) || "") + " ถึง " + ((L[L.length - 1] && L[L.length - 1].date) || "")],
+      ["จำนวนเทรด", O.n], ["ชนะ / แพ้", O.win + " / " + O.loss], ["Win rate", num(O.wr, 0) + "%"],
+      ["กำไร/ขาดทุนรวม", num(O.pnl)],
+      ["Profit factor", O.pf === Infinity ? "∞" : num(O.pf, 2)],
+      ["R รวม", num(O.rSum, 2)],
+      ["กำไรเฉลี่ย/ไม้ชนะ", num(O.avgW)], ["ขาดทุนเฉลี่ย/ไม้แพ้", num(O.avgL)],
+    ];
+
+    const out = [];
+    const push = (arr) => out.push((arr || []).map(csvEscape).join(","));
+    push(["=== ภาพรวม ==="]); overall.forEach(push); push([]);
+    push(["=== สรุปรายสัปดาห์ (เริ่มวันจันทร์) ==="]); push(perHead);
+    groupBy(t => weekStart(t.date)).forEach(e => push(perRow(e))); push([]);
+    push(["=== สรุปรายเดือน ==="]); push(perHead);
+    groupBy(t => (t.date || "").slice(0, 7)).forEach(e => push(perRow(e))); push([]);
+    push(["=== รายการเทรด ==="]); push(detHead); detRows.forEach(push);
+
+    triggerDownload(new Blob(["﻿" + out.join("\r\n")], { type: "text/csv;charset=utf-8;" }),
+      `trade-journal-${todayKey()}.csv`);
   });
 
   document.getElementById("logMarketFilter").addEventListener("change", renderLog);
