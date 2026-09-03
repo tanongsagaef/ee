@@ -388,6 +388,10 @@
     <h3>รายงาน Edge — จุดที่ได้เงิน / เสียเงิน</h3>
     <div id="edgeReportWrap"></div>
   </div>
+  <div class="panel">
+    <h3>วิเคราะห์จุดออก — แผน vs ผลจริง</h3>
+    <div id="exitAnalysisWrap"></div>
+  </div>
 </div>
 
 <!-- LOG TAB -->
@@ -586,6 +590,7 @@
     <div class="row">
       <div class="field"><label class="small">ราคาเข้า</label><input type="number" id="tfEntry" step="any"></div>
       <div class="field"><label class="small">ราคา SL (Stop Loss)</label><input type="number" id="tfSl" step="any"></div>
+      <div class="field"><label class="small">ราคาเป้า (TP)</label><input type="number" id="tfTp" step="any" placeholder="ไม่ใส่ก็ได้"></div>
       <div class="field"><label class="small">ราคาออก</label><input type="number" id="tfExit" step="any"></div>
     </div>
     <div id="tfCalcHint" class="small" style="text-transform:none; letter-spacing:0; font-weight:400; color:var(--muted); margin:-2px 0 12px; min-height:15px;"></div>
@@ -1274,6 +1279,62 @@
       ruleHtml;
   }
 
+  function renderExitAnalysis() {
+    const wrap = document.getElementById("exitAnalysisWrap");
+    const cl = trades.filter(t => !isPending(t) && t.entry != null && t.exit != null && t.sl != null && Math.abs(t.entry - t.sl) > 0);
+    if (cl.length < 4) { wrap.innerHTML = '<div class="empty">ต้องมีเทรดที่ปิดแล้ว + มีราคาเข้า/SL/ออก อย่างน้อย 4 ไม้ (ใส่ TP ด้วยจะละเอียดขึ้น)</div>'; return; }
+    const dir = (t) => t.side === "short" ? -1 : 1;
+    const realR = (t) => ((t.exit - t.entry) * dir(t)) / Math.abs(t.entry - t.sl);
+    const planR = (t) => (t.tp != null && t.tp !== t.entry) ? ((t.tp - t.entry) * dir(t)) / Math.abs(t.entry - t.sl) : null;
+    const capture = (t) => (t.tp != null && t.tp !== t.entry) ? ((t.exit - t.entry) * dir(t)) / ((t.tp - t.entry) * dir(t)) : null;
+
+    const winners = cl.filter(t => Number(t.pnl) > 0);
+    const losers = cl.filter(t => Number(t.pnl) < 0);
+    const withTp = cl.filter(t => capture(t) != null);
+    const winTp = winners.filter(t => capture(t) != null);
+
+    const avg = (a) => a.length ? a.reduce((s, x) => s + x, 0) / a.length : null;
+    const avgCap = avg(winTp.map(capture));
+    const fullHit = winTp.length ? winTp.filter(t => capture(t) >= 0.98).length / winTp.length * 100 : null;
+    const leftR = avg(cl.filter(t => planR(t) != null && Number(t.pnl) > 0).map(t => planR(t) - realR(t)));
+    const overrun = losers.map(t => -realR(t) - 1).filter(x => x > 0);  // how far past 1R the loss went
+    const avgOverrun = avg(overrun);
+    const slClean = losers.length ? losers.filter(t => -realR(t) <= 1.05).length / losers.length * 100 : null;
+    const expR = avg(cl.map(realR));
+
+    const pct = (n) => n == null ? "—" : n.toFixed(0) + "%";
+    const rr = (n) => n == null ? "—" : (n >= 0 ? "+" : "") + n.toFixed(2) + "R";
+    const tiles = [
+      ["R เฉลี่ยจริง/ไม้", rr(expR), expR >= 0 ? "pos" : "neg"],
+      ["เก็บกำไรได้ (% ของเป้า)", avgCap == null ? "—" : (avgCap * 100).toFixed(0) + "%", avgCap != null && avgCap >= 0.9 ? "pos" : ""],
+      ["ชนะแล้วถึงเป้าเต็ม", pct(fullHit), ""],
+      ["R ที่ทิ้งไว้ (ไม้ชนะที่มี TP)", leftR == null ? "—" : leftR.toFixed(2) + "R", leftR != null && leftR > 0.3 ? "neg" : ""],
+      ["ขาดทุนคุมที่ ≤ 1R", pct(slClean), slClean != null && slClean >= 90 ? "pos" : "neg"],
+      ["เกิน SL เฉลี่ย (ไม้ที่หลุด)", avgOverrun == null ? "—" : "+" + avgOverrun.toFixed(2) + "R", avgOverrun ? "neg" : ""],
+    ];
+
+    const insights = [];
+    if (avgCap != null && avgCap < 0.8) insights.push(`ตัดกำไรเร็ว — เก็บเฉลี่ยแค่ ${(avgCap * 100).toFixed(0)}% ของเป้า` + (leftR ? ` ทิ้งไว้ ~${leftR.toFixed(2)}R/ไม้` : "") + " · ลองเลื่อน SL ตาม (trailing) หรือปิดครึ่งไม้ที่ 1R แล้วปล่อยที่เหลือวิ่ง");
+    if (avgCap != null && avgCap > 1.15) insights.push(`มักถือเลยเป้า (${(avgCap * 100).toFixed(0)}%) — ดีถ้ากำไรโตจริง แต่ระวังคืนกำไรถ้าไม่มีแผนออก`);
+    if (avgOverrun != null && avgOverrun > 0.2) insights.push(`ปล่อยขาดทุนหลุด SL เฉลี่ย +${avgOverrun.toFixed(2)}R — ตั้ง hard stop ที่โบรก อย่าเลื่อน SL หนี`);
+    if (slClean != null && slClean < 80) insights.push(`มีแค่ ${slClean.toFixed(0)}% ของไม้แพ้ที่คุมได้ ≤ 1R — วินัยการตัดขาดทุนคือจุดที่ต้องแก้ก่อน`);
+    if (expR != null && leftR != null && leftR > 0.2) insights.push(`ถ้าเก็บกำไรได้เต็มเป้า R เฉลี่ยจะขยับจาก ${rr(expR)} → ~${rr(expR + leftR * (winners.length / cl.length))}`);
+
+    const worst = cl.filter(t => planR(t) != null && Number(t.pnl) > 0)
+      .map(t => ({ t, gap: planR(t) - realR(t) })).filter(x => x.gap > 0.2)
+      .sort((a, b) => b.gap - a.gap).slice(0, 5);
+    const worstHtml = worst.length ? `<div style="margin-top:10px"><b style="font-size:13px">ไม้ชนะที่ทิ้ง R ไว้มากสุด</b>
+      <div class="table-scroll"><table><thead><tr><th>วันที่</th><th>สัญลักษณ์</th><th>ได้จริง</th><th>แผน</th><th>ทิ้งไว้</th></tr></thead><tbody>
+      ${worst.map(x => `<tr><td>${x.t.date}</td><td>${escapeHtml(x.t.symbol || "")}</td><td class="mono pos">${rr(realR(x.t))}</td><td class="mono">${rr(planR(x.t))}</td><td class="mono neg">−${x.gap.toFixed(2)}R</td></tr>`).join("")}
+      </tbody></table></div></div>` : "";
+
+    wrap.innerHTML =
+      `<div class="muted-note" style="margin-bottom:8px">${cl.length} ไม้มีราคาครบ · ${withTp.length} ไม้ระบุ TP</div>` +
+      `<div class="metrics-grid">${tiles.map(t => `<div class="metric"><div class="metric-label">${t[0]}</div><div class="metric-value ${t[2]}">${t[1]}</div></div>`).join("")}</div>` +
+      (insights.length ? `<div class="edge-insight" style="margin-top:10px">💡 ${insights.join("<br>💡 ")}</div>` : "") +
+      worstHtml;
+  }
+
   function renderTagStats() {
     const wrap = document.getElementById("tagStatsWrap");
     const rows = computeTagStats();
@@ -1438,6 +1499,7 @@
     document.getElementById("monthlyChartWrap").innerHTML = buildMonthlyBarChart();
     renderTagStats();
     renderEdgeReport();
+    renderExitAnalysis();
   }
 
   function buildEquityCurveSvg() {
@@ -1641,6 +1703,7 @@
     const iPriceOpen = prices[0], iPriceClose = prices.length > 1 ? prices[prices.length - 1] : -1;
     const iTimeOpen = times[0], iTimeClose = times.length > 1 ? times[times.length - 1] : times[0];
     const iProfit = profits[profits.length - 1];
+    const iTP = first(/\bt ?\/ ?p\b|take profit|ทำกำไร/);
     const iPos = first(/position|ตำแหน่ง|deal|order|ticket/);
 
     const out = [];
@@ -1662,6 +1725,7 @@
         lot: iVol >= 0 ? mt5Num(c[iVol]) : null,
         entry: iPriceOpen >= 0 ? mt5Num(c[iPriceOpen]) : null,
         sl: iSL >= 0 ? mt5Num(c[iSL]) : null,
+        tp: iTP >= 0 ? mt5Num(c[iTP]) : null,
         exit: iPriceClose >= 0 ? mt5Num(c[iPriceClose]) : null,
         pnl: Math.round((profit + comm + swap) * 100) / 100,
       });
@@ -1763,7 +1827,7 @@
         id: uid(), createdAt: Date.now() + i,
         date: r.date, marketType: market, symbol: r.symbol, side: r.side,
         lot: market === "futures" ? null : r.lot, contracts: market === "futures" ? r.lot : null,
-        entry: r.entry, sl: r.sl, exit: r.exit, pnl: r.pnl,
+        entry: r.entry, sl: r.sl, tp: r.tp, exit: r.exit, pnl: r.pnl,
         session: "", account: "", model: "", grade: null,
         followedRules: null, breakeven: false, enteredWindow: false, riskPct: null,
         checklistDone: [], checklistTotal: 0, tags: [], negTags: [],
@@ -2049,6 +2113,7 @@
     document.getElementById("tfPoints").value = t && t.points != null ? t.points : "";
     document.getElementById("tfEntry").value = t && t.entry != null ? t.entry : "";
     document.getElementById("tfSl").value = t && t.sl != null ? t.sl : "";
+    document.getElementById("tfTp").value = t && t.tp != null ? t.tp : "";
     document.getElementById("tfExit").value = t && t.exit != null ? t.exit : "";
     document.getElementById("tfPipSize").value = t && t.pipSize != null ? t.pipSize : "";
     tfPipsDirty = !!(t && t.pips != null);
@@ -2233,6 +2298,7 @@
       entry: document.getElementById("tfEntry").value !== "" ? Number(document.getElementById("tfEntry").value) : null,
       exit: document.getElementById("tfExit").value !== "" ? Number(document.getElementById("tfExit").value) : null,
       sl: document.getElementById("tfSl").value !== "" ? Number(document.getElementById("tfSl").value) : null,
+      tp: document.getElementById("tfTp").value !== "" ? Number(document.getElementById("tfTp").value) : null,
       pipSize: marketType === "forex" && document.getElementById("tfPipSize").value !== "" ? Number(document.getElementById("tfPipSize").value) : null,
       pnl,
       session: document.getElementById("tfSession").value,
