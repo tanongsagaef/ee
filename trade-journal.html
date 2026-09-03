@@ -407,6 +407,8 @@
         </select>
         <button class="ghost" id="logFilterClearBtn" title="ล้างตัวกรอง">ล้าง</button>
         <button class="ghost" id="logExportCsvBtn" title="ส่งออกรายการที่กรองอยู่ + สรุปรายสัปดาห์/เดือน (เปิดใน Excel/Sheets)">⬇ Excel</button>
+        <button class="ghost" id="mt5ImportBtn" title="นำเข้าประวัติจาก MT5 / IUX (ไฟล์ HTML รายงาน หรือ CSV)">⬆ นำเข้า MT5</button>
+        <input type="file" id="mt5ImportInput" accept=".html,.htm,.csv,text/html,text/csv" hidden>
       </div>
     </div>
     <div id="logTableWrap" style="margin-top:12px;"></div>
@@ -1611,6 +1613,168 @@
 
     triggerDownload(new Blob(["﻿" + doc], { type: "application/vnd.ms-excel;charset=utf-8;" }),
       `trade-journal-${todayKey()}.xls`);
+  });
+
+  /* ---------- import MT5 / IUX history ---------- */
+  const mt5Num = (s) => {
+    let x = String(s == null ? "" : s).replace(/[\s  ]/g, "").replace(/[^\d.,-]/g, "");
+    if (x.includes(",") && x.includes(".")) x = x.replace(/,/g, "");
+    else if (x.includes(",") && !x.includes(".")) x = x.replace(",", ".");
+    const n = parseFloat(x); return isNaN(n) ? null : n;
+  };
+  const mt5Date = (s) => { const m = String(s || "").match(/(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})/); return m ? `${m[1]}-${pad2(+m[2])}-${pad2(+m[3])}` : ""; };
+  const norm = (s) => String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
+
+  function parseMt5Rows(cellRows) {
+    // cellRows: array of string[] (each = one table row's cells). Find the positions/deals header, map columns.
+    let hi = -1, H = null;
+    for (let i = 0; i < cellRows.length; i++) {
+      const h = cellRows[i].map(norm);
+      if (h.some(x => /symbol|สัญลักษณ์/.test(x)) && h.some(x => /profit|กำไร/.test(x)) && h.some(x => /type|ชนิด|direction/.test(x))) { hi = i; H = h; break; }
+    }
+    if (hi < 0) return [];
+    const first = (...re) => H.findIndex(x => re.some(r => r.test(x)));
+    const allIdx = (...re) => H.map((x, i) => re.some(r => r.test(x)) ? i : -1).filter(i => i >= 0);
+    const iSym = first(/symbol|สัญลักษณ์/), iType = first(/type|ชนิด|direction/), iVol = first(/volume|ปริมาณ|lots?/);
+    const iComm = first(/commission|คอมมิช/), iSwap = first(/swap|สว็อป/), iSL = first(/\bs ?\/ ?l\b|stop loss/);
+    const prices = allIdx(/price|ราคา/), times = allIdx(/time|เวลา/), profits = allIdx(/profit|กำไร/);
+    const iPriceOpen = prices[0], iPriceClose = prices.length > 1 ? prices[prices.length - 1] : -1;
+    const iTimeOpen = times[0], iTimeClose = times.length > 1 ? times[times.length - 1] : times[0];
+    const iProfit = profits[profits.length - 1];
+    const iPos = first(/position|ตำแหน่ง|deal|order|ticket/);
+
+    const out = [];
+    for (let i = hi + 1; i < cellRows.length; i++) {
+      const c = cellRows[i];
+      if (c.length < 5) break;                       // summary / blank rows -> stop
+      const sym = (c[iSym] || "").trim();
+      const type = norm(c[iType]);
+      if (!sym || !/buy|sell|ซื้อ|ขาย/.test(type)) continue;
+      const profit = mt5Num(c[iProfit]);
+      if (profit == null) continue;
+      const comm = iComm >= 0 ? (mt5Num(c[iComm]) || 0) : 0;
+      const swap = iSwap >= 0 ? (mt5Num(c[iSwap]) || 0) : 0;
+      out.push({
+        mt5Id: (iPos >= 0 ? (c[iPos] || "").trim() : "") || (sym + "|" + (c[iTimeOpen] || "")),
+        date: mt5Date(c[iTimeOpen]) || mt5Date(c[iTimeClose]),
+        symbol: sym,
+        side: /sell|ขาย/.test(type) ? "short" : "long",
+        lot: iVol >= 0 ? mt5Num(c[iVol]) : null,
+        entry: iPriceOpen >= 0 ? mt5Num(c[iPriceOpen]) : null,
+        sl: iSL >= 0 ? mt5Num(c[iSL]) : null,
+        exit: iPriceClose >= 0 ? mt5Num(c[iPriceClose]) : null,
+        pnl: Math.round((profit + comm + swap) * 100) / 100,
+      });
+    }
+    const res = out.filter(r => r.date);
+    res._dual = iPriceClose >= 0 && iPriceOpen !== iPriceClose;
+    return res;
+  }
+
+  function rowsFromHtml(text) {
+    const doc = new DOMParser().parseFromString(text, "text/html");
+    let best = [];
+    const score = (a) => a.length * (a._dual ? 1.15 : 1);
+    doc.querySelectorAll("table").forEach(tb => {
+      const rows = [...tb.querySelectorAll("tr")].map(tr =>
+        [...tr.querySelectorAll("th,td")].map(td => td.textContent.replace(/ /g, " ").trim()));
+      const parsed = parseMt5Rows(rows);
+      if (score(parsed) > score(best)) best = parsed;
+    });
+    // some reports put everything in one big table already handled; also try the flat row list
+    if (!best.length) {
+      const allRows = [...doc.querySelectorAll("tr")].map(tr =>
+        [...tr.querySelectorAll("th,td")].map(td => td.textContent.replace(/ /g, " ").trim()));
+      best = parseMt5Rows(allRows);
+    }
+    return best;
+  }
+  function rowsFromCsv(text) {
+    const lines = text.split(/\r?\n/).filter(l => l.trim() !== "");
+    const split = (l) => {
+      const o = []; let cur = "", q = false;
+      for (let i = 0; i < l.length; i++) {
+        const ch = l[i];
+        if (q) { if (ch === '"' && l[i + 1] === '"') { cur += '"'; i++; } else if (ch === '"') q = false; else cur += ch; }
+        else if (ch === '"') q = true;
+        else if (ch === "," || ch === "\t" || ch === ";") { o.push(cur); cur = ""; }
+        else cur += ch;
+      }
+      o.push(cur); return o.map(x => x.trim());
+    };
+    return parseMt5Rows(lines.map(split));
+  }
+
+  function readFileSmart(file) {
+    return new Promise((res, rej) => {
+      const fr = new FileReader();
+      fr.onload = () => {
+        const buf = fr.result, bytes = new Uint8Array(buf);
+        let enc = "utf-8";
+        if (bytes[0] === 0xff && bytes[1] === 0xfe) enc = "utf-16le";
+        else if (bytes[0] === 0xfe && bytes[1] === 0xff) enc = "utf-16be";
+        try { res(new TextDecoder(enc).decode(buf)); } catch (e) { res(new TextDecoder("utf-8").decode(buf)); }
+      };
+      fr.onerror = rej;
+      fr.readAsArrayBuffer(file);
+    });
+  }
+
+  document.getElementById("mt5ImportBtn").addEventListener("click", () => document.getElementById("mt5ImportInput").click());
+  document.getElementById("mt5ImportInput").addEventListener("change", async (e) => {
+    const file = e.target.files[0]; e.target.value = "";
+    if (!file) return;
+    let text;
+    try { text = await readFileSmart(file); } catch (err) { Swal.fire({ icon: "error", title: "อ่านไฟล์ไม่สำเร็จ" }); return; }
+    const isCsv = /\.csv$/i.test(file.name) || (!/<table/i.test(text) && /[,;\t].*[,;\t]/.test(text));
+    let parsed;
+    try { parsed = isCsv ? rowsFromCsv(text) : rowsFromHtml(text); }
+    catch (err) { parsed = []; }
+    if (!parsed.length) {
+      Swal.fire({ icon: "info", title: "ไม่พบตารางประวัติเทรด", html: "ใน MT5: <b>Toolbox → History → คลิกขวา → Report → HTML</b><br>(หรือ IUX cabinet ส่งออกเป็น CSV) แล้วเลือกไฟล์นั้น" });
+      return;
+    }
+    const existing = new Set(trades.map(t => t.mt5Id).filter(Boolean));
+    const keyOf = (t) => `${t.date}|${(t.symbol || "").toUpperCase()}|${t.entry}|${t.exit}|${t.lot}`;
+    const existKeys = new Set(trades.map(keyOf));
+    const fresh = parsed.filter(r => !(r.mt5Id && existing.has(r.mt5Id)) && !existKeys.has(keyOf(r)));
+    const dup = parsed.length - fresh.length;
+    const net = fresh.reduce((s, r) => s + (Number(r.pnl) || 0), 0);
+
+    const sample = fresh.slice(0, 5).map(r =>
+      `<tr><td>${r.date}</td><td>${escapeHtml(r.symbol)}</td><td>${r.side === "short" ? "SELL" : "BUY"}</td><td>${r.lot ?? ""}</td><td style="text-align:right;color:${r.pnl >= 0 ? "#16a34a" : "#dc2626"}">${(r.pnl >= 0 ? "+" : "") + r.pnl}</td></tr>`).join("");
+
+    const { value: market } = await Swal.fire({
+      title: `นำเข้า ${fresh.length} ไม้`,
+      html: `<div style="font-size:13px;text-align:left">พบทั้งหมด ${parsed.length} · ใหม่ <b>${fresh.length}</b> · ซ้ำข้าม ${dup} · P/L รวม <b style="color:${net >= 0 ? "#16a34a" : "#dc2626"}">${(net >= 0 ? "+" : "") + net.toFixed(2)}</b>
+        <table style="width:100%;margin-top:8px;border-collapse:collapse;font-size:12px">
+        <tr style="color:#888"><td>วันที่</td><td>สัญลักษณ์</td><td>ทิศ</td><td>Lot</td><td style="text-align:right">P/L</td></tr>${sample}
+        ${fresh.length > 5 ? `<tr><td colspan="5" style="color:#888">… อีก ${fresh.length - 5} ไม้</td></tr>` : ""}</table>
+        <label style="display:block;margin-top:10px">ตลาดของไม้เหล่านี้:
+        <select id="mt5Market" class="swal2-input" style="height:auto;margin:4px 0 0"><option value="forex">Forex</option><option value="futures">Futures</option><option value="other">อื่นๆ</option></select></label></div>`,
+      showCancelButton: true, confirmButtonText: "นำเข้า", cancelButtonText: "ยกเลิก",
+      preConfirm: () => document.getElementById("mt5Market").value,
+      didOpen: () => { if (!fresh.length) Swal.getConfirmButton().disabled = true; },
+    });
+    if (!market || !fresh.length) return;
+
+    fresh.forEach((r, i) => {
+      trades.push({
+        id: uid(), createdAt: Date.now() + i,
+        date: r.date, marketType: market, symbol: r.symbol, side: r.side,
+        lot: market === "futures" ? null : r.lot, contracts: market === "futures" ? r.lot : null,
+        entry: r.entry, sl: r.sl, exit: r.exit, pnl: r.pnl,
+        session: "", account: "", model: "", grade: null,
+        followedRules: null, breakeven: false, enteredWindow: false, riskPct: null,
+        checklistDone: [], checklistTotal: 0, tags: [], negTags: [],
+        imageBefore: null, imageAfter: null, tvLink: "", tvSymbol: "",
+        notes: "นำเข้าจาก MT5", mt5Id: r.mt5Id || null,
+      });
+    });
+    saveTrades();
+    renderCalendar(); renderLog();
+    if (typeof renderOverview === "function") renderOverview();
+    successToast(`นำเข้า ${fresh.length} ไม้เรียบร้อย`);
   });
 
   document.getElementById("logMarketFilter").addEventListener("change", renderLog);
