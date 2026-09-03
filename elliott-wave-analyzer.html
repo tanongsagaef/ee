@@ -1128,7 +1128,7 @@
   const inRange = (x, lo, hi) => (lo == null || x >= lo) && (hi == null || x <= hi);
   const nearRange = (x, lo, hi) => {
     const a = lo == null ? hi : lo, b = hi == null ? lo : hi;
-    const m = Math.abs((b - a) || 1) * 0.35 + 1e-9;
+    const m = Math.min(Math.abs((b - a) || 1) * 0.35, 0.45) + 1e-9;   // cap so a wide band isn't "near" everything
     return (lo == null || x >= lo - m) && (hi == null || x <= hi + m);
   };
 
@@ -1150,6 +1150,12 @@
     const zoneTxt = zone === "Zigzag" ? "ตระกูล Zigzag (b < 61.8%)"
       : zone === "Flat" ? "ตระกูล Flat (b >= 80%)"
       : "ก้ำกึ่ง 61.8-80% (Weak-b Flat / Zigzag) - ต้องดูจำนวนขาของ A";
+    // b-strength group (Strong / Normal / Weak) — the Flat chapter's primary sub-classifier
+    const bGroup = bRetrOfA >= 1.01 ? "strong b" : bRetrOfA >= 0.81 ? "normal b" : bRetrOfA >= 0.618 ? "weak b" : "";
+    const bGroupTxt = bGroup === "strong b" ? "กลุ่ม Strong b (b 101-161.8% ของ a → แรงซื้อคืนสูง impulse ถัดไปแรง)"
+      : bGroup === "normal b" ? "กลุ่ม Normal b (b 81-100% → สมดุล)"
+      : bGroup === "weak b" ? "กลุ่ม Weak b (b 61.8-80% → ลูกผสม flat/zigzag)"
+      : "b ตื้น (< 61.8% = โซน Zigzag)";
 
     function scoreSub(fam, s) {
       const chk = [];
@@ -1166,6 +1172,12 @@
         chk.push({ t: `c รีเทรซ >= 38.2% ของ a (ได้ ${(cRetrOfA * 100).toFixed(0)}%)`, pass: gc });
         chk.push({ t: `Degree 1/3: c >= 1/3 ของ b (ได้ ${cVsB.toFixed(2)}x)`, pass: gd });
         if (!(gb && gc && gd)) hard = false;
+        // subtype's b-strength group vs the actual b/a
+        softMax += 2;
+        const anyGrp = /ทุกกลุ่ม/.test(s.group || "");
+        const gMatch = anyGrp ? 1 : (s.group && bGroup && s.group === bGroup ? 2 : -1.5);
+        chk.push({ t: `กลุ่มแรง b: ตอนนี้ = ${bGroup || "—"} · subtype นี้ = ${s.group || "—"}`, pass: anyGrp ? null : s.group === bGroup });
+        soft += gMatch;
       }
 
       if (s.newHigh != null) {
@@ -1189,7 +1201,7 @@
         softMax += 2;
         const yes = inRange(val, rng[0], rng[1]);
         chk.push({ t: `${label} = ${val.toFixed(2)} (ทฤษฎี ${rng[0] == null ? 0 : rng[0]}-${rng[1] == null ? "inf" : rng[1]})`, pass: yes });
-        soft += yes ? 2 : (nearRange(val, rng[0], rng[1]) ? 1 : 0);
+        soft += yes ? 2 : (nearRange(val, rng[0], rng[1]) ? 0.7 : 0);
       };
       rangeChk(bRetrOfA, s.bRetrOfA, "b/a");
       rangeChk(cVsA, s.cVsA, "c/a");
@@ -1222,7 +1234,7 @@
     const best = scored[0];
 
     const cands = scored.map(x => ({
-      label: x.s.name,
+      label: x.s.name + (x.fam === "flat" && x.s.group ? ` · ${x.s.group}` : ""),
       conf: x.conf,
       notes: [
         x.s.desc || "",
@@ -1243,6 +1255,7 @@
 
     const rules = [
       { name: `ตัวแยกหลัก - b รีเทรซ ${(bRetrOfA * 100).toFixed(0)}% ของ a`, pass: null, detail: zoneTxt },
+      ...(zone === "Flat" || zone === "ambiguous" ? [{ name: bGroupTxt, pass: null }] : []),
       verdict,
       ...best.chk.map(c => ({ name: c.t, pass: c.pass })),
     ];
