@@ -85,6 +85,9 @@
     padding: 8px 10px; border-radius: 9px; font-size: 13px; font-family: inherit; width: 100%;
   }
   .fld input:focus, .fld select:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+  .adv { margin-top: 10px; border: 1px solid var(--border); border-radius: 9px; padding: 8px 12px; background: var(--surface-alt); }
+  .adv summary { cursor: pointer; font-size: 12px; font-weight: 800; color: var(--muted); list-style: none; }
+  .adv summary::-webkit-details-marker { display: none; }
   .riskrow { display: flex; gap: 6px; align-items: flex-end; }
   .riskrow .fld { flex: 1; }
   .mini-seg { display: inline-flex; border: 1px solid var(--border); border-radius: 9px; overflow: hidden; }
@@ -156,30 +159,31 @@
       </div>
 
       <div class="grid2">
-        <label class="fld"><span>พอร์ต ($)</span><input id="cBal" type="number" step="any" value="1000"></label>
-        <div class="fld"><span>ความเสี่ยงต่อไม้</span>
+        <label class="fld" id="fxPairWrap" style="grid-column:1/-1;"><span>สินค้า</span><select id="cInst"></select></label>
+        <label class="fld"><span>พอร์ต ($)</span><input id="cBal" type="number" step="any" inputmode="decimal" value="1000"></label>
+        <div class="fld"><span>เสี่ยงต่อไม้</span>
           <div class="riskrow">
-            <input id="cRisk" type="number" step="any" value="1" style="flex:1;">
+            <input id="cRisk" type="number" step="any" inputmode="decimal" value="1" style="flex:1;">
             <span class="mini-seg" id="riskUnit"><button data-u="pct" class="active">%</button><button data-u="usd">$</button></span>
           </div>
         </div>
-        <label class="fld"><span>ราคาเข้า</span><input id="cEntry" type="number" step="any"></label>
-        <label class="fld"><span>ราคา SL</span><input id="cSl" type="number" step="any"></label>
-        <label class="fld"><span>ราคาเป้า (ไม่ใส่ก็ได้)</span><input id="cTp" type="number" step="any"></label>
-        <label class="fld" id="fxPairWrap"><span>คู่เงิน / สินค้า</span>
-          <select id="cInst"></select>
-        </label>
+        <label class="fld"><span>ราคาเข้า</span><input id="cEntry" type="number" step="any" inputmode="decimal"></label>
+        <label class="fld"><span>ราคา SL</span><input id="cSl" type="number" step="any" inputmode="decimal"></label>
+        <label class="fld" style="grid-column:1/-1;"><span>TP — ไม่บังคับ (ไว้ดู R:R + กำไรที่เป้า)</span><input id="cTp" type="number" step="any" inputmode="decimal"></label>
       </div>
 
-      <div class="grid2" style="margin-top:10px;">
-        <label class="fld" id="pipSizeWrap"><span>ขนาด 1 pip</span><input id="cPipSize" type="number" step="any"></label>
-        <label class="fld" id="pipValWrap"><span>มูลค่า/pip ต่อ 1.00 lot ($)</span><input id="cPipVal" type="number" step="any"></label>
-        <label class="fld" id="tickSizeWrap" hidden><span>ขนาด 1 tick</span><input id="cTickSize" type="number" step="any"></label>
-        <label class="fld" id="tickValWrap" hidden><span>มูลค่า/tick ต่อ 1 สัญญา ($)</span><input id="cTickVal" type="number" step="any"></label>
-      </div>
+      <details class="adv">
+        <summary>⚙ ปรับค่า pip / tick เอง (ปกติไม่ต้องแตะ)</summary>
+        <div class="grid2" style="margin-top:8px;">
+          <label class="fld" id="pipSizeWrap"><span>ขนาด 1 pip</span><input id="cPipSize" type="number" step="any"></label>
+          <label class="fld" id="pipValWrap"><span>มูลค่า/pip ต่อ 1.00 lot ($)</span><input id="cPipVal" type="number" step="any"></label>
+          <label class="fld" id="tickSizeWrap" hidden><span>ขนาด 1 tick</span><input id="cTickSize" type="number" step="any"></label>
+          <label class="fld" id="tickValWrap" hidden><span>มูลค่า/tick ต่อ 1 สัญญา ($)</span><input id="cTickVal" type="number" step="any"></label>
+        </div>
+        <div class="muted-note" style="margin-top:6px;">JPY pairs / ทอง / index ปรับตามเรทปัจจุบันได้</div>
+      </details>
 
       <div class="result" id="cResult"></div>
-      <div class="muted-note" style="margin-top:8px;">แก้ค่า pip/tick ได้ถ้าโบรกเกอร์คุณต่างจากค่ามาตรฐาน (เช่น JPY pairs ปรับตามเรทปัจจุบัน)</div>
     </div>
 
   </div>
@@ -271,7 +275,7 @@
     const fx = m === "forex";
     $("pipSizeWrap").hidden = !fx; $("pipValWrap").hidden = !fx;
     $("tickSizeWrap").hidden = fx; $("tickValWrap").hidden = fx;
-    $("fxPairWrap").querySelector("span").textContent = fx ? "คู่เงิน / สินค้า" : "สินค้า Futures";
+    $("fxPairWrap").querySelector("span").textContent = fx ? "สินค้า (Forex / CFD)" : "สินค้า (Futures)";
     fillInst();
   }
 
@@ -330,15 +334,31 @@
       flags.map(f => `<div class="flag ${f[0]}">${f[1]}</div>`).join("");
   }
 
-  $("calcMode").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) setMode(b.dataset.m); });
+  /* remember balance / risk / instrument so you don't retype every time */
+  const CALC_KEY = "tt_calc_v1";
+  function saveCalc() {
+    try {
+      localStorage.setItem(CALC_KEY, JSON.stringify({
+        bal: $("cBal").value, risk: $("cRisk").value, unit: riskUnit, mode: calcMode,
+        fx: calcMode === "forex" ? $("cInst").value : undefined,
+        fut: calcMode === "futures" ? $("cInst").value : undefined,
+      }));
+    } catch (e) {}
+  }
+  let savedCalc = {};
+  try { savedCalc = JSON.parse(localStorage.getItem(CALC_KEY) || "{}") || {}; } catch (e) {}
+  let savedFx = savedCalc.fx, savedFut = savedCalc.fut;
+
+  $("calcMode").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) { setMode(b.dataset.m); saveCalc(); } });
   $("riskUnit").addEventListener("click", (e) => {
     const b = e.target.closest("button"); if (!b) return;
     riskUnit = b.dataset.u;
     [...$("riskUnit").children].forEach(x => x.classList.toggle("active", x === b));
-    calc();
+    calc(); saveCalc();
   });
-  $("cInst").addEventListener("change", onInst);
+  $("cInst").addEventListener("change", () => { onInst(); saveCalc(); });
   ["cBal", "cRisk", "cEntry", "cSl", "cTp", "cPipSize", "cPipVal", "cTickSize", "cTickVal"].forEach(id => $(id).addEventListener("input", calc));
+  ["cBal", "cRisk"].forEach(id => $(id).addEventListener("input", saveCalc));
 
   /* ================= session clock ================= */
   const SESS = [
@@ -480,7 +500,15 @@
   renderNews();
   setInterval(renderNews, 60000);
 
-  setMode("forex");
+  /* boot the calculator with remembered values */
+  if (savedCalc.bal != null && savedCalc.bal !== "") $("cBal").value = savedCalc.bal;
+  if (savedCalc.risk != null && savedCalc.risk !== "") $("cRisk").value = savedCalc.risk;
+  riskUnit = savedCalc.unit === "usd" ? "usd" : "pct";
+  [...$("riskUnit").children].forEach(x => x.classList.toggle("active", x.dataset.u === riskUnit));
+  calcMode = savedCalc.mode === "futures" ? "futures" : "forex";
+  setMode(calcMode);
+  const wantIdx = calcMode === "forex" ? savedFx : savedFut;
+  if (wantIdx != null && $("cInst").options[+wantIdx]) { $("cInst").value = wantIdx; onInst(); }
 })();
 </script>
 </body>
