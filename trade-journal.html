@@ -399,7 +399,7 @@
           <option value="other">อื่นๆ</option>
         </select>
         <button class="ghost" id="logFilterClearBtn" title="ล้างตัวกรอง">ล้าง</button>
-        <button class="ghost" id="logExportCsvBtn" title="ส่งออกรายการที่กรองอยู่นี้เป็น CSV">⬇ CSV</button>
+        <button class="ghost" id="logExportCsvBtn" title="ส่งออกรายการที่กรองอยู่ + สรุปรายสัปดาห์/เดือน (เปิดใน Excel/Sheets)">⬇ Excel</button>
       </div>
     </div>
     <div id="logTableWrap" style="margin-top:12px;"></div>
@@ -1418,11 +1418,6 @@
   /* ---------- trade log ---------- */
   let lastLogList = [];
 
-  function csvEscape(v) {
-    const s = String(v == null ? "" : v);
-    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-  }
-
   document.getElementById("logExportCsvBtn").addEventListener("click", () => {
     if (!lastLogList.length) {
       Swal.fire({ icon: "info", title: "ไม่มีรายการเทรดที่ตรงเงื่อนไขให้ส่งออก" });
@@ -1493,17 +1488,45 @@
       ["กำไรเฉลี่ย/ไม้ชนะ", num(O.avgW)], ["ขาดทุนเฉลี่ย/ไม้แพ้", num(O.avgL)],
     ];
 
-    const out = [];
-    const push = (arr) => out.push((arr || []).map(csvEscape).join(","));
-    push(["=== ภาพรวม ==="]); overall.forEach(push); push([]);
-    push(["=== สรุปรายสัปดาห์ (เริ่มวันจันทร์) ==="]); push(perHead);
-    groupBy(t => weekStart(t.date)).forEach(e => push(perRow(e))); push([]);
-    push(["=== สรุปรายเดือน ==="]); push(perHead);
-    groupBy(t => (t.date || "").slice(0, 7)).forEach(e => push(perRow(e))); push([]);
-    push(["=== รายการเทรด ==="]); push(detHead); detRows.forEach(push);
+    const weekRows = groupBy(t => weekStart(t.date)).map(perRow);
+    const monRows = groupBy(t => (t.date || "").slice(0, 7)).map(perRow);
 
-    triggerDownload(new Blob(["﻿" + out.join("\r\n")], { type: "text/csv;charset=utf-8;" }),
-      `trade-journal-${todayKey()}.csv`);
+    /* ---- styled workbook (HTML-table .xls: colored section banners, opens in Excel/Sheets) ---- */
+    const eh = (v) => String(v == null ? "" : v).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+    const isNumCell = (v) => v !== "" && v != null && /^-?[\d,]+(\.\d+)?%?$/.test(String(v).trim());
+    const pnlColor = (v) => {
+      const n = parseFloat(String(v).replace(/[, %]/g, ""));
+      return isNaN(n) || n === 0 ? "" : n > 0 ? "color:#15803d;font-weight:600" : "color:#b91c1c;font-weight:600";
+    };
+    function section(color, title, headers, rows, pnlCols) {
+      const pc = pnlCols || [];
+      let s = `<tr><td class="ban" colspan="${headers.length}" style="background:${color}">${eh(title)}</td></tr>`;
+      s += `<tr>` + headers.map(hd => `<th style="background:${color}22;border-color:${color}55">${eh(hd)}</th>`).join("") + `</tr>`;
+      s += rows.map((r, ri) => `<tr style="background:${ri % 2 ? "#f7f7fb" : "#fff"}">` + r.map((cell, ci) => {
+        const align = isNumCell(cell) ? "text-align:right" : "";
+        const col = pc.indexOf(ci) >= 0 ? pnlColor(cell) : "";
+        return `<td style="${align};${col}">${eh(cell)}</td>`;
+      }).join("") + `</tr>`).join("");
+      s += `<tr><td colspan="${headers.length}" style="border:none;height:14px"></td></tr>`;
+      return s;
+    }
+    const doc =
+      `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8">` +
+      `<style>
+        body{font-family:"Sarabun","Segoe UI",sans-serif}
+        table{border-collapse:collapse}
+        td,th{border:1px solid #d9dbe6;padding:5px 9px;font-size:12px;white-space:nowrap}
+        th{font-weight:700;color:#1f2430}
+        td.ban{color:#fff;font-weight:800;font-size:14px;letter-spacing:.3px;border-color:transparent;padding:8px 10px}
+      </style></head><body><table>` +
+      section("#4f46e5", "ภาพรวม", ["รายการ", "ค่า"], overall, []) +
+      section("#0d9488", "สรุปรายสัปดาห์ (เริ่มวันจันทร์)", perHead, weekRows, [5, 6]) +
+      section("#d97706", "สรุปรายเดือน", perHead, monRows, [5, 6]) +
+      section("#475569", "รายการเทรด", detHead, detRows, [8, 9]) +
+      `</table></body></html>`;
+
+    triggerDownload(new Blob(["﻿" + doc], { type: "application/vnd.ms-excel;charset=utf-8;" }),
+      `trade-journal-${todayKey()}.xls`);
   });
 
   document.getElementById("logMarketFilter").addEventListener("change", renderLog);
