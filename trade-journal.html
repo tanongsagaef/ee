@@ -1798,31 +1798,50 @@
       Swal.fire({ icon: "info", title: "ไม่พบตารางประวัติเทรด", html: "ใน MT5: <b>Toolbox → History → คลิกขวา → Report → HTML</b><br>(หรือ IUX cabinet ส่งออกเป็น CSV) แล้วเลือกไฟล์นั้น" });
       return;
     }
-    const existing = new Set(trades.map(t => t.mt5Id).filter(Boolean));
-    const keyOf = (t) => `${t.date}|${(t.symbol || "").toUpperCase()}|${t.entry}|${t.exit}|${t.lot}`;
-    const existKeys = new Set(trades.map(keyOf));
-    const fresh = parsed.filter(r => !(r.mt5Id && existing.has(r.mt5Id)) && !existKeys.has(keyOf(r)));
-    const dup = parsed.length - fresh.length;
-    const net = fresh.reduce((s, r) => s + (Number(r.pnl) || 0), 0);
+    // ---- dedup vs trades already in the journal (manual entries included) ----
+    const baseSym = (s) => String(s || "").toLowerCase().replace(/[.\-#+_].*$/, "").replace(/[^a-z0-9]/g, "");
+    const existIds = new Set(trades.map(t => t.mt5Id).filter(Boolean));
+    const exactKey = (t) => `${t.date}|${baseSym(t.symbol)}|${round5(t.entry)}|${round5(t.exit)}|${round5(t.lot ?? t.contracts)}`;
+    function round5(n) { return n == null ? "" : Math.round(Number(n) * 1e5) / 1e5; }
+    const existExact = new Set(trades.map(exactKey));
+    const closedExisting = trades.filter(t => !isPending(t));
+    // fuzzy: same day + base symbol + side + P/L within max($0.50, 1%)
+    const fuzzyHit = (r) => closedExisting.some(t =>
+      t.date === r.date && baseSym(t.symbol) === baseSym(r.symbol) &&
+      (t.side === r.side) &&
+      Math.abs(Number(t.pnl) - Number(r.pnl)) <= Math.max(0.5, Math.abs(Number(r.pnl)) * 0.01));
 
-    const sample = fresh.slice(0, 5).map(r =>
+    const fresh = [], maybe = [];
+    let dupExact = 0;
+    parsed.forEach(r => {
+      if ((r.mt5Id && existIds.has(r.mt5Id)) || existExact.has(exactKey(r))) { dupExact++; return; }
+      (fuzzyHit(r) ? maybe : fresh).push(r);
+    });
+
+    const rowHtml = (list) => list.slice(0, 6).map(r =>
       `<tr><td>${r.date}</td><td>${escapeHtml(r.symbol)}</td><td>${r.side === "short" ? "SELL" : "BUY"}</td><td>${r.lot ?? ""}</td><td style="text-align:right;color:${r.pnl >= 0 ? "#16a34a" : "#dc2626"}">${(r.pnl >= 0 ? "+" : "") + r.pnl}</td></tr>`).join("");
+    const net0 = fresh.reduce((s, r) => s + (Number(r.pnl) || 0), 0);
 
-    const { value: market } = await Swal.fire({
+    const { value: res } = await Swal.fire({
       title: `นำเข้า ${fresh.length} ไม้`,
-      html: `<div style="font-size:13px;text-align:left">พบทั้งหมด ${parsed.length} · ใหม่ <b>${fresh.length}</b> · ซ้ำข้าม ${dup} · P/L รวม <b style="color:${net >= 0 ? "#16a34a" : "#dc2626"}">${(net >= 0 ? "+" : "") + net.toFixed(2)}</b>
+      html: `<div style="font-size:13px;text-align:left">พบทั้งหมด ${parsed.length} · ใหม่ <b>${fresh.length}</b> · ซ้ำแน่ข้ามให้ ${dupExact} · <b>อาจซ้ำ ${maybe.length}</b> (ตรงกับที่มีในสมุด: วัน+สัญลักษณ์+ทิศ+P/L)
         <table style="width:100%;margin-top:8px;border-collapse:collapse;font-size:12px">
-        <tr style="color:#888"><td>วันที่</td><td>สัญลักษณ์</td><td>ทิศ</td><td>Lot</td><td style="text-align:right">P/L</td></tr>${sample}
-        ${fresh.length > 5 ? `<tr><td colspan="5" style="color:#888">… อีก ${fresh.length - 5} ไม้</td></tr>` : ""}</table>
+        <tr style="color:#888"><td>วันที่</td><td>สัญลักษณ์</td><td>ทิศ</td><td>Lot</td><td style="text-align:right">P/L</td></tr>${rowHtml(fresh)}
+        ${fresh.length > 6 ? `<tr><td colspan="5" style="color:#888">… อีก ${fresh.length - 6} ไม้</td></tr>` : ""}</table>
+        <div style="color:#888;margin-top:4px">P/L รวมของรายการใหม่: <b style="color:${net0 >= 0 ? "#16a34a" : "#dc2626"}">${(net0 >= 0 ? "+" : "") + net0.toFixed(2)}</b></div>
+        ${maybe.length ? `<label style="display:flex;gap:6px;align-items:flex-start;margin-top:10px;background:#0001;padding:6px 8px;border-radius:6px"><input type="checkbox" id="mt5IncMaybe" style="margin-top:2px"><span>นำเข้ารายการ "อาจซ้ำ" ${maybe.length} รายการด้วย (ติ๊กเฉพาะถ้าที่กรอกไว้ไม่ใช่ไม้เดียวกัน)</span></label>` : ""}
         <label style="display:block;margin-top:10px">ตลาดของไม้เหล่านี้:
         <select id="mt5Market" class="swal2-input" style="height:auto;margin:4px 0 0"><option value="forex">Forex</option><option value="futures">Futures</option><option value="other">อื่นๆ</option></select></label></div>`,
       showCancelButton: true, confirmButtonText: "นำเข้า", cancelButtonText: "ยกเลิก",
-      preConfirm: () => document.getElementById("mt5Market").value,
-      didOpen: () => { if (!fresh.length) Swal.getConfirmButton().disabled = true; },
+      preConfirm: () => ({ market: document.getElementById("mt5Market").value, incMaybe: !!(document.getElementById("mt5IncMaybe") || {}).checked }),
+      didOpen: () => { if (!fresh.length && !maybe.length) Swal.getConfirmButton().disabled = true; },
     });
-    if (!market || !fresh.length) return;
+    if (!res) return;
+    const market = res.market;
+    const toImport = res.incMaybe ? fresh.concat(maybe) : fresh;
+    if (!toImport.length) return;
 
-    fresh.forEach((r, i) => {
+    toImport.forEach((r, i) => {
       trades.push({
         id: uid(), createdAt: Date.now() + i,
         date: r.date, marketType: market, symbol: r.symbol, side: r.side,
@@ -1838,7 +1857,7 @@
     saveTrades();
     renderCalendar(); renderLog();
     if (typeof renderOverview === "function") renderOverview();
-    successToast(`นำเข้า ${fresh.length} ไม้เรียบร้อย`);
+    successToast(`นำเข้า ${toImport.length} ไม้เรียบร้อย`);
   });
 
   document.getElementById("logMarketFilter").addEventListener("change", renderLog);
