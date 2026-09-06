@@ -2083,18 +2083,77 @@
     if (!$("statsBox").hidden) renderStats();
   }
 
-  function loadCountToChart(c) {
+  const TF_MS = { "15m": 9e5, "1h": 36e5, "4h": 144e5, "1d": 864e5, "1w": 6048e5 };
+  // build a placeholder line series through the saved pivots so a count with no chart snapshot still shows
+  function synthFromPoints(pts) {
+    if (!pts.length) return { series: [0, 0], points: [], view: { i0: 0, n: 2 } };
+    const maxI = Math.max(...pts.map(p => p.i)), minI = Math.min(...pts.map(p => p.i));
+    const pad = Math.max(12, Math.round((maxI - minI) * 0.3));
+    const off = Math.max(0, minI - pad);
+    const N = (maxI - off) + pad + 1;
+    const sorted = pts.map(p => ({ i: p.i - off, v: p.v })).sort((a, b) => a.i - b.i);
+    const s = new Array(N);
+    for (let k = 0; k < N; k++) {
+      if (k <= sorted[0].i) { s[k] = sorted[0].v; continue; }
+      if (k >= sorted[sorted.length - 1].i) { s[k] = sorted[sorted.length - 1].v; continue; }
+      let a = sorted[0], b = sorted[sorted.length - 1];
+      for (let j = 0; j < sorted.length - 1; j++) if (k >= sorted[j].i && k <= sorted[j + 1].i) { a = sorted[j]; b = sorted[j + 1]; break; }
+      s[k] = a.v + (b.v - a.v) * ((k - a.i) / ((b.i - a.i) || 1));
+    }
+    return {
+      series: s, points: pts.map(p => ({ i: p.i - off, v: p.v })),
+      view: { i0: 0, n: Math.min(N, (maxI - minI) + 2 * pad) },
+    };
+  }
+  // try to re-fetch real klines for a Binance count whose candle snapshot was dropped
+  async function refetchCountChart(c) {
+    const barMs = TF_MS[c.timeframe];
+    if (!c.symbol || !barMs || typeof c.lastPivotT !== "number" || !c.points || !c.points.length) return null;
+    const maxI = Math.max(...c.points.map(p => p.i)), minI = Math.min(...c.points.map(p => p.i));
+    const timeOf = (i) => c.lastPivotT - (maxI - i) * barMs;
+    try {
+      const sym = c.symbol.toUpperCase().replace(/[^A-Z0-9]/g, "");
+      const startT = Math.floor(timeOf(minI) - barMs * 40);
+      const limit = Math.min(1000, (maxI - minI) + 130);
+      const r = await fetch(`https://data-api.binance.vision/api/v3/klines?symbol=${sym}&interval=${c.timeframe}&startTime=${startT}&limit=${limit}`);
+      if (!r.ok) return null;
+      const raw = await r.json();
+      if (!Array.isArray(raw) || raw.length < 5) return null;
+      const cs = raw.map(k => ({ t: k[0], o: +k[1], h: +k[2], l: +k[3], c: +k[4] }));
+      const nearIdx = (t) => { let bi = 0, bd = Infinity; for (let j = 0; j < cs.length; j++) { const d = Math.abs(cs[j].t - t); if (d < bd) { bd = d; bi = j; } } return bi; };
+      const pts = c.points.map(p => ({ i: nearIdx(timeOf(p.i)), v: p.v }));
+      const lo = Math.min(...pts.map(p => p.i)), hi = Math.max(...pts.map(p => p.i));
+      return { candles: cs, series: cs.map(x => x.c), points: pts, view: { i0: Math.max(0, lo - 20), n: Math.min(cs.length, (hi - lo) + 60) } };
+    } catch (e) { return null; }
+  }
+
+  async function loadCountToChart(c) {
     live = false; $("liveChk").checked = false; closeWS();
     noMoreHistory = false;
     mode = normMode(c.mode);
     if (Array.isArray(c.candles) && c.candles.length > 5) {
       candles = c.candles.slice(); series = candles.map(x => x.c); src = "binance";
+      points = c.points.map(p => ({ i: p.i, v: p.v }));
+      if (c.view && typeof c.view.i0 === "number") view = { i0: c.view.i0, n: c.view.n || 120 };
+      else fitView(120);
+    } else if (Array.isArray(c.series) && c.series.length > 10) {
+      candles = null; series = c.series.slice(); src = "sim";
+      points = c.points.map(p => ({ i: p.i, v: p.v }));
+      if (c.view && typeof c.view.i0 === "number") view = { i0: c.view.i0, n: c.view.n || 120 };
+      else fitView(120);
     } else {
-      candles = null; series = (c.series || []).slice(); src = "sim";
+      // no chart snapshot — recover it
+      $("loadMsg").textContent = "กำลังกู้กราฟของการนับนี้…";
+      const got = await refetchCountChart(c);
+      if (got) {
+        candles = got.candles; series = got.series; points = got.points; view = got.view; src = "binance";
+        $("loadMsg").textContent = "กู้กราฟจริงจาก Binance แล้ว";
+      } else {
+        const sy = synthFromPoints((c.points || []).map(p => ({ i: p.i, v: p.v })));
+        candles = null; series = sy.series; points = sy.points; view = sy.view; src = "sim";
+        $("loadMsg").textContent = "การนับนี้ไม่มีกราฟบันทึกไว้ — แสดงเส้นจำลองจากจุดที่วาง";
+      }
     }
-    points = c.points.map(p => ({ i: p.i, v: p.v }));
-    if (c.view && typeof c.view.i0 === "number") view = { i0: c.view.i0, n: c.view.n || 120 };
-    else fitView(120);
     subALegs = c.subALegs === 3 || c.subALegs === 5 ? c.subALegs : 0;
     subA4Overlap = !!c.subA4Overlap;
     $("subALegs").value = String(subALegs);
