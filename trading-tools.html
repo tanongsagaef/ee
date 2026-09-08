@@ -105,6 +105,7 @@
   .flag { margin-top: 8px; font-size: 12px; padding: 8px 10px; border-radius: 9px; }
   .flag.warn { background: var(--warn-soft); color: var(--warn); }
   .flag.ok { background: var(--bull-soft); color: var(--bull); }
+  .flag.danger { background: rgba(220,38,38,0.13); color: #dc2626; font-weight: 700; }
 
   /* session clock */
   .clock-now { font-size: 13px; color: var(--muted); margin-bottom: 10px; }
@@ -173,6 +174,7 @@
       <div class="seg" id="calcMode">
         <button data-m="forex" class="active">Forex</button>
         <button data-m="futures">Futures</button>
+        <button data-m="perp">Crypto Perp</button>
       </div>
 
       <div class="grid2">
@@ -186,18 +188,22 @@
         </div>
         <label class="fld"><span>ราคาเข้า</span><input id="cEntry" type="number" step="any" inputmode="decimal"></label>
         <label class="fld"><span>ราคา SL</span><input id="cSl" type="number" step="any" inputmode="decimal"></label>
+        <label class="fld" id="levWrap" hidden><span>Leverage (เท่า)</span><input id="cLev" type="number" step="any" inputmode="decimal" placeholder="เช่น 10"></label>
         <label class="fld" style="grid-column:1/-1;"><span>TP — ไม่บังคับ (ไว้ดู R:R + กำไรที่เป้า)</span><input id="cTp" type="number" step="any" inputmode="decimal"></label>
       </div>
 
       <details class="adv">
-        <summary>⚙ ปรับค่า pip / tick เอง (ปกติไม่ต้องแตะ)</summary>
+        <summary id="advSum">⚙ ค่าขั้นสูง (ปกติไม่ต้องแตะ)</summary>
         <div class="grid2" style="margin-top:8px;">
           <label class="fld" id="pipSizeWrap"><span>ขนาด 1 pip</span><input id="cPipSize" type="number" step="any"></label>
           <label class="fld" id="pipValWrap"><span>มูลค่า/pip ต่อ 1.00 lot ($)</span><input id="cPipVal" type="number" step="any"></label>
           <label class="fld" id="tickSizeWrap" hidden><span>ขนาด 1 tick</span><input id="cTickSize" type="number" step="any"></label>
           <label class="fld" id="tickValWrap" hidden><span>มูลค่า/tick ต่อ 1 สัญญา ($)</span><input id="cTickVal" type="number" step="any"></label>
+          <label class="fld" id="mmrWrap" hidden><span>Maint. margin rate (mmr)</span><input id="cMmr" type="number" step="any" placeholder="0.004"></label>
+          <label class="fld" id="fundingWrap" hidden><span>Funding rate % / 8ชม</span><input id="cFunding" type="number" step="any" value="0.01"></label>
+          <label class="fld" id="feeWrap" hidden><span>Taker fee % (ต่อข้าง)</span><input id="cFee" type="number" step="any" value="0.05"></label>
         </div>
-        <div class="muted-note" style="margin-top:6px;">JPY pairs / ทอง / index ปรับตามเรทปัจจุบันได้</div>
+        <div class="muted-note" id="advNote" style="margin-top:6px;">JPY pairs / ทอง / index ปรับตามเรทปัจจุบันได้</div>
       </details>
 
       <div class="result" id="cResult"></div>
@@ -270,10 +276,20 @@
     { k: "6B  British Pound", ts: 0.0001, tv: 6.25 }, { k: "6J  Japanese Yen", ts: 0.0000005, tv: 6.25 },
     { k: "กำหนดเอง", ts: 0.25, tv: 12.5 },
   ];
+  // OKX USDT-perp — mmr = maintenance-margin-rate ประมาณ tier แรก (ปรับได้ในค่าขั้นสูง)
+  const PERP = [
+    { k: "BTC-USDT", mmr: 0.004 }, { k: "ETH-USDT", mmr: 0.005 },
+    { k: "SOL-USDT", mmr: 0.0075 }, { k: "BNB-USDT", mmr: 0.0075 },
+    { k: "XRP-USDT", mmr: 0.0075 }, { k: "DOGE-USDT", mmr: 0.0075 },
+    { k: "ADA-USDT", mmr: 0.0075 }, { k: "AVAX-USDT", mmr: 0.0075 },
+    { k: "LINK-USDT", mmr: 0.0075 }, { k: "TON-USDT", mmr: 0.0075 },
+    { k: "กำหนดเอง", mmr: 0.005 },
+  ];
   let calcMode = "forex", riskUnit = "pct";
 
   function fillInst() {
-    const sel = $("cInst"); const list = calcMode === "forex" ? FX : FUT;
+    const sel = $("cInst");
+    const list = calcMode === "forex" ? FX : calcMode === "futures" ? FUT : PERP;
     sel.innerHTML = list.map((o, i) => `<option value="${i}">${o.k}</option>`).join("");
     onInst();
   }
@@ -281,18 +297,26 @@
     const i = +$("cInst").value || 0;
     if (calcMode === "forex") {
       const o = FX[i]; $("cPipSize").value = o.pip; $("cPipVal").value = o.val;
-    } else {
+    } else if (calcMode === "futures") {
       const o = FUT[i]; $("cTickSize").value = o.ts; $("cTickVal").value = o.tv;
+    } else {
+      const o = PERP[i]; $("cMmr").value = o.mmr;
     }
     calc();
   }
   function setMode(m) {
     calcMode = m;
     [...$("calcMode").children].forEach(b => b.classList.toggle("active", b.dataset.m === m));
-    const fx = m === "forex";
+    const fx = m === "forex", fut = m === "futures", perp = m === "perp";
     $("pipSizeWrap").hidden = !fx; $("pipValWrap").hidden = !fx;
-    $("tickSizeWrap").hidden = fx; $("tickValWrap").hidden = fx;
-    $("fxPairWrap").querySelector("span").textContent = fx ? "สินค้า (Forex / CFD)" : "สินค้า (Futures)";
+    $("tickSizeWrap").hidden = !fut; $("tickValWrap").hidden = !fut;
+    $("mmrWrap").hidden = !perp; $("fundingWrap").hidden = !perp; $("feeWrap").hidden = !perp;
+    $("levWrap").hidden = !perp;
+    $("fxPairWrap").querySelector("span").textContent =
+      fx ? "สินค้า (Forex / CFD)" : fut ? "สินค้า (Futures)" : "เหรียญ (OKX Perpetual)";
+    $("advNote").textContent = perp
+      ? "mmr = maintenance margin rate โดยประมาณของ OKX (BTC ~0.4%) · funding ทุก 8 ชม. · ราคาโดนล้างเป็นค่าประมาณแบบ isolated margin ไม่รวม fee ที่จ่ายไปแล้ว"
+      : "JPY pairs / ทอง / index ปรับตามเรทปัจจุบันได้";
     fillInst();
   }
 
@@ -305,7 +329,7 @@
       R.innerHTML = `<div class="big"><div class="lbl">ขนาดโพสิชัน</div><div class="num">—</div><div class="sub">กรอก พอร์ต · ความเสี่ยง · ราคาเข้า · ราคา SL</div></div>`;
       return;
     }
-    let rows = [], bigNum, bigSub, flags = [];
+    let rows = [], bigNum, bigSub, flags = [], bigLbl = "ขนาดโพสิชัน";
     if (calcMode === "forex") {
       const pipSize = parseFloat($("cPipSize").value), pipVal = parseFloat($("cPipVal").value);
       if (!(pipSize > 0) || !(pipVal > 0)) { R.innerHTML = `<div class="big"><div class="num">—</div><div class="sub">ตรวจค่า pip</div></div>`; return; }
@@ -324,7 +348,7 @@
         rows.push(["กำไรที่เป้า", money(tpPips * pipVal * lots)]);
       }
       if (lots < 0.01) flags.push(["warn", "ขนาด < 0.01 lot — SL ไกลไป หรือความเสี่ยงน้อยไป"]);
-    } else {
+    } else if (calcMode === "futures") {
       const ts = parseFloat($("cTickSize").value), tv = parseFloat($("cTickVal").value);
       if (!(ts > 0) || !(tv > 0)) { R.innerHTML = `<div class="big"><div class="num">—</div><div class="sub">ตรวจค่า tick</div></div>`; return; }
       const stopPts = Math.abs(entry - sl);
@@ -344,9 +368,54 @@
       }
       if (contracts < 1) flags.push(["warn", "ได้ 0 สัญญา — 1 สัญญาเสี่ยง " + money(riskPerC) + " เกินความเสี่ยงที่รับได้ · ลด SL หรือใช้ Micro"]);
       else if (Math.abs(actual - riskAmt) / riskAmt > 0.2) flags.push(["warn", "ปัดจำนวนสัญญาแล้วเสี่ยงจริงต่างจากที่ตั้ง " + fmt(Math.abs(actual - riskAmt) / riskAmt * 100, 0) + "%"]);
+    } else {
+      /* ---- crypto perp (OKX) ---- */
+      const lev = parseFloat($("cLev").value);
+      const mmr = parseFloat($("cMmr").value) || 0;
+      const fundingR = (parseFloat($("cFunding").value) || 0) / 100;
+      const feeR = (parseFloat($("cFee").value) || 0) / 100;
+      const dir = entry > sl ? 1 : -1;                 // Long ถ้า SL อยู่ใต้ราคาเข้า
+      const dirTxt = dir === 1 ? "Long" : "Short";
+      const px = (v) => fmt(v, v < 1 ? 6 : v < 100 ? 4 : 2);
+      const stopDist = Math.abs(entry - sl);
+      const stopFrac = stopDist / entry;
+      const notional = riskAmt / stopFrac;             // ขาดทุนที่ SL = notional * stopFrac = riskAmt
+      const coins = notional / entry;
+      bigLbl = "ขนาดโพสิชัน (Notional)";
+      bigNum = money(notional);
+      bigSub = fmt(coins, coins < 1 ? 6 : 3) + " เหรียญ · " + dirTxt + " · SL " + fmt(stopFrac * 100, 2) + "% จากราคาเข้า";
+      rows.push(["$ ที่เสี่ยงจริง", money(riskAmt)]);
+      rows.push(["ขนาด (เหรียญ)", fmt(coins, coins < 1 ? 6 : 3)]);
+      if (isFinite(lev) && lev > 0) {
+        const margin = notional / lev;
+        const liq = dir === 1 ? entry * (1 - 1 / lev + mmr) : entry * (1 + 1 / lev - mmr);
+        const liqFrac = Math.abs(entry - liq) / entry;
+        rows.push(["Margin ที่ต้องใช้ (isolated)", money(margin)]);
+        rows.push(["Leverage จริงเทียบพอร์ต", fmt(notional / bal, 2) + "x"]);
+        rows.push(["ราคาโดนล้าง (ประมาณ)", px(liq) + "  ·  " + fmt(liqFrac * 100, 2) + "% จากราคาเข้า"]);
+        if (margin > bal) flags.push(["warn", "Margin " + money(margin) + " เกินพอร์ต ($" + fmt(bal, 0) + ") — ลดขนาดไม้ หรือเพิ่ม leverage"]);
+        const slBeyondLiq = dir === 1 ? (sl <= liq) : (sl >= liq);
+        if (slBeyondLiq) {
+          flags.push(["danger", "⚠ SL อยู่เลยราคาโดนล้าง — จะโดนล้างก่อนถึง SL! ลด leverage ลง หรือขยับ SL เข้ามา"]);
+        } else {
+          const buf = (liqFrac - stopFrac) / stopFrac;
+          if (buf < 0.5) flags.push(["warn", "ระยะราคาโดนล้างห่างจาก SL แค่ " + fmt(buf * 100, 0) + "% ของระยะ SL — บางไป ถ้าสวนแรงอาจโดนล้างก่อน"]);
+          else flags.push(["ok", "SL ถึงก่อนราคาโดนล้าง (buffer " + fmt(buf * 100, 0) + "% ของระยะ SL)"]);
+        }
+      } else {
+        flags.push(["warn", "ใส่ Leverage เพื่อดู margin ที่ต้องใช้ + ราคาโดนล้าง"]);
+      }
+      rows.push(["ค่าธรรมเนียม เปิด+ปิด (ประมาณ)", money(notional * feeR * 2)]);
+      rows.push(["ต้นทุน Funding / 8ชม (ถ้าฝั่งจ่าย)", money(notional * fundingR)]);
+      if (isFinite(tp) && tp !== entry) {
+        const tpDist = Math.abs(tp - entry), rr = tpDist / stopDist;
+        rows.push(["ระยะเป้า", fmt(tpDist / entry * 100, 2) + "%"]);
+        rows.push(["R:R", "1 : " + fmt(rr, 2)]);
+        rows.push(["กำไรที่เป้า (ก่อน fee/funding)", money(notional * tpDist / entry)]);
+      }
     }
     R.innerHTML =
-      `<div class="big"><div class="lbl">ขนาดโพสิชัน</div><div class="num">${bigNum}</div><div class="sub">${bigSub}</div></div>` +
+      `<div class="big"><div class="lbl">${bigLbl}</div><div class="num">${bigNum}</div><div class="sub">${bigSub}</div></div>` +
       `<table>${rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join("")}</table>` +
       flags.map(f => `<div class="flag ${f[0]}">${f[1]}</div>`).join("");
   }
@@ -357,14 +426,16 @@
     try {
       localStorage.setItem(CALC_KEY, JSON.stringify({
         bal: $("cBal").value, risk: $("cRisk").value, unit: riskUnit, mode: calcMode,
+        lev: $("cLev").value,
         fx: calcMode === "forex" ? $("cInst").value : undefined,
         fut: calcMode === "futures" ? $("cInst").value : undefined,
+        perp: calcMode === "perp" ? $("cInst").value : undefined,
       }));
     } catch (e) {}
   }
   let savedCalc = {};
   try { savedCalc = JSON.parse(localStorage.getItem(CALC_KEY) || "{}") || {}; } catch (e) {}
-  let savedFx = savedCalc.fx, savedFut = savedCalc.fut;
+  let savedFx = savedCalc.fx, savedFut = savedCalc.fut, savedPerp = savedCalc.perp;
 
   $("calcMode").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) { setMode(b.dataset.m); saveCalc(); } });
   $("riskUnit").addEventListener("click", (e) => {
@@ -374,8 +445,8 @@
     calc(); saveCalc();
   });
   $("cInst").addEventListener("change", () => { onInst(); saveCalc(); });
-  ["cBal", "cRisk", "cEntry", "cSl", "cTp", "cPipSize", "cPipVal", "cTickSize", "cTickVal"].forEach(id => $(id).addEventListener("input", calc));
-  ["cBal", "cRisk"].forEach(id => $(id).addEventListener("input", saveCalc));
+  ["cBal", "cRisk", "cEntry", "cSl", "cTp", "cPipSize", "cPipVal", "cTickSize", "cTickVal", "cLev", "cMmr", "cFunding", "cFee"].forEach(id => $(id).addEventListener("input", calc));
+  ["cBal", "cRisk", "cLev"].forEach(id => $(id).addEventListener("input", saveCalc));
 
   /* ================= session clock ================= */
   const SESS = [
@@ -520,11 +591,12 @@
   /* boot the calculator with remembered values */
   if (savedCalc.bal != null && savedCalc.bal !== "") $("cBal").value = savedCalc.bal;
   if (savedCalc.risk != null && savedCalc.risk !== "") $("cRisk").value = savedCalc.risk;
+  if (savedCalc.lev != null && savedCalc.lev !== "") $("cLev").value = savedCalc.lev;
   riskUnit = savedCalc.unit === "usd" ? "usd" : "pct";
   [...$("riskUnit").children].forEach(x => x.classList.toggle("active", x.dataset.u === riskUnit));
-  calcMode = savedCalc.mode === "futures" ? "futures" : "forex";
+  calcMode = savedCalc.mode === "futures" ? "futures" : savedCalc.mode === "perp" ? "perp" : "forex";
   setMode(calcMode);
-  const wantIdx = calcMode === "forex" ? savedFx : savedFut;
+  const wantIdx = calcMode === "forex" ? savedFx : calcMode === "futures" ? savedFut : savedPerp;
   if (wantIdx != null && $("cInst").options[+wantIdx]) { $("cInst").value = wantIdx; onInst(); }
 })();
 </script>
