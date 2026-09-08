@@ -133,7 +133,11 @@ function renderHomeContent() {
   const content = document.getElementById("content");
 
   if (!chapters.length) {
-    content.innerHTML = `<h1>ทบทวน Elliott Wave</h1><p class="empty-chapter">ยังไม่มีบทเนื้อหา กด "+ เพิ่มเนื้อหา" เพื่อเริ่มต้น</p>`;
+    const signedIn = !!(window.FirebaseSync && FirebaseSync.getUser && FirebaseSync.getUser());
+    const hint = signedIn
+      ? `ยังไม่มีบทเนื้อหา กด "+ เพิ่มเนื้อหา" เพื่อเริ่มต้น`
+      : `ยังไม่มีบทเนื้อหาบนเครื่องนี้ — ถ้าเคยบันทึกไว้บนเครื่องอื่น กด "☁ ซิงค์ข้ามอุปกรณ์" ด้านบนเพื่อดึงมา หรือกด "+ เพิ่มเนื้อหา" เพื่อเริ่มใหม่`;
+    content.innerHTML = `<h1>ทบทวน Elliott Wave</h1><p class="empty-chapter">${hint}</p>`;
     return;
   }
 
@@ -1604,7 +1608,14 @@ function setupCloudSync() {
 
 /* ---------- Init ---------- */
 (async function init() {
-  chapters = await loadData();
+  try {
+    chapters = await loadData();
+  } catch (e) {
+    // some mobile browsers (iOS Safari private mode, storage blocked) reject IndexedDB —
+    // don't let that leave a blank page; cloud sync can still pull the chapters after sign-in
+    console.error("โหลดข้อมูลจากเครื่องไม่สำเร็จ (IndexedDB ใช้ไม่ได้?)", e);
+    chapters = [];
+  }
   activeView = "home";
   activeChapterId = null;
   renderContent();
