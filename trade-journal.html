@@ -643,7 +643,7 @@
       <input type="number" id="tfPnl" step="any" placeholder="เว้นว่างได้ถ้ายังไม่ปิดเทรด ใส่ค่าลบถ้าขาดทุน เช่น -45.50">
     </div>
 
-    <div class="row">
+    <div class="row" id="tfSessionRow">
       <div class="field">
         <label class="small">ช่วงเวลาเทรด (Session)</label>
         <select id="tfSession">
@@ -659,12 +659,12 @@
       </div>
     </div>
 
-    <div class="field">
+    <div class="field" id="tfModelRow">
       <label class="small">กลยุทธ์ / Model</label>
       <input type="text" id="tfModel" placeholder="เช่น Breakout Retest, ICT FVG">
     </div>
 
-    <div class="field">
+    <div class="field" id="tfGradeRow">
       <label class="small">เกรดการเทรด (เมื่อเทรดเสร็จ)</label>
       <div class="grade-toggle" id="tfGradeToggle">
         <button type="button" class="grade-btn" data-grade="A">A</button>
@@ -675,7 +675,7 @@
       </div>
     </div>
 
-    <div class="field">
+    <div class="field" id="tfDisciplineRow">
       <label class="small">การวินัยในการเทรด</label>
       <div class="check-row">
         <label class="check-item"><input type="checkbox" id="tfFollowedRules"> ทำตามแผน</label>
@@ -684,7 +684,7 @@
       </div>
     </div>
 
-    <div class="row">
+    <div class="row" id="tfTagsRow">
       <div class="field">
         <label class="small">แท็กบวก — สิ่งที่ทำได้ดี (คั่นด้วยคอมมา)</label>
         <input type="text" id="tfTags" placeholder="เช่น BREAKOUT, FOLLOWED PLAN">
@@ -695,7 +695,7 @@
       </div>
     </div>
 
-    <div class="row">
+    <div class="row" id="tfImagesRow">
       <div class="field">
         <label class="small">รูปก่อนเข้าเทรด</label>
         <div id="tfImageBeforePreview"></div>
@@ -714,12 +714,12 @@
       </div>
     </div>
 
-    <div class="field">
+    <div class="field" id="tfTvLinkRow">
       <label class="small">ลิงก์ TradingView (สแนปช็อต ถ้ามี)</label>
       <input type="text" id="tfTvLink" placeholder="https://www.tradingview.com/x/xxxxxxxx/">
     </div>
 
-    <div class="field">
+    <div class="field" id="tfTvSymbolRow">
       <label class="small">TradingView Symbol (ฝังกราฟสด)</label>
       <input type="text" id="tfTvSymbol" placeholder="เช่น SET:PTT, BINANCE:BTCUSDT, NASDAQ:AAPL, FX:EURUSD">
       <button type="button" class="ghost" id="tfTvPreviewBtn" style="margin-top:8px;">📈 แสดง / ซ่อนกราฟสด</button>
@@ -2084,10 +2084,14 @@
 
   function toggleMarketFields() {
     const type = tfMarketType.value;
+    const isFut = type === "futures";
     document.getElementById("tfForexFields").classList.toggle("hidden", type !== "forex");
-    document.getElementById("tfFuturesFields").classList.toggle("hidden", type !== "futures");
-    document.getElementById("tfFuturesDetail").classList.toggle("hidden", type !== "futures");
-    if (type === "futures" && typeof updateFuturesDetailCalc === "function") updateFuturesDetailCalc();
+    document.getElementById("tfFuturesFields").classList.add("hidden"); // Contracts/Points ถูกแทนด้วย Size ในบล็อกละเอียด
+    document.getElementById("tfFuturesDetail").classList.toggle("hidden", !isFut);
+    // โหมด Futures: ตัดช่องของฟอร์มเดิมออก เหลือแค่เช็กลิสต์ + บล็อก Futures/Perp + ราคา/PNL/โน้ต
+    ["tfSessionRow", "tfModelRow", "tfGradeRow", "tfDisciplineRow", "tfTagsRow", "tfImagesRow", "tfTvLinkRow", "tfTvSymbolRow"]
+      .forEach(id => { const el = document.getElementById(id); if (el) el.classList.toggle("hidden", isFut); });
+    if (isFut && typeof updateFuturesDetailCalc === "function") updateFuturesDetailCalc();
     document.getElementById("tfSymbolLabel").textContent =
       type === "forex" ? "คู่เงิน" : type === "futures" ? "สัญญา / Ticker" : "สัญลักษณ์";
     document.getElementById("tfSymbol").placeholder =
