@@ -659,3 +659,16 @@ textarea::placeholder, input::placeholder { color: var(--text-muted); opacity: .
   .section-card { padding: 20px 18px; }
   .section-card h3 { font-size: 1.18rem; }
 }
+@media (max-width: 600px) {
+  .topbar { padding: 10px 14px; gap: 8px; }
+  .brand { font-size: 1rem; margin-right: 8px; }
+  .topbar-actions { gap: 6px; width: 100%; justify-content: flex-start; }
+  .topbar-actions .btn { padding: 7px 10px; font-size: 0.78rem; }
+  .content { padding: 22px 13px 80px; }
+  .home-grid { grid-template-columns: 1fr; gap: 12px; }
+  .search-bar { max-width: 100%; }
+  .chapter-header-row { gap: 8px; }
+  .modal { max-width: 100%; }
+  .modal-footer { flex-wrap: wrap; }
+  .modal-footer .btn { flex: 1 1 auto; }
+}

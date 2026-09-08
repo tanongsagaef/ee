@@ -132,7 +132,24 @@
   .btn:hover { border-color: var(--accent); color: var(--accent); }
   .btn.solid { background: var(--accent); border-color: var(--accent); color: #fff; }
   .muted-note { color: var(--muted); font-size: 12px; }
-  @media (max-width: 560px) { body { padding: 12px 12px 50px; } .grid2 { grid-template-columns: 1fr; } }
+  @media (max-width: 640px) {
+    body { padding: 12px 12px 46px; }
+    .header { padding: 10px 12px; margin-bottom: 14px; }
+    .brand { font-size: 16px; }
+    .panel { padding: 14px 13px; margin-bottom: 13px; }
+    .grid2 { grid-template-columns: 1fr; }
+    .riskrow { flex-wrap: wrap; }
+    .riskrow .mini-seg { width: 100%; }
+    .riskrow .mini-seg button { flex: 1; }
+    .result .big .num { font-size: 25px; }
+    .result td { padding: 8px 12px; }
+    .tl { height: 150px; }
+    .tl .hr { font-size: 7.5px; }
+    .sess-list { grid-template-columns: 1fr 1fr; }
+    .seg { display: flex; width: 100%; }
+    .seg button { flex: 1; padding: 8px 6px; }
+  }
+  @media (max-width: 380px) { .sess-list { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>

@@ -146,6 +146,20 @@
   .wl-score-num { font-family: ui-monospace, monospace; font-size: 22px; font-weight: 800; }
   .wl-actions { display: flex; gap: 6px; margin-top: 8px; }
   .wl-actions button { flex: 1; font-size: 11px; padding: 5px 6px; }
+  @media (max-width: 640px) {
+    body { padding: 12px 12px 46px; }
+    .header { padding-bottom: 10px; margin-bottom: 12px; }
+    .brand { font-size: 17px; }
+    .panel { padding: 13px 12px; margin-bottom: 12px; }
+    .tabs { overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; }
+    .tab-btn { white-space: nowrap; }
+    .sym-name { font-size: 20px; }
+    .stamp { font-size: 18px; letter-spacing: 2px; padding: 5px 12px; }
+    .metrics-grid { grid-template-columns: 1fr 1fr; }
+    .result-top { gap: 10px; }
+    input[type="text"], input[type="number"], input[type="password"] { flex: 1 1 auto; min-width: 0; }
+  }
+  @media (max-width: 380px) { .metrics-grid { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
