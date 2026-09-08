@@ -292,6 +292,18 @@
   .trade-card .tag-chip { font-size: 12px; padding: 3px 10px; }
   .trade-card .flag-badge { font-size: 12px; padding: 3px 11px; }
 
+  /* playbook */
+  .pb-card { background: var(--surface-alt); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px; margin-bottom: 12px; }
+  .pb-card.pb-archived { opacity: .6; }
+  .pb-card-head { display: flex; align-items: center; gap: 8px; }
+  .pb-card-name { font-weight: 800; font-size: 17px; flex: 1; }
+  .pb-badges { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+  .pb-stat { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+  .pb-block { margin: 8px 0; font-size: 13.5px; }
+  .pb-block > span { display: block; font-size: 10.5px; text-transform: uppercase; letter-spacing: .3px; color: var(--muted); font-weight: 800; margin-bottom: 2px; }
+  .pb-block > div { line-height: 1.6; }
+  .pb-card .pb-img { max-height: 300px; }
+
   /* grade stamp */
   .grade-stamp {
     width: 42px; height: 42px; flex-shrink: 0; border-radius: 50%;
@@ -385,6 +397,7 @@
   <button class="tab-btn active" data-tab="calendar">ปฏิทิน</button>
   <button class="tab-btn" data-tab="overview">ภาพรวม</button>
   <button class="tab-btn" data-tab="log">บันทึกเทรด</button>
+  <button class="tab-btn" data-tab="playbook">Playbook</button>
   <button class="tab-btn" data-tab="chart">กราฟ + AI</button>
 </div>
 
@@ -560,6 +573,93 @@
   </div>
 </div>
 
+<!-- PLAYBOOK TAB -->
+<div id="tab-playbook" class="hidden">
+  <div class="panel">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+      <h3 style="margin:0;">คลังเซ็ตอัพ (Playbook)</h3>
+      <button class="primary" id="pbAddBtn">+ เพิ่มเซ็ตอัพ</button>
+    </div>
+    <p class="small" style="text-transform:none;letter-spacing:0;font-weight:400;color:var(--muted);margin:-4px 0 14px;">
+      รวมเซ็ตอัพที่คุณเทรด — กฎเข้า / จุดที่ผิดแผน / วิธีทำกำไร + รูปแพทเทิร์นตัวอย่าง ผูกกับไม้ตอนเพิ่มเทรดได้จากช่อง "เซ็ตอัพ / Playbook"
+    </p>
+    <div id="pbList"></div>
+  </div>
+</div>
+
+<!-- Playbook add/edit modal -->
+<div id="pbModal" class="modal-backdrop">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="pbModalTitle">เพิ่มเซ็ตอัพ</h2>
+      <button class="icon-btn" id="pbModalClose">✕</button>
+    </div>
+
+    <div class="field">
+      <label class="small">ชื่อเซ็ตอัพ</label>
+      <input type="text" id="pbName" placeholder="เช่น Breakout Retest, Wave B (sub A), FVG H1">
+    </div>
+
+    <div class="row">
+      <div class="field">
+        <label class="small">ทิศทาง</label>
+        <select id="pbDirection">
+          <option value="both">ทั้งสองทาง</option>
+          <option value="long">Long เท่านั้น</option>
+          <option value="short">Short เท่านั้น</option>
+        </select>
+      </div>
+      <div class="field">
+        <label class="small">ตลาด</label>
+        <select id="pbMarket">
+          <option value="any">ทุกตลาด</option>
+          <option value="forex">Forex</option>
+          <option value="futures">Futures / Perp</option>
+        </select>
+      </div>
+      <div class="field">
+        <label class="small">ไทม์เฟรม</label>
+        <input type="text" id="pbTimeframe" placeholder="เช่น H1 setup / M5 entry">
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="small">กฎการเข้า (Entry rules) — บรรทัดละ 1 ข้อ</label>
+      <textarea id="pbEntryRules" rows="4" placeholder="เงื่อนไขที่ต้องครบก่อนเข้า"></textarea>
+    </div>
+    <div class="field">
+      <label class="small">จุดที่ผิดแผน (Invalidation / ตั้ง SL ตรงไหน)</label>
+      <textarea id="pbInvalidation" rows="2"></textarea>
+    </div>
+    <div class="field">
+      <label class="small">วิธีทำกำไร (Target / ออกตรงไหน)</label>
+      <textarea id="pbTarget" rows="2"></textarea>
+    </div>
+
+    <div class="field">
+      <label class="small">รูปแพทเทิร์นในอุดมคติ (1 รูป)</label>
+      <div id="pbImagePreview"></div>
+      <label class="file-btn">
+        <span id="pbImageLabelText">+ เพิ่มรูปภาพ</span>
+        <input type="file" accept="image/*" id="pbImageInput" hidden>
+      </label>
+    </div>
+
+    <div class="field">
+      <label class="small">โน้ตเพิ่มเติม</label>
+      <textarea id="pbNotes" rows="2"></textarea>
+    </div>
+    <label class="check-item" style="margin-top:2px;"><input type="checkbox" id="pbActive" checked> ใช้งานอยู่ (โชว์ใน dropdown ตอนเพิ่มเทรด)</label>
+
+    <div class="modal-footer">
+      <button class="ghost danger hidden" id="pbDeleteBtn">ลบเซ็ตอัพนี้</button>
+      <div class="spacer"></div>
+      <button class="ghost" id="pbCancelBtn">ยกเลิก</button>
+      <button class="primary" id="pbSaveBtn">บันทึก</button>
+    </div>
+  </div>
+</div>
+
 <!-- Add/Edit Trade Modal -->
 <div id="tradeModal" class="modal-backdrop">
   <div class="modal">
@@ -594,6 +694,12 @@
         <button type="button" class="side-btn buy" data-side="long">▲ BUY</button>
         <button type="button" class="side-btn sell" data-side="short">▼ SELL</button>
       </div>
+    </div>
+
+    <div class="field" id="tfPlaybookRow">
+      <label class="small">เซ็ตอัพ / Playbook</label>
+      <select id="tfPlaybookPick"><option value="">— ไม่ผูกเซ็ตอัพ —</option></select>
+      <div id="tfPlaybookHint" class="small" style="text-transform:none;letter-spacing:0;font-weight:400;color:var(--muted);margin-top:6px;white-space:pre-wrap;"></div>
     </div>
 
     <div class="pretrade" id="tfPretrade">
@@ -847,6 +953,19 @@
   let trades = loadTrades();
   let capital = loadCapital();
 
+  const PLAYBOOKS_KEY = "tj_playbooks_v1";
+  function loadPlaybooks() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(PLAYBOOKS_KEY) || "[]");
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) { return []; }
+  }
+  function savePlaybooks() {
+    localStorage.setItem(PLAYBOOKS_KEY, JSON.stringify(playbooks));
+    pushCloudSync();
+  }
+  let playbooks = loadPlaybooks();
+
   function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
   function pad2(n) { return String(n).padStart(2, "0"); }
   function dateKey(y, m, d) { return `${y}-${pad2(m + 1)}-${pad2(d)}`; }
@@ -934,9 +1053,11 @@
     document.getElementById("tab-calendar").classList.toggle("hidden", tab !== "calendar");
     document.getElementById("tab-overview").classList.toggle("hidden", tab !== "overview");
     document.getElementById("tab-log").classList.toggle("hidden", tab !== "log");
+    document.getElementById("tab-playbook").classList.toggle("hidden", tab !== "playbook");
     document.getElementById("tab-chart").classList.toggle("hidden", tab !== "chart");
     if (tab === "overview") renderOverview();
     if (tab === "log") renderLog();
+    if (tab === "playbook") renderPlaybooks();
     if (tab === "chart") initChartTab();
   }
 
@@ -2277,6 +2398,196 @@
     () => currentImageAfter, (v) => { currentImageAfter = v; }
   );
 
+  /* ---------- playbook (setup library) ---------- */
+  let pbEditingId = null;
+  let pbCurrentImage = null;
+  let currentPlaybookId = null;
+  const renderPbImagePreview = wireImageField(
+    "pbImageInput", "pbImagePreview", "pbImageLabelText",
+    () => pbCurrentImage, (v) => { pbCurrentImage = v; }
+  );
+
+  function playbookById(id) { return playbooks.find(p => p.id === id) || null; }
+  function matchPlaybookId(t) {
+    if (!t) return null;
+    if (t.playbookId && playbookById(t.playbookId)) return t.playbookId;
+    const keys = [t.model, t.setup].map(s => (s || "").trim().toLowerCase()).filter(Boolean);
+    if (!keys.length) return null;
+    const hit = playbooks.find(p => keys.includes((p.name || "").trim().toLowerCase()));
+    return hit ? hit.id : null;
+  }
+  function tradesForPlaybook(pb) {
+    const nm = (pb.name || "").trim().toLowerCase();
+    return trades.filter(t =>
+      t.playbookId === pb.id ||
+      (!t.playbookId && nm && [(t.model || ""), (t.setup || "")].some(s => s.trim().toLowerCase() === nm))
+    );
+  }
+  function playbookStats(pb) {
+    const closed = tradesForPlaybook(pb).filter(t => !isPending(t));
+    const wins = closed.filter(t => Number(t.pnl) > 0).length;
+    const losses = closed.filter(t => Number(t.pnl) < 0).length;
+    const pnl = closed.reduce((s, t) => s + Number(t.pnl || 0), 0);
+    const rs = closed.map(edgeR).filter(x => x != null && isFinite(x));
+    return {
+      n: closed.length,
+      wr: (wins + losses) ? wins / (wins + losses) * 100 : null,
+      pnl,
+      avgR: rs.length ? rs.reduce((a, b) => a + b, 0) / rs.length : null,
+    };
+  }
+
+  function renderPlaybooks() {
+    const wrap = document.getElementById("pbList");
+    if (!playbooks.length) {
+      wrap.innerHTML = `<div class="empty">ยังไม่มีเซ็ตอัพ — กด "+ เพิ่มเซ็ตอัพ" เพื่อสร้างอันแรก</div>`;
+      return;
+    }
+    const DIR = { both: "ทั้งสองทาง", long: "Long", short: "Short" };
+    const MKT = { any: "ทุกตลาด", forex: "Forex", futures: "Futures/Perp" };
+    const sorted = playbooks.slice().sort((a, b) => {
+      const arc = (a.active === false ? 1 : 0) - (b.active === false ? 1 : 0);
+      return arc !== 0 ? arc : (a.name || "").localeCompare(b.name || "");
+    });
+    wrap.innerHTML = sorted.map(pb => {
+      const s = playbookStats(pb);
+      const statLine = s.n
+        ? `${s.n} ไม้ · Win ${s.wr == null ? "—" : Math.round(s.wr) + "%"} · avg ${s.avgR == null ? "—" : (s.avgR >= 0 ? "+" : "") + s.avgR.toFixed(2) + "R"} · <span class="${s.pnl >= 0 ? "pos" : "neg"} mono">${fmtMoney(s.pnl)}</span>`
+        : `ยังไม่มีไม้ที่ผูกกับเซ็ตอัพนี้`;
+      const nl = (str) => escapeHtml(str).replace(/\n/g, "<br>");
+      return `<div class="pb-card${pb.active === false ? " pb-archived" : ""}" data-id="${pb.id}">
+        <div class="pb-card-head">
+          <div class="pb-card-name">${escapeHtml(pb.name || "ไม่มีชื่อ")}</div>
+          <button type="button" class="trade-card-edit pb-edit" data-id="${pb.id}" title="แก้ไข">✎</button>
+        </div>
+        <div class="pb-badges">
+          <span class="flag-badge">${DIR[pb.direction] || "ทั้งสองทาง"}</span>
+          <span class="flag-badge">${MKT[pb.market] || "ทุกตลาด"}</span>
+          ${pb.timeframe ? `<span class="flag-badge">${escapeHtml(pb.timeframe)}</span>` : ""}
+          ${pb.active === false ? `<span class="flag-badge" style="color:var(--muted);">เก็บเข้าคลัง</span>` : ""}
+        </div>
+        <div class="pb-stat">${statLine}</div>
+        ${pb.entryRules ? `<div class="pb-block"><span>กฎเข้า</span><div>${nl(pb.entryRules)}</div></div>` : ""}
+        ${pb.invalidation ? `<div class="pb-block"><span>ผิดแผนเมื่อ</span><div>${nl(pb.invalidation)}</div></div>` : ""}
+        ${pb.target ? `<div class="pb-block"><span>ทำกำไร</span><div>${nl(pb.target)}</div></div>` : ""}
+        ${pb.image ? `<img class="trade-card-image pb-img" src="${pb.image}" alt="">` : ""}
+        ${pb.notes ? `<div class="trade-card-notes">${escapeHtml(pb.notes)}</div>` : ""}
+        ${s.n ? `<button type="button" class="tv-link-btn pb-see-trades" data-name="${escapeHtml(pb.name || "")}">ดูไม้ที่ใช้เซ็ตอัพนี้ (${s.n}) →</button>` : ""}
+      </div>`;
+    }).join("");
+    wrap.querySelectorAll(".pb-edit").forEach(b => b.addEventListener("click", () => openPbModal(b.dataset.id)));
+    wrap.querySelectorAll(".pb-img").forEach(img => img.addEventListener("click", () => openLightbox(img.src)));
+    wrap.querySelectorAll(".pb-see-trades").forEach(b => b.addEventListener("click", () => {
+      const inp = document.getElementById("logSearchInput");
+      if (inp) inp.value = b.dataset.name;
+      switchTab("log");
+    }));
+  }
+
+  function openPbModal(id) {
+    pbEditingId = id || null;
+    const pb = pbEditingId ? playbookById(pbEditingId) : null;
+    document.getElementById("pbModalTitle").textContent = pb ? "แก้ไขเซ็ตอัพ" : "เพิ่มเซ็ตอัพ";
+    document.getElementById("pbDeleteBtn").classList.toggle("hidden", !pb);
+    document.getElementById("pbName").value = pb ? (pb.name || "") : "";
+    document.getElementById("pbDirection").value = pb ? (pb.direction || "both") : "both";
+    document.getElementById("pbMarket").value = pb ? (pb.market || "any") : "any";
+    document.getElementById("pbTimeframe").value = pb ? (pb.timeframe || "") : "";
+    document.getElementById("pbEntryRules").value = pb ? (pb.entryRules || "") : "";
+    document.getElementById("pbInvalidation").value = pb ? (pb.invalidation || "") : "";
+    document.getElementById("pbTarget").value = pb ? (pb.target || "") : "";
+    document.getElementById("pbNotes").value = pb ? (pb.notes || "") : "";
+    document.getElementById("pbActive").checked = pb ? pb.active !== false : true;
+    pbCurrentImage = pb ? (pb.image || null) : null;
+    renderPbImagePreview();
+    document.getElementById("pbModal").classList.add("open");
+  }
+  function closePbModal() { document.getElementById("pbModal").classList.remove("open"); pbEditingId = null; }
+
+  document.getElementById("pbAddBtn").addEventListener("click", () => openPbModal(null));
+  document.getElementById("pbModalClose").addEventListener("click", closePbModal);
+  document.getElementById("pbCancelBtn").addEventListener("click", closePbModal);
+  document.getElementById("pbModal").addEventListener("click", (e) => { if (e.target === document.getElementById("pbModal")) closePbModal(); });
+
+  document.getElementById("pbSaveBtn").addEventListener("click", () => {
+    const name = document.getElementById("pbName").value.trim();
+    if (!name) { Swal.fire({ icon: "warning", title: "ใส่ชื่อเซ็ตอัพก่อน" }); return; }
+    const now = Date.now();
+    const rec = {
+      id: pbEditingId || uid(),
+      name,
+      direction: document.getElementById("pbDirection").value,
+      market: document.getElementById("pbMarket").value,
+      timeframe: document.getElementById("pbTimeframe").value.trim(),
+      entryRules: document.getElementById("pbEntryRules").value.trim(),
+      invalidation: document.getElementById("pbInvalidation").value.trim(),
+      target: document.getElementById("pbTarget").value.trim(),
+      notes: document.getElementById("pbNotes").value.trim(),
+      image: pbCurrentImage,
+      active: document.getElementById("pbActive").checked,
+      createdAt: pbEditingId ? (playbookById(pbEditingId) || {}).createdAt || now : now,
+      updatedAt: now,
+    };
+    if (pbEditingId) playbooks = playbooks.map(p => p.id === pbEditingId ? rec : p);
+    else playbooks.push(rec);
+    savePlaybooks();
+    closePbModal();
+    renderPlaybooks();
+    successToast(pbEditingId ? "แก้ไขเซ็ตอัพแล้ว" : "เพิ่มเซ็ตอัพแล้ว");
+  });
+
+  document.getElementById("pbDeleteBtn").addEventListener("click", () => {
+    if (!pbEditingId) return;
+    const idToDelete = pbEditingId;
+    Swal.fire({
+      icon: "warning", title: "ลบเซ็ตอัพนี้?",
+      text: "ไม้ที่เคยผูกไว้จะไม่ถูกลบ แต่จะไม่ถูกนับรวมกับเซ็ตอัพนี้อีก",
+      showCancelButton: true, confirmButtonText: "ลบ", cancelButtonText: "ยกเลิก",
+      confirmButtonColor: "#dc2626", reverseButtons: true,
+    }).then(r => {
+      if (!r.isConfirmed) return;
+      playbooks = playbooks.filter(p => p.id !== idToDelete);
+      savePlaybooks();
+      closePbModal();
+      renderPlaybooks();
+      successToast("ลบเซ็ตอัพแล้ว");
+    });
+  });
+
+  function populatePlaybookPicker() {
+    const sel = document.getElementById("tfPlaybookPick");
+    const list = playbooks.filter(p => p.active !== false);
+    if (currentPlaybookId && !list.some(p => p.id === currentPlaybookId)) {
+      const linked = playbookById(currentPlaybookId);
+      if (linked) list.push(linked);
+    }
+    sel.innerHTML = `<option value="">— ไม่ผูกเซ็ตอัพ —</option>` +
+      list.sort((a, b) => (a.name || "").localeCompare(b.name || ""))
+        .map(p => `<option value="${p.id}">${escapeHtml(p.name || "ไม่มีชื่อ")}</option>`).join("");
+    sel.value = currentPlaybookId || "";
+  }
+  function renderPlaybookHint() {
+    const el = document.getElementById("tfPlaybookHint");
+    const pb = currentPlaybookId ? playbookById(currentPlaybookId) : null;
+    if (!pb) { el.textContent = ""; return; }
+    const parts = [];
+    if (pb.entryRules) parts.push("เข้า: " + pb.entryRules);
+    if (pb.invalidation) parts.push("ผิดแผนเมื่อ: " + pb.invalidation);
+    if (pb.target) parts.push("ทำกำไร: " + pb.target);
+    el.textContent = parts.join("\n");
+  }
+  document.getElementById("tfPlaybookPick").addEventListener("change", (e) => {
+    currentPlaybookId = e.target.value || null;
+    const pb = currentPlaybookId ? playbookById(currentPlaybookId) : null;
+    if (pb) {
+      const mdl = document.getElementById("tfModel");
+      if (mdl && !mdl.value.trim()) mdl.value = pb.name;
+      const setup = document.getElementById("tfSetup");
+      if (setup && !setup.value.trim()) setup.value = pb.name;
+    }
+    renderPlaybookHint();
+  });
+
   function openTradeModal(id, prefillDate) {
     editingId = id || null;
     const t = editingId ? trades.find(x => x.id === editingId) : null;
@@ -2327,6 +2638,10 @@
     renderImageAfterPreview();
     currentGrade = t ? (t.grade || null) : null;
     updateGradeToggle();
+
+    currentPlaybookId = t ? (t.playbookId || matchPlaybookId(t)) : null;
+    populatePlaybookPicker();
+    renderPlaybookHint();
 
     // futures detail fields
     document.getElementById("tfDateClose").value = t && t.dateClose ? t.dateClose : "";
@@ -2524,6 +2839,7 @@
       account: document.getElementById("tfAccount").value.trim(),
       model: document.getElementById("tfModel").value.trim(),
       grade: currentGrade,
+      playbookId: currentPlaybookId || null,
       followedRules: document.getElementById("tfFollowedRules").checked,
       breakeven: document.getElementById("tfBreakeven").checked,
       enteredWindow: document.getElementById("tfEntryWindow").checked,
@@ -2641,7 +2957,7 @@
       app: "ee-suite-backup",
       exportedAt: new Date().toISOString(),
       elliottWave: { chapters: exportChapters },
-      tradeJournal: { trades, capital, checklist },
+      tradeJournal: { trades, capital, checklist, playbooks },
       stockDecide: {
         watchlist: JSON.parse(localStorage.getItem("sd_watchlist") || "[]"),
         log: JSON.parse(localStorage.getItem("sd_log") || "[]"),
@@ -2673,6 +2989,11 @@
     if (tj && Array.isArray(tj.checklist) && tj.checklist.length) {
       checklist = tj.checklist.map(String);
       try { localStorage.setItem(CHECKLIST_LS, JSON.stringify(checklist)); } catch (e) {}
+    }
+    if (tj && Array.isArray(tj.playbooks) && tj.playbooks.length) {
+      const existingPbIds = new Set(playbooks.map(p => p.id));
+      playbooks = playbooks.concat(tj.playbooks.filter(p => !(p.id && existingPbIds.has(p.id))).map(p => ({ ...p, id: p.id || uid() })));
+      savePlaybooks();
     }
 
     // Elliott Wave (remote — merge straight into its IndexedDB)
@@ -2772,7 +3093,7 @@
     const db = FirebaseSync.getDb();
     const uid = FirebaseSync.getUser().uid;
     db.collection("users").doc(uid).collection("sync").doc("tradeJournal")
-      .set({ trades, capital, checklist, updatedAt: Date.now() })
+      .set({ trades, capital, checklist, playbooks, updatedAt: Date.now() })
       .catch(err => console.error("sync push failed", err));
   }
 
@@ -2792,13 +3113,20 @@
           checklist = remote.checklist.map(String);
           try { localStorage.setItem(CHECKLIST_LS, JSON.stringify(checklist)); } catch (e) {}
         }
+        if (Array.isArray(remote.playbooks)) {
+          const pmap = {};
+          remote.playbooks.forEach(p => { if (p && p.id) pmap[p.id] = p; });
+          playbooks.forEach(p => { if (p && p.id) pmap[p.id] = p; }); // local wins on id clash
+          playbooks = Object.values(pmap);
+          try { localStorage.setItem(PLAYBOOKS_KEY, JSON.stringify(playbooks)); } catch (e) {}
+        }
         syncApplyingRemote = true;
         saveTrades();
         saveCapital();
         syncApplyingRemote = false;
-        await ref.set({ trades, capital, checklist, updatedAt: Date.now() });
+        await ref.set({ trades, capital, checklist, playbooks, updatedAt: Date.now() });
       } else {
-        await ref.set({ trades, capital, checklist, updatedAt: Date.now() });
+        await ref.set({ trades, capital, checklist, playbooks, updatedAt: Date.now() });
       }
     } catch (err) {
       console.error("initial sync failed", err);
@@ -2817,11 +3145,16 @@
         checklist = data.checklist.map(String);
         try { localStorage.setItem(CHECKLIST_LS, JSON.stringify(checklist)); } catch (e) {}
       }
+      if (Array.isArray(data.playbooks)) {
+        playbooks = data.playbooks;
+        try { localStorage.setItem(PLAYBOOKS_KEY, JSON.stringify(playbooks)); } catch (e) {}
+      }
       saveTrades();
       saveCapital();
       syncApplyingRemote = false;
       renderCalendar();
       renderLog();
+      if (typeof renderPlaybooks === "function" && !document.getElementById("tab-playbook").classList.contains("hidden")) renderPlaybooks();
     }, err => console.error("sync listener error", err));
   }
 
