@@ -587,6 +587,49 @@
       <div class="field"><label class="small">จำนวน Points</label><input type="number" id="tfPoints" step="0.01" placeholder="เช่น 12.5"></div>
     </div>
 
+    <div class="pretrade hidden" id="tfFuturesDetail" style="margin-top:2px;">
+      <div class="pretrade-head">
+        <label class="small" style="margin:0;">🔩 รายละเอียด Futures / Perp (ตามฟอร์มบันทึกการเทรด)</label>
+      </div>
+      <div class="row">
+        <div class="field"><label class="small">วันที่ปิด (Date Close)</label><input type="date" id="tfDateClose"></div>
+        <div class="field"><label class="small">ระยะเวลา (อัตโนมัติ)</label><input type="text" id="tfDuration" readonly placeholder="—"></div>
+        <div class="field"><label class="small">Leverage (เท่า)</label><input type="number" id="tfLeverage" step="any" inputmode="decimal" placeholder="เช่น 10"></div>
+      </div>
+      <div class="row">
+        <div class="field"><label class="small">ขนาดโพสิชัน (Size)</label><input type="number" id="tfSize" step="any" inputmode="decimal" placeholder="จำนวนหน่วย/เหรียญ"></div>
+        <div class="field"><label class="small">Margin ที่ใช้ ($)</label><input type="number" id="tfMargin" step="any" inputmode="decimal"></div>
+        <div class="field"><label class="small">ความเสี่ยงเป็นเงิน ($)</label><input type="number" id="tfRiskUsd" step="any" inputmode="decimal"></div>
+      </div>
+      <div class="row">
+        <div class="field"><label class="small">ประเภทการออก (TP/SP/SL)</label>
+          <select id="tfExitType">
+            <option value="">-- ไม่ระบุ --</option>
+            <option value="TP">TP — ถึงเป้า</option>
+            <option value="SP">SP — Stop Profit / Trailing</option>
+            <option value="SL">SL — ตัดขาดทุน</option>
+            <option value="Manual">Manual — ปิดเอง</option>
+          </select>
+        </div>
+        <div class="field"><label class="small">PNL % (บนมาร์จิน)</label><input type="number" id="tfPnlPct" step="any" inputmode="decimal" placeholder="เช่น 158.5"></div>
+        <div class="field"><label class="small">ค่าธรรมเนียม ($)</label><input type="number" id="tfFee" step="any" inputmode="decimal"></div>
+      </div>
+      <div class="row">
+        <div class="field"><label class="small">RRR ที่วางแผน</label><input type="number" id="tfRrr" step="any" inputmode="decimal" placeholder="อัตโนมัติจาก TP/SL"></div>
+        <div class="field"><label class="small">SL % (อัตโนมัติ)</label><input type="text" id="tfSlPct" readonly placeholder="—"></div>
+        <div class="field"><label class="small">TP % (อัตโนมัติ)</label><input type="text" id="tfTpPct" readonly placeholder="—"></div>
+      </div>
+      <div class="field"><label class="small">Setup (ป้ายสั้น ๆ)</label><input type="text" id="tfSetup" placeholder="เช่น short wave B (sub A)"></div>
+      <div class="field"><label class="small">เงื่อนไขหยุด (Stop condition)</label><input type="text" id="tfStopCond" placeholder="เช่น break B, break low"></div>
+      <div class="field"><label class="small">เหตุผลเข้า (Entry reasoning)</label><textarea id="tfEntryReason" rows="2" placeholder="ทำไมถึงเข้าไม้นี้ / เงื่อนไขที่รอ"></textarea></div>
+      <div class="field"><label class="small">แผนการออก (Exit plan)</label><textarea id="tfExitPlan" rows="2" placeholder="วางแผนไว้ว่าจะออกยังไง"></textarea></div>
+      <div class="field"><label class="small">การออกจริง (Exit execution)</label><textarea id="tfExitExec" rows="2" placeholder="ออกจริงเป็นยังไง ตรงแผนไหม (MATCH / รายละเอียด)"></textarea></div>
+      <div class="row">
+        <div class="field"><label class="small">ลิงก์กราฟ Setup</label><input type="text" id="tfChartSetup" placeholder="ลิงก์รูป/TradingView ตอนเข้า"></div>
+        <div class="field"><label class="small">ลิงก์กราฟตอนออก</label><input type="text" id="tfChartExit" placeholder="ลิงก์รูป/TradingView ตอนออก"></div>
+      </div>
+    </div>
+
     <div class="row">
       <div class="field"><label class="small">ราคาเข้า</label><input type="number" id="tfEntry" step="any"></div>
       <div class="field"><label class="small">ราคา SL (Stop Loss)</label><input type="number" id="tfSl" step="any"></div>
@@ -1045,6 +1088,15 @@
     } else if (t.marketType === "futures") {
       if (t.contracts != null) details.push(["Contracts", t.contracts]);
       if (t.points != null) details.push(["Points", t.points]);
+      if (t.leverage != null) details.push(["Leverage", t.leverage + "x"]);
+      if (t.size != null) details.push(["Size", t.size]);
+      if (t.duration) details.push(["ระยะเวลา", t.duration]);
+      if (t.exitType) details.push(["ออกแบบ", t.exitType]);
+      if (t.pnlPct != null) details.push(["PNL %", t.pnlPct + "%"]);
+      if (t.rrr != null) details.push(["RRR แผน", t.rrr]);
+      if (t.margin != null) details.push(["Margin $", t.margin]);
+      if (t.riskUsd != null) details.push(["ความเสี่ยง $", t.riskUsd]);
+      if (t.fee != null) details.push(["ค่าธรรมเนียม $", t.fee]);
     }
     if (t.entry != null) details.push(["ราคาเข้า", t.entry]);
     if (t.sl != null) details.push(["ราคา SL", t.sl]);
@@ -1068,6 +1120,19 @@
     if (t.breakeven) flags.push("Breakeven");
     if (t.enteredWindow) flags.push("เข้าตามช่วงเวลา ✓");
 
+    const narr = [];
+    if (t.setup) narr.push(["Setup", t.setup]);
+    if (t.stopCond) narr.push(["เงื่อนไขหยุด", t.stopCond]);
+    if (t.entryReason) narr.push(["เหตุผลเข้า", t.entryReason]);
+    if (t.exitPlan) narr.push(["แผนออก", t.exitPlan]);
+    if (t.exitExec) narr.push(["ออกจริง", t.exitExec]);
+    const isUrl = (s) => /^https?:\/\//i.test(s || "");
+    const chartLinks = [];
+    if (isUrl(t.chartSetup)) chartLinks.push(["🖼️ กราฟ Setup ↗", t.chartSetup]);
+    if (isUrl(t.chartExit)) chartLinks.push(["🖼️ กราฟตอนออก ↗", t.chartExit]);
+    if (t.chartSetup && !isUrl(t.chartSetup)) narr.push(["กราฟ Setup", t.chartSetup]);
+    if (t.chartExit && !isUrl(t.chartExit)) narr.push(["กราฟตอนออก", t.chartExit]);
+
     const posTags = t.tags || [];
     const negTags = t.negTags || [];
     // t.image is the legacy single-image field from before before/after images existed
@@ -1087,7 +1152,9 @@
       ${imgAfter ? `<div class="trade-card-detail" style="margin:6px 0;"><span>หลังเทรดเสร็จ</span></div><img class="trade-card-image" src="${imgAfter}">` : ""}
       ${tvSymbolFor(t) ? `<button type="button" class="tv-link-btn tv-embed-toggle" data-sym="${escapeHtml(tvSymbolFor(t))}">📈 กราฟสด TradingView</button><div class="tv-embed tv-embed-card hidden" data-tv-card></div>` : ""}
       ${t.tvLink ? `<a class="tv-link-btn" href="${escapeHtml(t.tvLink)}" target="_blank" rel="noopener">🖼️ เปิดสแนปช็อต ↗</a>` : ""}
+      ${chartLinks.map(([lbl, href]) => `<a class="tv-link-btn" href="${escapeHtml(href)}" target="_blank" rel="noopener">${lbl}</a>`).join("")}
       ${details.length ? `<div class="trade-card-details">${details.map(([k, v]) => `<div class="trade-card-detail"><span>${k}</span><span class="mono">${escapeHtml(String(v))}</span></div>`).join("")}</div>` : ""}
+      ${narr.length ? `<div class="trade-card-notes">${narr.map(([k, v]) => `<div><b>${k}:</b> ${escapeHtml(String(v))}</div>`).join("")}</div>` : ""}
       ${flags.length ? `<div class="trade-card-tags-row">${flags.map(f => `<span class="flag-badge">${f}</span>`).join("")}</div>` : ""}
       ${posTags.length ? `<div class="trade-card-tags-row">${posTags.map(tag => `<span class="tag-chip positive">${escapeHtml(tag)}</span>`).join("")}</div>` : ""}
       ${negTags.length ? `<div class="trade-card-tags-row">${negTags.map(tag => `<span class="tag-chip negative">${escapeHtml(tag)}</span>`).join("")}</div>` : ""}
@@ -1603,6 +1670,25 @@
       ];
     });
 
+    /* ---- futures detail rows (ตามฟอร์ม Futures / Perp) ---- */
+    const futL = L.filter(t => t.marketType === "futures");
+    const pct = (a, b) => (a == null || b == null || Number(b) === 0) ? "" : (Math.abs(a - b) / Math.abs(b) * 100).toFixed(2);
+    const futHead = ["วันที่เปิด", "วันที่ปิด", "ระยะเวลา", "สัญลักษณ์", "ทิศทาง", "Lev", "Size", "เข้า", "SL", "TP", "ออก", "ออกแบบ", "PNL %", "กำไร/ขาดทุน $", "ค่าธรรมเนียม", "SL %", "TP %", "RRR แผน", "Margin $", "เสี่ยง $", "RPT %", "Setup", "เงื่อนไขหยุด", "เหตุผลเข้า", "แผนออก", "ออกจริง", "เกรด", "ผล"];
+    const futRows = futL.map(t => {
+      const clean = (s) => (s || "").replace(/\s+/g, " ").trim();
+      const wl = isPending(t) ? "" : (Number(t.pnl) > 0 ? "W" : Number(t.pnl) < 0 ? "L" : "BE");
+      return [
+        t.date || "", t.dateClose || "", t.duration || "", t.symbol || "", t.side === "long" ? "LONG" : "SHORT",
+        t.leverage != null ? t.leverage : "", t.size != null ? t.size : "",
+        t.entry != null ? t.entry : "", t.sl != null ? t.sl : "", t.tp != null ? t.tp : "", t.exit != null ? t.exit : "",
+        t.exitType || "", t.pnlPct != null ? t.pnlPct : "", isPending(t) ? "" : num(t.pnl), t.fee != null ? t.fee : "",
+        pct(t.entry, t.sl) === "" ? "" : pct(t.entry, t.sl), pct(t.tp, t.entry) === "" ? "" : pct(t.tp, t.entry),
+        t.rrr != null ? t.rrr : "", t.margin != null ? t.margin : "", t.riskUsd != null ? t.riskUsd : "",
+        t.riskPct != null ? t.riskPct : "", clean(t.setup), clean(t.stopCond), clean(t.entryReason),
+        clean(t.exitPlan), clean(t.exitExec), t.grade || "", wl,
+      ];
+    });
+
     /* ---- aggregates ---- */
     const agg = (arr) => {
       const c = arr.filter(t => !isPending(t));
@@ -1671,6 +1757,7 @@
       section("#0d9488", "สรุปรายสัปดาห์ (เริ่มวันจันทร์)", perHead, weekRows, [5, 6]) +
       section("#d97706", "สรุปรายเดือน", perHead, monRows, [5, 6]) +
       section("#475569", "รายการเทรด", detHead, detRows, [8, 9]) +
+      (futL.length ? section("#7c3aed", "รายการเทรด Futures / Perp (ละเอียด)", futHead, futRows, [13]) : "") +
       `</table></body></html>`;
 
     triggerDownload(new Blob(["﻿" + doc], { type: "application/vnd.ms-excel;charset=utf-8;" }),
@@ -1999,6 +2086,8 @@
     const type = tfMarketType.value;
     document.getElementById("tfForexFields").classList.toggle("hidden", type !== "forex");
     document.getElementById("tfFuturesFields").classList.toggle("hidden", type !== "futures");
+    document.getElementById("tfFuturesDetail").classList.toggle("hidden", type !== "futures");
+    if (type === "futures" && typeof updateFuturesDetailCalc === "function") updateFuturesDetailCalc();
     document.getElementById("tfSymbolLabel").textContent =
       type === "forex" ? "คู่เงิน" : type === "futures" ? "สัญญา / Ticker" : "สัญลักษณ์";
     document.getElementById("tfSymbol").placeholder =
@@ -2073,6 +2162,33 @@
     if (!tfPipSizeDirty) document.getElementById("tfPipSize").value = guessPipSize(document.getElementById("tfSymbol").value);
     updateTradeCalc();
   });
+
+  /* ---------- futures detail: auto duration / SL% / TP% / RRR hint ---------- */
+  function futDurationText(openStr, closeStr) {
+    if (!openStr || !closeStr) return "";
+    const a = new Date(openStr + "T00:00:00"), b = new Date(closeStr + "T00:00:00");
+    if (isNaN(a) || isNaN(b)) return "";
+    const days = Math.round((b - a) / 86400000);
+    if (days < 0) return "";
+    if (days === 0) return "ในวันเดียว";
+    if (days === 1) return "1 วัน";
+    if (days < 7) return days + " วัน";
+    return days + " วัน (~" + Math.round(days / 7) + " สัปดาห์)";
+  }
+  function updateFuturesDetailCalc() {
+    if (tfMarketType.value !== "futures") return;
+    const g = id => document.getElementById(id);
+    g("tfDuration").value = futDurationText(g("tfDate").value, g("tfDateClose").value);
+    const entry = tfNum("tfEntry"), sl = tfNum("tfSl"), tp = tfNum("tfTp");
+    let slPct = null, tpPct = null;
+    if (entry != null && entry !== 0 && sl != null) { slPct = Math.abs(entry - sl) / Math.abs(entry) * 100; g("tfSlPct").value = slPct.toFixed(2) + "%"; }
+    else g("tfSlPct").value = "";
+    if (entry != null && entry !== 0 && tp != null) { tpPct = Math.abs(tp - entry) / Math.abs(entry) * 100; g("tfTpPct").value = tpPct.toFixed(2) + "%"; }
+    else g("tfTpPct").value = "";
+    g("tfRrr").placeholder = (slPct && tpPct) ? ("อัตโนมัติ ≈ " + (tpPct / slPct).toFixed(2)) : "อัตโนมัติจาก TP/SL";
+  }
+  ["tfDate", "tfDateClose", "tfEntry", "tfSl", "tfTp"].forEach(id =>
+    document.getElementById(id).addEventListener("input", updateFuturesDetailCalc));
 
   function updateGradeToggle() {
     document.querySelectorAll("#tfGradeToggle .grade-btn").forEach(btn => {
@@ -2165,8 +2281,27 @@
     currentGrade = t ? (t.grade || null) : null;
     updateGradeToggle();
 
+    // futures detail fields
+    document.getElementById("tfDateClose").value = t && t.dateClose ? t.dateClose : "";
+    document.getElementById("tfLeverage").value = t && t.leverage != null ? t.leverage : "";
+    document.getElementById("tfSize").value = t && t.size != null ? t.size : "";
+    document.getElementById("tfMargin").value = t && t.margin != null ? t.margin : "";
+    document.getElementById("tfRiskUsd").value = t && t.riskUsd != null ? t.riskUsd : "";
+    document.getElementById("tfExitType").value = t && t.exitType ? t.exitType : "";
+    document.getElementById("tfPnlPct").value = t && t.pnlPct != null ? t.pnlPct : "";
+    document.getElementById("tfFee").value = t && t.fee != null ? t.fee : "";
+    document.getElementById("tfRrr").value = t && t.rrr != null ? t.rrr : "";
+    document.getElementById("tfSetup").value = t && t.setup ? t.setup : "";
+    document.getElementById("tfStopCond").value = t && t.stopCond ? t.stopCond : "";
+    document.getElementById("tfEntryReason").value = t && t.entryReason ? t.entryReason : "";
+    document.getElementById("tfExitPlan").value = t && t.exitPlan ? t.exitPlan : "";
+    document.getElementById("tfExitExec").value = t && t.exitExec ? t.exitExec : "";
+    document.getElementById("tfChartSetup").value = t && t.chartSetup ? t.chartSetup : "";
+    document.getElementById("tfChartExit").value = t && t.chartExit ? t.chartExit : "";
+
     toggleMarketFields();
     updateTradeCalc();
+    updateFuturesDetailCalc();
     tradeModal.classList.add("open");
   }
   function closeTradeModal() {
@@ -2294,6 +2429,7 @@
 
   function commitTrade() {
     const isEdit = !!editingId;
+    const futNum = (id) => { const v = document.getElementById(id).value; return (v === "" || isNaN(Number(v))) ? null : Number(v); };
     const date = document.getElementById("tfDate").value || todayKey();
     const pnlRaw = document.getElementById("tfPnl").value;
     const pnl = (pnlRaw === "" || isNaN(Number(pnlRaw))) ? null : Number(pnlRaw);
@@ -2314,6 +2450,23 @@
       pips: marketType === "forex" && document.getElementById("tfPips").value !== "" ? Number(document.getElementById("tfPips").value) : null,
       contracts: marketType === "futures" && document.getElementById("tfContracts").value !== "" ? Number(document.getElementById("tfContracts").value) : null,
       points: marketType === "futures" && document.getElementById("tfPoints").value !== "" ? Number(document.getElementById("tfPoints").value) : null,
+      dateClose: marketType === "futures" ? (document.getElementById("tfDateClose").value || null) : null,
+      duration: marketType === "futures" ? (futDurationText(date, document.getElementById("tfDateClose").value) || null) : null,
+      leverage: marketType === "futures" ? futNum("tfLeverage") : null,
+      size: marketType === "futures" ? futNum("tfSize") : null,
+      margin: marketType === "futures" ? futNum("tfMargin") : null,
+      riskUsd: marketType === "futures" ? futNum("tfRiskUsd") : null,
+      exitType: marketType === "futures" ? (document.getElementById("tfExitType").value || null) : null,
+      pnlPct: marketType === "futures" ? futNum("tfPnlPct") : null,
+      fee: marketType === "futures" ? futNum("tfFee") : null,
+      rrr: marketType === "futures" ? futNum("tfRrr") : null,
+      setup: marketType === "futures" ? (document.getElementById("tfSetup").value.trim() || null) : null,
+      stopCond: marketType === "futures" ? (document.getElementById("tfStopCond").value.trim() || null) : null,
+      entryReason: marketType === "futures" ? (document.getElementById("tfEntryReason").value.trim() || null) : null,
+      exitPlan: marketType === "futures" ? (document.getElementById("tfExitPlan").value.trim() || null) : null,
+      exitExec: marketType === "futures" ? (document.getElementById("tfExitExec").value.trim() || null) : null,
+      chartSetup: marketType === "futures" ? (document.getElementById("tfChartSetup").value.trim() || null) : null,
+      chartExit: marketType === "futures" ? (document.getElementById("tfChartExit").value.trim() || null) : null,
       entry: document.getElementById("tfEntry").value !== "" ? Number(document.getElementById("tfEntry").value) : null,
       exit: document.getElementById("tfExit").value !== "" ? Number(document.getElementById("tfExit").value) : null,
       sl: document.getElementById("tfSl").value !== "" ? Number(document.getElementById("tfSl").value) : null,
