@@ -2252,8 +2252,8 @@
     document.getElementById("tfForexFields").classList.toggle("hidden", type !== "forex");
     document.getElementById("tfFuturesFields").classList.add("hidden"); // Contracts/Points ถูกแทนด้วย Size ในบล็อกละเอียด
     document.getElementById("tfFuturesDetail").classList.toggle("hidden", !isFut);
-    // โหมด Futures: ตัดช่องของฟอร์มเดิมออก เหลือแค่เช็กลิสต์ + บล็อก Futures/Perp + ราคา/PNL/โน้ต
-    ["tfSessionRow", "tfModelRow", "tfGradeRow", "tfDisciplineRow", "tfTagsRow", "tfImagesRow", "tfTvLinkRow", "tfTvSymbolRow"]
+    // โหมด Futures: ตัดช่องของฟอร์มเดิมออก เหลือแค่เช็กลิสต์ + บล็อก Futures/Perp + ราคา/PNL/รูปก่อน-หลัง/โน้ต
+    ["tfSessionRow", "tfModelRow", "tfGradeRow", "tfDisciplineRow", "tfTagsRow", "tfTvLinkRow", "tfTvSymbolRow"]
       .forEach(id => { const el = document.getElementById(id); if (el) el.classList.toggle("hidden", isFut); });
     if (isFut && typeof updateFuturesDetailCalc === "function") updateFuturesDetailCalc();
     document.getElementById("tfSymbolLabel").textContent =
