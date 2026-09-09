@@ -162,6 +162,8 @@
   /* image upload */
   .file-btn { display: inline-flex; align-items: center; background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 9px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; }
   .file-btn:hover { border-color: var(--accent); color: var(--accent); }
+  /* keep the file input in the layout (not display:none) so the wrapping label reliably opens the picker on mobile */
+  .file-btn input[type="file"] { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); border: 0; }
   .image-preview-item { display: flex; align-items: center; gap: 10px; background: var(--surface-alt); border: 1px solid var(--border); border-radius: 8px; padding: 8px; margin-bottom: 8px; }
   .image-preview-item img { width: 64px; height: 64px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); }
   .image-preview-item button { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 12px; margin-left: auto; }
@@ -641,7 +643,7 @@
       <div id="pbImagePreview"></div>
       <label class="file-btn">
         <span id="pbImageLabelText">+ เพิ่มรูปภาพ</span>
-        <input type="file" accept="image/*" id="pbImageInput" hidden>
+        <input type="file" accept="image/*" id="pbImageInput">
       </label>
     </div>
 
@@ -850,7 +852,7 @@
         <div id="tfImageBeforePreview"></div>
         <label class="file-btn">
           <span id="tfImageBeforeLabelText">+ เพิ่มรูปภาพ</span>
-          <input type="file" accept="image/*" id="tfImageBeforeInput" hidden>
+          <input type="file" accept="image/*" id="tfImageBeforeInput">
         </label>
       </div>
       <div class="field">
@@ -858,7 +860,7 @@
         <div id="tfImageAfterPreview"></div>
         <label class="file-btn">
           <span id="tfImageAfterLabelText">+ เพิ่มรูปภาพ</span>
-          <input type="file" accept="image/*" id="tfImageAfterInput" hidden>
+          <input type="file" accept="image/*" id="tfImageAfterInput">
         </label>
       </div>
     </div>
@@ -1019,18 +1021,30 @@
     });
   }
   function resizeImageToDataUrl(file, maxWidth) {
-    return new Promise((resolve) => {
-      const img = new Image();
+    return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = (e) => { img.src = e.target.result; };
-      img.onload = () => {
-        const scale = Math.min(1, maxWidth / img.width);
-        const canvas = document.createElement("canvas");
-        canvas.width = img.width * scale;
-        canvas.height = img.height * scale;
-        const ctx = canvas.getContext("2d");
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL("image/jpeg", 0.85));
+      reader.onerror = () => reject(new Error("อ่านไฟล์รูปไม่สำเร็จ"));
+      reader.onload = (e) => {
+        const raw = e.target.result;
+        const img = new Image();
+        img.onload = () => {
+          try {
+            const w = img.width || maxWidth, h = img.height || maxWidth;
+            const scale = Math.min(1, maxWidth / w);
+            const canvas = document.createElement("canvas");
+            canvas.width = Math.max(1, Math.round(w * scale));
+            canvas.height = Math.max(1, Math.round(h * scale));
+            canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+            const out = canvas.toDataURL("image/jpeg", 0.85);
+            resolve(out && out.length > 20 ? out : raw); // canvas failed/blank → keep original
+          } catch (err) { resolve(raw); }
+        };
+        img.onerror = () => {
+          // browser can't decode it (most often iPhone HEIC) — keep the bytes if they're web-displayable
+          if (/^data:image\/(jpe?g|png|gif|webp|bmp);/i.test(raw || "")) resolve(raw);
+          else reject(new Error("ไฟล์รูปนี้เปิดในเบราว์เซอร์ไม่ได้ (เช่น HEIC ของ iPhone) — ตั้งกล้องเป็นแบบ 'เข้ากันได้มากที่สุด/JPG' หรือแคปหน้าจอรูปแล้วเลือกใหม่"));
+        };
+        img.src = raw;
       };
       reader.readAsDataURL(file);
     });
@@ -2415,8 +2429,18 @@
     document.getElementById(inputId).addEventListener("change", async (e) => {
       const file = e.target.files[0];
       if (!file) return;
-      setImage(await resizeImageToDataUrl(file, 1000));
-      render();
+      const labelText = document.getElementById(labelTextId);
+      const prev = labelText ? labelText.textContent : "";
+      if (labelText) labelText.textContent = "กำลังเพิ่มรูป…";
+      try {
+        setImage(await resizeImageToDataUrl(file, 1000));
+        render();
+      } catch (err) {
+        if (labelText) labelText.textContent = prev;
+        Swal.fire({ icon: "error", title: "เพิ่มรูปไม่สำเร็จ", text: (err && err.message) || String(err) });
+      } finally {
+        e.target.value = ""; // let the same file be picked again
+      }
     });
     return render;
   }
