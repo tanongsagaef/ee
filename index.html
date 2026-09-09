@@ -311,7 +311,25 @@
     try { return JSON.parse(localStorage.getItem(key) || "null") ?? fallback; }
     catch (e) { return fallback; }
   }
-  const isClosed = (t) => t && t.pnl != null && !isNaN(Number(t.pnl));
+  // tolerant P/L parser — mirrors trade-journal.html: "-1,234.50", "$-45", "(45)", "1234,50"
+  function pnlNum(v) {
+    if (typeof v === "number") return isFinite(v) ? v : 0;
+    if (v == null) return 0;
+    let s = String(v).trim();
+    if (!s) return 0;
+    const paren = /^\(.*\)$/.test(s);
+    s = s.replace(/−/g, "-").replace(/[^\d.,-]/g, "");
+    if (s.indexOf("-") > 0) s = "-" + s.replace(/-/g, "");
+    if (s.includes(",") && s.includes(".")) s = s.replace(/,/g, "");
+    else if (s.includes(",")) {
+      const frac = s.slice(s.lastIndexOf(",") + 1);
+      s = frac.length === 3 ? s.replace(/,/g, "") : s.replace(/,/g, ".");
+    }
+    let n = parseFloat(s);
+    if (!isFinite(n)) return 0;
+    return paren ? -Math.abs(n) : n;
+  }
+  const isClosed = (t) => t && t.pnl != null && String(t.pnl).trim() !== "";
   function rMultiple(t) {
     if (t.entry == null || t.sl == null || t.exit == null) return null;
     const risk = Math.abs(Number(t.entry) - Number(t.sl));
@@ -374,7 +392,7 @@
     const tk = todayKey();
     const today = trades.filter(t => t.date === tk);
     const closed = today.filter(isClosed);
-    const net = closed.reduce((s, t) => s + Number(t.pnl), 0);
+    const net = closed.reduce((s, t) => s + pnlNum(t.pnl), 0);
     const pending = today.length - closed.length;
     $("todayTiles").innerHTML = [
       tile("P/L วันนี้", closed.length ? `<span class="${net >= 0 ? "pos" : "neg"}">${money(net)}</span>` : "—",
@@ -390,22 +408,22 @@
   /* ---------- render: KPI ---------- */
   function renderKpi() {
     const list = ordered(trades.filter(t => inPeriod(t) && isClosed(t)));
-    const wins = list.filter(t => Number(t.pnl) > 0);
-    const losses = list.filter(t => Number(t.pnl) < 0);
-    const net = list.reduce((s, t) => s + Number(t.pnl), 0);
-    const grossW = wins.reduce((s, t) => s + Number(t.pnl), 0);
-    const grossL = Math.abs(losses.reduce((s, t) => s + Number(t.pnl), 0));
+    const wins = list.filter(t => pnlNum(t.pnl) > 0);
+    const losses = list.filter(t => pnlNum(t.pnl) < 0);
+    const net = list.reduce((s, t) => s + pnlNum(t.pnl), 0);
+    const grossW = wins.reduce((s, t) => s + pnlNum(t.pnl), 0);
+    const grossL = Math.abs(losses.reduce((s, t) => s + pnlNum(t.pnl), 0));
     const wr = (wins.length + losses.length) ? wins.length / (wins.length + losses.length) : 0;
     const pf = grossL ? grossW / grossL : (grossW ? Infinity : 0);
     const rs = list.map(rMultiple).filter(v => v != null);
     const avgR = rs.length ? rs.reduce((s, v) => s + v, 0) / rs.length : null;
-    const best = list.reduce((m, t) => Number(t.pnl) > (m ? Number(m.pnl) : -Infinity) ? t : m, null);
-    const worst = list.reduce((m, t) => Number(t.pnl) < (m ? Number(m.pnl) : Infinity) ? t : m, null);
+    const best = list.reduce((m, t) => pnlNum(t.pnl) > (m ? pnlNum(m.pnl) : -Infinity) ? t : m, null);
+    const worst = list.reduce((m, t) => pnlNum(t.pnl) < (m ? pnlNum(m.pnl) : Infinity) ? t : m, null);
 
     // streak (trailing)
     let streak = 0, sign = 0;
     for (let i = list.length - 1; i >= 0; i--) {
-      const p = Number(list[i].pnl);
+      const p = pnlNum(list[i].pnl);
       const s = p > 0 ? 1 : p < 0 ? -1 : 0;
       if (s === 0) break;
       if (sign === 0) sign = s;
@@ -418,7 +436,7 @@
       tile("Net P/L", `<span class="${net >= 0 ? "pos" : "neg"}">${list.length ? money(net) : "—"}</span>`, list.length + " เทรด"),
       tile("Profit factor", pf === Infinity ? "∞" : (grossW + grossL ? pf.toFixed(2) : "—"), ""),
       tile("Avg R", avgR == null ? "—" : (avgR >= 0 ? "+" : "") + avgR.toFixed(2) + "R", rs.length ? rs.length + " เทรดมี SL" : "ใส่ราคา SL เพื่อคำนวณ", true),
-      tile("ไม้ดีสุด / แย่สุด", (best ? `<span class="pos">${money(Number(best.pnl))}</span>` : "—") + " / " + (worst ? `<span class="neg">${money(Number(worst.pnl))}</span>` : "—"), "", true),
+      tile("ไม้ดีสุด / แย่สุด", (best ? `<span class="pos">${money(pnlNum(best.pnl))}</span>` : "—") + " / " + (worst ? `<span class="neg">${money(pnlNum(worst.pnl))}</span>` : "—"), "", true),
       tile("สตรีคปัจจุบัน", streakTxt, "", true),
     ].join("");
 
@@ -432,7 +450,7 @@
     if (!list.length) { svg.innerHTML = `<text x="12" y="64" fill="var(--muted)" font-size="12">ยังไม่มีเทรดที่ปิดแล้วในช่วงนี้</text>`; return; }
     let cum = 0;
     const pts = [{ x: 0, y: 0 }];
-    list.forEach(t => { cum += Number(t.pnl); pts.push({ x: pts.length, y: cum }); });
+    list.forEach(t => { cum += pnlNum(t.pnl); pts.push({ x: pts.length, y: cum }); });
     const ys = pts.map(p => p.y);
     const minY = Math.min(0, ...ys), maxY = Math.max(0, ...ys);
     const spanY = (maxY - minY) || 1;
@@ -457,7 +475,7 @@
     $("recentEmpty").hidden = list.length > 0;
     tb.innerHTML = list.map(t => {
       const closed = isClosed(t);
-      const p = Number(t.pnl);
+      const p = pnlNum(t.pnl);
       const pl = closed ? `<span class="${p >= 0 ? "pos" : "neg"} mono">${money(p)}</span>` : `<span class="muted-note">รอผล</span>`;
       const dir = t.side === "short" ? `<span class="badge down">SELL</span>` : `<span class="badge up">BUY</span>`;
       const grade = t.grade ? `<span class="grade-stamp">${t.grade}</span>` : "";

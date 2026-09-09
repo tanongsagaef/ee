@@ -789,7 +789,7 @@
 
     <div class="field">
       <label class="small">กำไร/ขาดทุน ($)</label>
-      <input type="number" id="tfPnl" step="any" placeholder="เว้นว่างได้ถ้ายังไม่ปิดเทรด ใส่ค่าลบถ้าขาดทุน เช่น -45.50">
+      <input type="text" id="tfPnl" inputmode="text" autocomplete="off" placeholder="เว้นว่างได้ถ้ายังไม่ปิดเทรด · ขาดทุนใส่ค่าลบ เช่น -45.50 หรือ -1,234.50">
     </div>
 
     <div class="row" id="tfSessionRow">
@@ -973,6 +973,26 @@
   function escapeHtml(str) {
     return (str || "").replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
   }
+  // tolerant P/L parser: handles numbers, "-1,234.50", "$-45", "(45.00)" (accounting negative),
+  // "1234,50" (euro decimal), unicode minus. Returns a finite number (0 when unparseable).
+  function pnlNum(v) {
+    if (typeof v === "number") return isFinite(v) ? v : 0;
+    if (v == null) return 0;
+    let s = String(v).trim();
+    if (!s) return 0;
+    const paren = /^\(.*\)$/.test(s);
+    s = s.replace(/−/g, "-").replace(/[^\d.,-]/g, "");
+    if (s.indexOf("-") > 0) s = "-" + s.replace(/-/g, "");
+    if (s.includes(",") && s.includes(".")) s = s.replace(/,/g, "");
+    else if (s.includes(",")) {
+      const frac = s.slice(s.lastIndexOf(",") + 1);
+      s = frac.length === 3 ? s.replace(/,/g, "") : s.replace(/,/g, ".");
+    }
+    let n = parseFloat(s);
+    if (!isFinite(n)) return 0;
+    if (paren) n = -Math.abs(n);
+    return n;
+  }
   function fmtMoney(n) {
     const v = Number(n) || 0;
     const sign = v > 0 ? "+" : "";
@@ -981,10 +1001,10 @@
   function fmtPlain(n) {
     return (Number(n) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
-  function isPending(t) { return t.pnl === null || t.pnl === undefined; }
+  function isPending(t) { return t.pnl === null || t.pnl === undefined || (typeof t.pnl === "string" && t.pnl.trim() === ""); }
   function pnlHtml(t, cls) {
     if (isPending(t)) return `<span class="${cls || ""} mono" style="color:var(--muted);font-style:italic;">รอผล</span>`;
-    const n = Number(t.pnl);
+    const n = pnlNum(t.pnl);
     return `<span class="${cls || ""} mono ${n >= 0 ? "pos" : "neg"}">${fmtMoney(n)}</span>`;
   }
   function successToast(title) {
@@ -1122,7 +1142,7 @@
         }
         const dayTrades = byDate[key] || [];
         const closedDayTrades = dayTrades.filter(t => !isPending(t));
-        const dayTotal = closedDayTrades.reduce((s, t) => s + Number(t.pnl), 0);
+        const dayTotal = closedDayTrades.reduce((s, t) => s + pnlNum(t.pnl), 0);
         const dayHasClosed = closedDayTrades.length > 0;
         if (key === todayKey()) div.classList.add("today");
         if (dayTrades.length) {
@@ -1160,7 +1180,7 @@
         const dayTrades = byDate[key] || [];
         const closed = dayTrades.filter(t => !isPending(t));
         if (closed.length) weekHasClosed = true;
-        weekTotal += closed.reduce((s, t) => s + Number(t.pnl), 0);
+        weekTotal += closed.reduce((s, t) => s + pnlNum(t.pnl), 0);
         weekCount2 += dayTrades.length;
       });
       const sumDiv = document.createElement("div");
@@ -1330,7 +1350,7 @@
     dayModalDate = key;
     const dayTrades = trades.filter(t => t.date === key).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
     const closedDayTrades = dayTrades.filter(t => !isPending(t));
-    const total = closedDayTrades.reduce((s, t) => s + Number(t.pnl), 0);
+    const total = closedDayTrades.reduce((s, t) => s + pnlNum(t.pnl), 0);
     const hasClosed = closedDayTrades.length > 0;
 
     document.getElementById("dayModalTitle").textContent = key;
@@ -1391,14 +1411,14 @@
     const total = trades.length;
     const closed = trades.filter(t => !isPending(t));
     const pendingCount = total - closed.length;
-    const wins = closed.filter(t => Number(t.pnl) > 0);
-    const losses = closed.filter(t => Number(t.pnl) < 0);
-    const totalPnl = closed.reduce((s, t) => s + Number(t.pnl), 0);
+    const wins = closed.filter(t => pnlNum(t.pnl) > 0);
+    const losses = closed.filter(t => pnlNum(t.pnl) < 0);
+    const totalPnl = closed.reduce((s, t) => s + pnlNum(t.pnl), 0);
     const winRate = closed.length ? (wins.length / closed.length * 100) : 0;
-    const avgWin = wins.length ? wins.reduce((s, t) => s + Number(t.pnl), 0) / wins.length : 0;
-    const avgLoss = losses.length ? losses.reduce((s, t) => s + Number(t.pnl), 0) / losses.length : 0;
-    const grossWin = wins.reduce((s, t) => s + Number(t.pnl), 0);
-    const grossLoss = Math.abs(losses.reduce((s, t) => s + Number(t.pnl), 0));
+    const avgWin = wins.length ? wins.reduce((s, t) => s + pnlNum(t.pnl), 0) / wins.length : 0;
+    const avgLoss = losses.length ? losses.reduce((s, t) => s + pnlNum(t.pnl), 0) / losses.length : 0;
+    const grossWin = wins.reduce((s, t) => s + pnlNum(t.pnl), 0);
+    const grossLoss = Math.abs(losses.reduce((s, t) => s + pnlNum(t.pnl), 0));
     const profitFactor = grossLoss > 0 ? (grossWin / grossLoss) : (grossWin > 0 ? Infinity : 0);
 
     const byDate = tradesByDate();
@@ -1406,7 +1426,7 @@
     Object.keys(byDate).forEach(key => {
       const dayClosed = byDate[key].filter(t => !isPending(t));
       if (!dayClosed.length) return;
-      const sum = dayClosed.reduce((s, t) => s + Number(t.pnl), 0);
+      const sum = dayClosed.reduce((s, t) => s + pnlNum(t.pnl), 0);
       if (!bestDay || sum > bestDay.sum) bestDay = { key, sum };
       if (!worstDay || sum < worstDay.sum) worstDay = { key, sum };
     });
@@ -1425,7 +1445,7 @@
     }
     trades.forEach(t => {
       if (isPending(t)) return;
-      const pnl = Number(t.pnl);
+      const pnl = pnlNum(t.pnl);
       (t.tags || []).forEach(tag => add(tag, pnl, "positive"));
       (t.negTags || []).forEach(tag => add(tag, pnl, "negative"));
     });
@@ -1455,8 +1475,8 @@
       });
       if (!m.size) return "";
       const rows = [...m.entries()].map(([k, arr]) => {
-        const w = arr.filter(t => Number(t.pnl) > 0).length;
-        const pnl = arr.reduce((s, t) => s + Number(t.pnl), 0);
+        const w = arr.filter(t => pnlNum(t.pnl) > 0).length;
+        const pnl = arr.reduce((s, t) => s + pnlNum(t.pnl), 0);
         const rs = arr.map(edgeR).filter(x => x != null);
         return {
           k, n: arr.length, w, wr: arr.length ? w / arr.length * 100 : 0,
@@ -1489,13 +1509,13 @@
     let ruleHtml = "";
     if (ruled.length >= 4) {
       const y = ruled.filter(t => t.followedRules), n = ruled.filter(t => !t.followedRules);
-      const sum = (a) => a.reduce((s, t) => s + Number(t.pnl), 0);
+      const sum = (a) => a.reduce((s, t) => s + pnlNum(t.pnl), 0);
       ruleHtml = `<div class="edge-block"><h4>ต้นทุนการแหกกฎ</h4>
         <div class="table-scroll"><table>
         <thead><tr><th></th><th>ไม้</th><th>Win%</th><th>P/L เฉลี่ย</th><th>P/L รวม</th></tr></thead>
         <tbody>
-          <tr><td>ทำตามแผน ✓</td><td>${y.length}</td><td>${y.length ? (y.filter(t => t.pnl > 0).length / y.length * 100).toFixed(0) : 0}%</td><td class="mono ${y.length && sum(y) / y.length >= 0 ? "pos" : "neg"}">${y.length ? fmtMoney(sum(y) / y.length) : "—"}</td><td class="mono ${sum(y) >= 0 ? "pos" : "neg"}">${fmtMoney(sum(y))}</td></tr>
-          <tr><td>แหกกฎ ✗</td><td>${n.length}</td><td>${n.length ? (n.filter(t => t.pnl > 0).length / n.length * 100).toFixed(0) : 0}%</td><td class="mono ${n.length && sum(n) / n.length >= 0 ? "pos" : "neg"}">${n.length ? fmtMoney(sum(n) / n.length) : "—"}</td><td class="mono ${sum(n) >= 0 ? "pos" : "neg"}">${fmtMoney(sum(n))}</td></tr>
+          <tr><td>ทำตามแผน ✓</td><td>${y.length}</td><td>${y.length ? (y.filter(t => pnlNum(t.pnl) > 0).length / y.length * 100).toFixed(0) : 0}%</td><td class="mono ${y.length && sum(y) / y.length >= 0 ? "pos" : "neg"}">${y.length ? fmtMoney(sum(y) / y.length) : "—"}</td><td class="mono ${sum(y) >= 0 ? "pos" : "neg"}">${fmtMoney(sum(y))}</td></tr>
+          <tr><td>แหกกฎ ✗</td><td>${n.length}</td><td>${n.length ? (n.filter(t => pnlNum(t.pnl) > 0).length / n.length * 100).toFixed(0) : 0}%</td><td class="mono ${n.length && sum(n) / n.length >= 0 ? "pos" : "neg"}">${n.length ? fmtMoney(sum(n) / n.length) : "—"}</td><td class="mono ${sum(n) >= 0 ? "pos" : "neg"}">${fmtMoney(sum(n))}</td></tr>
         </tbody></table></div>
         ${n.length ? `<div class="edge-insight">💡 ไม้ที่แหกกฎรวม ${fmtMoney(sum(n))} — ${sum(n) < 0 ? "ถ้าไม่เทรดพวกนี้ พอร์ตดีขึ้น " + fmtMoney(-sum(n)) : "บังเอิญยังบวก แต่คือการเสี่ยงที่ไม่ควรทำ"}</div>` : ""}</div>`;
     }
@@ -1519,15 +1539,15 @@
     const planR = (t) => (t.tp != null && t.tp !== t.entry) ? ((t.tp - t.entry) * dir(t)) / Math.abs(t.entry - t.sl) : null;
     const capture = (t) => (t.tp != null && t.tp !== t.entry) ? ((t.exit - t.entry) * dir(t)) / ((t.tp - t.entry) * dir(t)) : null;
 
-    const winners = cl.filter(t => Number(t.pnl) > 0);
-    const losers = cl.filter(t => Number(t.pnl) < 0);
+    const winners = cl.filter(t => pnlNum(t.pnl) > 0);
+    const losers = cl.filter(t => pnlNum(t.pnl) < 0);
     const withTp = cl.filter(t => capture(t) != null);
     const winTp = winners.filter(t => capture(t) != null);
 
     const avg = (a) => a.length ? a.reduce((s, x) => s + x, 0) / a.length : null;
     const avgCap = avg(winTp.map(capture));
     const fullHit = winTp.length ? winTp.filter(t => capture(t) >= 0.98).length / winTp.length * 100 : null;
-    const leftR = avg(cl.filter(t => planR(t) != null && Number(t.pnl) > 0).map(t => planR(t) - realR(t)));
+    const leftR = avg(cl.filter(t => planR(t) != null && pnlNum(t.pnl) > 0).map(t => planR(t) - realR(t)));
     const overrun = losers.map(t => -realR(t) - 1).filter(x => x > 0);  // how far past 1R the loss went
     const avgOverrun = avg(overrun);
     const slClean = losers.length ? losers.filter(t => -realR(t) <= 1.05).length / losers.length * 100 : null;
@@ -1551,7 +1571,7 @@
     if (slClean != null && slClean < 80) insights.push(`มีแค่ ${slClean.toFixed(0)}% ของไม้แพ้ที่คุมได้ ≤ 1R — วินัยการตัดขาดทุนคือจุดที่ต้องแก้ก่อน`);
     if (expR != null && leftR != null && leftR > 0.2) insights.push(`ถ้าเก็บกำไรได้เต็มเป้า R เฉลี่ยจะขยับจาก ${rr(expR)} → ~${rr(expR + leftR * (winners.length / cl.length))}`);
 
-    const worst = cl.filter(t => planR(t) != null && Number(t.pnl) > 0)
+    const worst = cl.filter(t => planR(t) != null && pnlNum(t.pnl) > 0)
       .map(t => ({ t, gap: planR(t) - realR(t) })).filter(x => x.gap > 0.2)
       .sort((a, b) => b.gap - a.gap).slice(0, 5);
     const worstHtml = worst.length ? `<div style="margin-top:10px"><b style="font-size:13px">ไม้ชนะที่ทิ้ง R ไว้มากสุด</b>
@@ -1593,7 +1613,7 @@
     const sorted = [...trades].filter(t => !isPending(t)).sort((a, b) => a.date.localeCompare(b.date) || (a.createdAt || 0) - (b.createdAt || 0));
     let cum = 0, peak = 0, maxDD = 0;
     sorted.forEach(t => {
-      cum += Number(t.pnl) || 0;
+      cum += pnlNum(t.pnl) || 0;
       if (cum > peak) peak = cum;
       const dd = peak - cum;
       if (dd > maxDD) maxDD = dd;
@@ -1611,7 +1631,7 @@
 
     const byDate = tradesByDate();
     const closedDays = Object.keys(byDate).filter(k => byDate[k].some(t => !isPending(t)));
-    const profitableDays = closedDays.filter(k => byDate[k].reduce((sum, t) => sum + (isPending(t) ? 0 : Number(t.pnl)), 0) > 0).length;
+    const profitableDays = closedDays.filter(k => byDate[k].reduce((sum, t) => sum + (isPending(t) ? 0 : pnlNum(t.pnl)), 0) > 0).length;
     const consistency = closedDays.length ? (profitableDays / closedDays.length * 100) : 0;
 
     const rr = (s.avgWin && s.avgLoss) ? (s.avgWin / Math.abs(s.avgLoss)) : 0;
@@ -1737,7 +1757,7 @@
     const sorted = [...trades].filter(t => !isPending(t)).sort((a, b) => a.date.localeCompare(b.date) || (a.createdAt || 0) - (b.createdAt || 0));
     if (!sorted.length) return '<div class="empty">ยังไม่มีเทรดที่ปิดแล้ว</div>';
     let cum = capital;
-    const points = sorted.map(t => { cum += Number(t.pnl); return cum; });
+    const points = sorted.map(t => { cum += pnlNum(t.pnl); return cum; });
 
     const w = 900, h = 260, padL = 60, padR = 20, padT = 20, padB = 30;
     const minV = Math.min(capital, ...points);
@@ -1779,7 +1799,7 @@
       if (isPending(t)) return;
       const [y, m] = t.date.split("-").map(Number);
       const bucket = months.find(mo => mo.y === y && mo.m === (m - 1));
-      if (bucket) bucket.total += Number(t.pnl);
+      if (bucket) bucket.total += pnlNum(t.pnl);
     });
     const maxAbs = Math.max(1, ...months.map(m => Math.abs(m.total)));
 
@@ -1840,7 +1860,7 @@
     const futHead = ["วันที่เปิด", "วันที่ปิด", "ระยะเวลา", "สัญลักษณ์", "ทิศทาง", "Lev", "Size", "เข้า", "SL", "TP", "ออก", "ออกแบบ", "PNL %", "กำไร/ขาดทุน $", "ค่าธรรมเนียม", "SL %", "TP %", "RRR แผน", "Margin $", "เสี่ยง $", "RPT %", "Setup", "เงื่อนไขหยุด", "เหตุผลเข้า", "แผนออก", "ออกจริง", "เกรด", "ผล"];
     const futRows = futL.map(t => {
       const clean = (s) => (s || "").replace(/\s+/g, " ").trim();
-      const wl = isPending(t) ? "" : (Number(t.pnl) > 0 ? "W" : Number(t.pnl) < 0 ? "L" : "BE");
+      const wl = isPending(t) ? "" : (pnlNum(t.pnl) > 0 ? "W" : pnlNum(t.pnl) < 0 ? "L" : "BE");
       return [
         t.date || "", t.dateClose || "", t.duration || "", t.symbol || "", t.side === "long" ? "LONG" : "SHORT",
         t.leverage != null ? t.leverage : "", t.size != null ? t.size : "",
@@ -1856,13 +1876,13 @@
     /* ---- aggregates ---- */
     const agg = (arr) => {
       const c = arr.filter(t => !isPending(t));
-      const w = c.filter(t => Number(t.pnl) > 0), l = c.filter(t => Number(t.pnl) < 0);
-      const gW = w.reduce((s, t) => s + Number(t.pnl), 0), gL = Math.abs(l.reduce((s, t) => s + Number(t.pnl), 0));
+      const w = c.filter(t => pnlNum(t.pnl) > 0), l = c.filter(t => pnlNum(t.pnl) < 0);
+      const gW = w.reduce((s, t) => s + pnlNum(t.pnl), 0), gL = Math.abs(l.reduce((s, t) => s + pnlNum(t.pnl), 0));
       const rs = c.map(rMult).filter(x => x != null);
       return {
         n: arr.length, win: w.length, loss: l.length,
         wr: (w.length + l.length) ? w.length / (w.length + l.length) * 100 : 0,
-        pnl: c.reduce((s, t) => s + Number(t.pnl), 0),
+        pnl: c.reduce((s, t) => s + pnlNum(t.pnl), 0),
         pf: gL > 0 ? gW / gL : (gW > 0 ? Infinity : 0),
         rSum: rs.reduce((s, x) => s + x, 0),
         avgW: w.length ? gW / w.length : 0, avgL: l.length ? -gL / l.length : 0,
@@ -2060,7 +2080,7 @@
     const fuzzyHit = (r) => closedExisting.some(t =>
       t.date === r.date && baseSym(t.symbol) === baseSym(r.symbol) &&
       (t.side === r.side) &&
-      Math.abs(Number(t.pnl) - Number(r.pnl)) <= Math.max(0.5, Math.abs(Number(r.pnl)) * 0.01));
+      Math.abs(pnlNum(t.pnl) - pnlNum(r.pnl)) <= Math.max(0.5, Math.abs(pnlNum(r.pnl)) * 0.01));
 
     const fresh = [], maybe = [];
     let dupExact = 0;
@@ -2071,7 +2091,7 @@
 
     const rowHtml = (list) => list.slice(0, 6).map(r =>
       `<tr><td>${r.date}</td><td>${escapeHtml(r.symbol)}</td><td>${r.side === "short" ? "SELL" : "BUY"}</td><td>${r.lot ?? ""}</td><td style="text-align:right;color:${r.pnl >= 0 ? "#16a34a" : "#dc2626"}">${(r.pnl >= 0 ? "+" : "") + r.pnl}</td></tr>`).join("");
-    const net0 = fresh.reduce((s, r) => s + (Number(r.pnl) || 0), 0);
+    const net0 = fresh.reduce((s, r) => s + (pnlNum(r.pnl) || 0), 0);
 
     const { value: res } = await Swal.fire({
       title: `นำเข้า ${fresh.length} ไม้`,
@@ -2319,9 +2339,20 @@
       const risk = Math.abs(entry - sl);
       if (risk > 0) parts.push("R:R ≈ " + (Math.abs(exit - entry) / risk).toFixed(2));
     }
+    // catch a P/L typed with the wrong sign (e.g. loss entered as +45)
+    const pnlRaw = document.getElementById("tfPnl").value.trim();
+    if (pnlRaw !== "" && entry != null && exit != null && entry !== exit) {
+      const p = pnlNum(pnlRaw);
+      const impliedWin = ((exit - entry) * dir) > 0;
+      if (p !== 0 && impliedWin !== (p > 0)) {
+        parts.push(impliedWin
+          ? "⚠️ ราคาออกฝั่งกำไร แต่กรอก P/L เป็นลบ"
+          : "⚠️ ราคาออกฝั่งขาดทุน แต่กรอก P/L เป็นบวก — ขาดทุนต้องใส่ค่าลบ");
+      }
+    }
     document.getElementById("tfCalcHint").textContent = parts.join("   ·   ");
   }
-  ["tfEntry", "tfExit", "tfSl"].forEach(id =>
+  ["tfEntry", "tfExit", "tfSl", "tfPnl"].forEach(id =>
     document.getElementById(id).addEventListener("input", updateTradeCalc));
   document.getElementById("tfPipSize").addEventListener("input", () => { tfPipSizeDirty = true; updateTradeCalc(); });
   document.getElementById("tfPips").addEventListener("input", () => { tfPipsDirty = true; });
@@ -2425,9 +2456,9 @@
   }
   function playbookStats(pb) {
     const closed = tradesForPlaybook(pb).filter(t => !isPending(t));
-    const wins = closed.filter(t => Number(t.pnl) > 0).length;
-    const losses = closed.filter(t => Number(t.pnl) < 0).length;
-    const pnl = closed.reduce((s, t) => s + Number(t.pnl || 0), 0);
+    const wins = closed.filter(t => pnlNum(t.pnl) > 0).length;
+    const losses = closed.filter(t => pnlNum(t.pnl) < 0).length;
+    const pnl = closed.reduce((s, t) => s + pnlNum(t.pnl), 0);
     const rs = closed.map(edgeR).filter(x => x != null && isFinite(x));
     return {
       n: closed.length,
@@ -2794,7 +2825,7 @@
     const futNum = (id) => { const v = document.getElementById(id).value; return (v === "" || isNaN(Number(v))) ? null : Number(v); };
     const date = document.getElementById("tfDate").value || todayKey();
     const pnlRaw = document.getElementById("tfPnl").value;
-    const pnl = (pnlRaw === "" || isNaN(Number(pnlRaw))) ? null : Number(pnlRaw);
+    const pnl = pnlRaw.trim() === "" ? null : pnlNum(pnlRaw);
 
     const marketType = tfMarketType.value;
     const tags = document.getElementById("tfTags").value
