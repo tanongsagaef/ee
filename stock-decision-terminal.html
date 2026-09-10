@@ -198,6 +198,7 @@
 <div class="tabs">
   <button class="tab-btn active" data-tab="holdings">พอร์ต</button>
   <button class="tab-btn" data-tab="analyze">วิเคราะห์</button>
+  <button class="tab-btn" data-tab="scan">สแกนเนอร์</button>
   <button class="tab-btn" data-tab="watchlist">Watchlist</button>
   <button class="tab-btn" data-tab="thesis">Thesis / รีวิว</button>
   <button class="tab-btn hidden" data-tab="oldlog" id="oldlogTabBtn">บันทึกเก่า</button>
@@ -318,6 +319,43 @@
       </table>
     </div>
     <div class="empty" id="wlEmpty" hidden>ยังไม่มีรายการติดตาม</div>
+  </div>
+</div>
+
+<!-- ===================== SCANNER ===================== -->
+<div id="tab-scan" class="hidden">
+  <div class="panel">
+    <h2>สแกนเนอร์ <span class="sub muted-note">ดึงข้อมูล + ให้คะแนนหลายตัวรวดเดียว</span></h2>
+    <div class="frow" style="align-items:flex-end;">
+      <div class="field" style="flex:2;min-width:200px;">
+        <label class="lbl" id="scanListLbl">รายชื่อที่จะสแกน (บรรทัดละ 1 ตัว หรือคั่นด้วยคอมมา)</label>
+        <textarea id="scanList" rows="4" placeholder="BTC, ETH, SOL…"></textarea>
+      </div>
+      <div class="field" style="max-width:150px;">
+        <button class="ghost mini" id="scanReset" style="margin-bottom:6px;width:100%;">คืนค่าเริ่มต้น</button>
+        <button class="primary" id="scanRun" style="width:100%;">▶ สแกน</button>
+        <button class="ghost mini danger hidden" id="scanStop" style="margin-top:6px;width:100%;">■ หยุด</button>
+      </div>
+    </div>
+    <div class="muted-note" id="scanNote">โหมดตามพอร์ตที่เลือกด้านบน — "ทั้งหมด" = สแกนทั้งหุ้นและคริปโต · หุ้นถูกจำกัด 8 ครั้ง/นาที (30 ตัว ~4 นาที) · คริปโตเร็ว</div>
+    <div id="scanProg" style="height:6px;background:var(--surface-alt);border-radius:999px;margin:10px 0;overflow:hidden;"><div id="scanProgBar" style="height:100%;width:0;background:var(--grad);transition:width .2s;"></div></div>
+    <div class="frow" style="align-items:flex-end;">
+      <div class="field" style="max-width:130px;"><label class="lbl">คะแนนขั้นต่ำ</label><input type="number" id="scanMin" value="0" min="0" max="100"></div>
+      <label class="lbl" style="display:flex;align-items:center;gap:6px;margin-bottom:12px;font-size:12px;text-transform:none;letter-spacing:0;"><input type="checkbox" id="scanOnlyNow" style="width:auto;"> เฉพาะ "เข้าได้"</label>
+      <div class="field"><button class="ghost mini" id="scanAddWatch">+ ที่ผ่านเกณฑ์ → Watchlist</button></div>
+    </div>
+    <div class="table-scroll">
+      <table id="scanTbl">
+        <thead><tr>
+          <th>สัญลักษณ์</th><th class="num">ราคา</th><th class="num scan-sort" data-k="score">คะแนน ▾</th>
+          <th>เทรนด์</th><th class="num scan-sort" data-k="rsi14">RSI</th><th class="num scan-sort" data-k="relStrength">RS</th>
+          <th>จังหวะเข้า</th><th></th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="empty" id="scanEmpty">ยังไม่ได้สแกน — กด "▶ สแกน"</div>
+    <div class="muted-note" id="scanStamp" style="margin-top:6px;"></div>
   </div>
 </div>
 
@@ -746,7 +784,8 @@
       } else {
         series = parseTD(await tdFetch("/time_series", { symbol: sym, interval: "1day", outputsize: "400" }));
         if (!series.closes.length) throw new Error("ไม่พบข้อมูลหุ้นนี้");
-        [overview, qual] = await Promise.all([fetchOverview(sym), fhMetric(sym)]);
+        if (opts.lite) { overview = null; qual = null; } // scanner: skip the extra Twelve Data / Finnhub calls
+        else [overview, qual] = await Promise.all([fetchOverview(sym), fhMetric(sym)]);
       }
       const bench = await getBench(market);
       const r = analyzeStock(series.closes, series.volumes, bench, overview, series.highs, series.lows);
@@ -1001,6 +1040,131 @@
   }
 
   /* =======================================================================
+     SCANNER — fetch + score a list of symbols
+     ======================================================================= */
+  const DEFAULT_SCAN = {
+    crypto: ["BTC", "ETH", "BNB", "SOL", "XRP", "ADA", "DOGE", "AVAX", "TRX", "LINK", "DOT", "MATIC", "TON", "SHIB", "LTC", "BCH", "NEAR", "UNI", "APT", "ICP", "FIL", "ETC", "HBAR", "ARB", "OP", "INJ", "SUI", "SEI", "RUNE", "AAVE"],
+    stock: ["AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "META", "TSLA", "AVGO", "AMD", "NFLX", "CRM", "ADBE", "COST", "PEP", "KO", "DIS", "BA", "CAT", "JPM", "V", "MA", "UNH", "LLY", "XOM", "CVX", "WMT", "HD", "PG", "ORCL", "QCOM"],
+  };
+  state.scanLists = {
+    crypto: readLS("sd_scan_crypto", null) || DEFAULT_SCAN.crypto.slice(),
+    stock: readLS("sd_scan_stock", null) || DEFAULT_SCAN.stock.slice(),
+  };
+  state.scanResults = readLS("sd_scan_results", []) || [];
+  state.scanAt = Number(localStorage.getItem("sd_scan_at")) || 0;
+  state.scanStop = false;
+  let scanSortKey = "score", scanSortDir = -1;
+
+  function parseSymList(txt) {
+    return [...new Set(String(txt).split(/[\s,]+/).map(s => s.trim().toUpperCase()).filter(Boolean))];
+  }
+  function scanMarkets() { return activePf === "all" ? ["stock", "crypto"] : [activePf]; }
+  function fillScanList() {
+    // load the editable list for the active view into the textarea
+    const mk = scanMarkets();
+    const merged = mk.length === 2
+      ? state.scanLists.stock.map(s => s).concat(state.scanLists.crypto)
+      : state.scanLists[mk[0]];
+    $("scanList").value = merged.join(mk.length === 2 ? "\n" : ", ");
+    $("scanListLbl").textContent = mk.length === 2
+      ? "รายชื่อ (หุ้นด้านบน + คริปโตด้านล่าง — ระบบเดาตลาดจากสัญลักษณ์)"
+      : "รายชื่อ" + (mk[0] === "crypto" ? "เหรียญ" : "หุ้น") + "ที่จะสแกน (บรรทัดละ 1 ตัว หรือคั่นด้วยคอมมา)";
+  }
+  const KNOWN_CRYPTO = new Set(DEFAULT_SCAN.crypto.concat(["USDT", "USDC", "PEPE", "WIF", "BONK", "JUP", "TIA", "STX", "IMX", "GALA", "SAND", "MANA", "AXS", "GRT", "ALGO", "XLM", "VET", "FTM", "RNDR", "KAS", "MKR", "LDO", "CRV", "SNX", "DYDX", "ENA", "ONDO"]));
+  function guessMarket(sym) {
+    if (activePf === "stock") return "stock";
+    if (activePf === "crypto") return "crypto";
+    return KNOWN_CRYPTO.has(sym) ? "crypto" : "stock";
+  }
+
+  async function runScan() {
+    const syms = parseSymList($("scanList").value);
+    if (!syms.length) { Swal.fire({ icon: "info", title: "ใส่รายชื่อก่อน" }); return; }
+    // persist edited lists
+    const mk = scanMarkets();
+    if (mk.length === 1) { state.scanLists[mk[0]] = syms; }
+    else { state.scanLists.stock = syms.filter(s => guessMarket(s) === "stock"); state.scanLists.crypto = syms.filter(s => guessMarket(s) === "crypto"); }
+    try { localStorage.setItem("sd_scan_stock", JSON.stringify(state.scanLists.stock)); localStorage.setItem("sd_scan_crypto", JSON.stringify(state.scanLists.crypto)); } catch (e) {}
+
+    state.scanStop = false;
+    $("scanRun").classList.add("hidden"); $("scanStop").classList.remove("hidden");
+    $("scanEmpty").hidden = true;
+    const results = [];
+    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+    let done = 0;
+    for (const sym of syms) {
+      if (state.scanStop) break;
+      const market = guessMarket(sym);
+      $("scanStamp").textContent = "กำลังสแกน " + sym + " (" + market + ")… " + (done + 1) + "/" + syms.length;
+      const r = await runAnalyze(sym, market, { quiet: true, lite: true });
+      if (r) {
+        const g = computeEntryGuidance(r);
+        results.push({ sym, market, price: r.price, score: r.score, trendLabel: r.trendLabel, rsi14: r.rsi14, relStrength: r.relStrength, guide: g.status, guideTitle: g.title, at: Date.now() });
+        state.scanResults = results.slice();
+        renderScanTable();
+      }
+      done++;
+      $("scanProgBar").style.width = (done / syms.length * 100) + "%";
+      if (!state.scanStop && done < syms.length) await sleep(market === "stock" ? 7600 : 180);
+    }
+    state.scanResults = results;
+    state.scanAt = Date.now();
+    try { localStorage.setItem("sd_scan_results", JSON.stringify(results)); localStorage.setItem("sd_scan_at", String(state.scanAt)); } catch (e) {}
+    $("scanRun").classList.remove("hidden"); $("scanStop").classList.add("hidden");
+    $("scanProgBar").style.width = "0";
+    $("scanStamp").textContent = (state.scanStop ? "หยุดแล้ว · " : "สแกนเสร็จ · ") + results.length + "/" + syms.length + " ตัว · " + new Date(state.scanAt).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
+    renderScanTable();
+    renderWatchlist();
+  }
+
+  function scanRows() {
+    const minS = Number($("scanMin").value) || 0;
+    const onlyNow = $("scanOnlyNow").checked;
+    let rows = (state.scanResults || []).filter(r => activePf === "all" || r.market === activePf);
+    rows = rows.filter(r => r.score >= minS && (!onlyNow || r.guide === "now"));
+    rows.sort((a, b) => {
+      const av = a[scanSortKey], bv = b[scanSortKey];
+      return ((av == null ? -Infinity : av) - (bv == null ? -Infinity : bv)) * scanSortDir;
+    });
+    return rows;
+  }
+  function renderScanTable() {
+    const rows = scanRows();
+    $("scanEmpty").hidden = rows.length > 0 || (state.scanResults || []).length > 0;
+    const tb = $("scanTbl").querySelector("tbody");
+    const held = new Set(Object.values(computeBook(state.lots).book).filter(b => b.qty > 1e-9).map(b => keyOf(b.pf, b.sym)));
+    const wl = new Set(state.watchlist.map(w => /^crypto:(.+)$/.test(w) ? "crypto:" + w.slice(7).toUpperCase() : "stock:" + String(w).toUpperCase()));
+    tb.innerHTML = rows.map(r => {
+      const k = keyOf(r.market, r.sym);
+      const scls = r.score >= 70 ? "up" : r.score >= 45 ? "warn" : "down";
+      const gcls = r.guide === "now" ? "up" : r.guide === "avoid" ? "down" : "warn";
+      return `<tr>
+        <td><b>${esc(r.sym)}</b> <span class="chip">${r.market === "crypto" ? "คริปโต" : "หุ้น"}</span>${held.has(k) ? ' <span class="badge up" style="font-size:9px;">ถืออยู่</span>' : ""}</td>
+        <td class="num mono">${usd(r.price, r.price < 1 ? 5 : 2)}</td>
+        <td class="num"><span class="badge ${scls}">${r.score}</span></td>
+        <td>${esc(r.trendLabel)}</td>
+        <td class="num mono ${r.rsi14 >= 70 || r.rsi14 <= 30 ? "neg" : ""}">${r.rsi14 == null ? "—" : r.rsi14.toFixed(0)}</td>
+        <td class="num mono ${r.relStrength == null ? "" : r.relStrength >= 0 ? "pos" : "neg"}">${r.relStrength == null ? "—" : pctS(r.relStrength)}</td>
+        <td><span class="badge ${gcls}">${esc(r.guideTitle)}</span></td>
+        <td class="num">
+          <button class="ghost mini sc-an" data-pf="${r.market}" data-sym="${esc(r.sym)}">ดู</button>
+          <button class="ghost mini sc-buy" data-pf="${r.market}" data-sym="${esc(r.sym)}">ซื้อ</button>
+          ${wl.has(k) ? "" : `<button class="ghost mini sc-wl" data-w="${esc(r.market === "crypto" ? "crypto:" + r.sym : r.sym)}">+W</button>`}
+        </td>
+      </tr>`;
+    }).join("");
+    tb.querySelectorAll(".sc-an").forEach(b => b.addEventListener("click", () => { $("anSym").value = b.dataset.sym; $("anMarket").value = b.dataset.pf; switchTab("analyze"); $("anRun").click(); }));
+    tb.querySelectorAll(".sc-buy").forEach(b => b.addEventListener("click", () => openTradeModal({ pf: b.dataset.pf, symbol: b.dataset.sym, side: "buy" })));
+    tb.querySelectorAll(".sc-wl").forEach(b => b.addEventListener("click", () => { if (!state.watchlist.includes(b.dataset.w)) { state.watchlist.push(b.dataset.w); saveWatchlist(); } renderScanTable(); renderWatchlist(); }));
+  }
+
+  function renderScanner() {
+    if (!$("scanList").value.trim()) fillScanList();
+    renderScanTable();
+    $("scanStamp").textContent = state.scanAt ? ("สแกนล่าสุด " + new Date(state.scanAt).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" })) : "";
+  }
+
+  /* =======================================================================
      MODALS
      ======================================================================= */
   let tmCtx = null;
@@ -1103,17 +1267,46 @@
   function switchTab(tab) {
     currentTab = tab;
     document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
-    ["holdings", "analyze", "watchlist", "thesis", "oldlog"].forEach(t => $("tab-" + t).classList.toggle("hidden", t !== tab));
+    ["holdings", "analyze", "scan", "watchlist", "thesis", "oldlog"].forEach(t => $("tab-" + t).classList.toggle("hidden", t !== tab));
     if (tab === "thesis") renderThesis();
     if (tab === "watchlist") renderWatchlist();
+    if (tab === "scan") renderScanner();
     if (tab === "oldlog") renderOldLog();
   }
   document.querySelectorAll("#pfSwitch button").forEach(btn => btn.addEventListener("click", () => {
     activePf = btn.dataset.pf;
     try { localStorage.setItem(PF_KEY, activePf); } catch (e) {}
     document.querySelectorAll("#pfSwitch button").forEach(b => b.classList.toggle("active", b.dataset.pf === activePf));
+    fillScanList();
     renderAll();
+    if (currentTab === "scan") renderScanTable();
   }));
+
+  $("scanRun").addEventListener("click", runScan);
+  $("scanStop").addEventListener("click", () => { state.scanStop = true; $("scanStop").textContent = "กำลังหยุด…"; });
+  $("scanReset").addEventListener("click", () => {
+    const mk = scanMarkets();
+    mk.forEach(m => { state.scanLists[m] = DEFAULT_SCAN[m].slice(); });
+    try { localStorage.setItem("sd_scan_stock", JSON.stringify(state.scanLists.stock)); localStorage.setItem("sd_scan_crypto", JSON.stringify(state.scanLists.crypto)); } catch (e) {}
+    fillScanList();
+  });
+  ["scanMin", "scanOnlyNow"].forEach(id => $(id).addEventListener("input", renderScanTable));
+  document.querySelectorAll("#scanTbl .scan-sort").forEach(th => th.style.cursor = "pointer");
+  $("scanTbl").querySelector("thead").addEventListener("click", (e) => {
+    const th = e.target.closest(".scan-sort"); if (!th) return;
+    const k = th.dataset.k;
+    if (scanSortKey === k) scanSortDir *= -1; else { scanSortKey = k; scanSortDir = -1; }
+    $("scanTbl").querySelectorAll(".scan-sort").forEach(x => x.textContent = x.textContent.replace(/ [▾▴]$/, ""));
+    th.textContent += scanSortDir < 0 ? " ▾" : " ▴";
+    renderScanTable();
+  });
+  $("scanAddWatch").addEventListener("click", () => {
+    const rows = scanRows();
+    let n = 0;
+    rows.forEach(r => { const w = r.market === "crypto" ? "crypto:" + r.sym : r.sym; if (!state.watchlist.includes(w)) { state.watchlist.push(w); n++; } });
+    if (n) { saveWatchlist(); renderWatchlist(); renderScanTable(); }
+    Swal.fire({ icon: n ? "success" : "info", title: n ? "เพิ่ม " + n + " ตัวเข้า Watchlist" : "ไม่มีตัวใหม่ให้เพิ่ม", timer: 1400, showConfirmButton: false });
+  });
 
   $("buyBtn").addEventListener("click", () => openTradeModal({ side: "buy" }));
   $("refreshPricesBtn").addEventListener("click", refreshPrices);
@@ -1150,6 +1343,7 @@
     renderHoldings();
     if (currentTab === "watchlist") renderWatchlist();
     if (currentTab === "thesis") renderThesis();
+    if (currentTab === "scan") renderScanTable();
     renderOldLog();
   }
 
