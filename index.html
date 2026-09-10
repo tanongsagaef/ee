@@ -263,8 +263,8 @@
         <div class="c" id="cntTrades">—</div>
       </a>
       <a class="app-card" href="stock-decision-terminal.html">
-        <div class="t">📊 Stock / Decide</div>
-        <div class="d">ให้คะแนนหุ้น / watchlist / บันทึกการตัดสินใจ</div>
+        <div class="t">📊 พอร์ตลงทุน</div>
+        <div class="d">พอร์ตหุ้น + คริปโต · ให้คะแนน · watchlist · thesis</div>
         <div class="c" id="cntStock">—</div>
       </a>
       <a class="app-card" href="elliott-wave.html">
@@ -358,7 +358,7 @@
   let trades = [];
   let playbooks = [];
   let capital = 0;
-  let sd = { watchlist: [], log: [], scores: {} };
+  let sd = { watchlist: [], log: [], scores: {}, lots: [], cash: { stock: 0, crypto: 0 }, prices: {} };
   let ewCount = null;
   let period = 30;
 
@@ -369,6 +369,32 @@
     sd.watchlist = readLS("sd_watchlist", []) || [];
     sd.log = readLS("sd_log", []) || [];
     sd.scores = readLS("sd_watchlist_scores", {}) || {};
+    sd.lots = Array.isArray(readLS("sd_lots_v1", [])) ? readLS("sd_lots_v1", []) : [];
+    sd.cash = Object.assign({ stock: 0, crypto: 0 }, readLS("sd_cash_v1", {}));
+    sd.prices = readLS("sd_prices_v1", {}) || {};
+  }
+
+  /* value of the investment portfolio (Stock/Crypto holdings + cash), avg-cost book */
+  function sdPortfolio() {
+    const book = {};
+    sd.lots.slice().sort((a, b) => (a.date || "").localeCompare(b.date || "") || (a.createdAt || 0) - (b.createdAt || 0)).forEach(l => {
+      const k = l.pf + ":" + String(l.symbol).toUpperCase().trim();
+      const b = book[k] || (book[k] = { pf: l.pf, sym: String(l.symbol).toUpperCase().trim(), qty: 0, cost: 0, realized: 0 });
+      const q = Math.abs(Number(l.qty) || 0), p = Number(l.price) || 0, fee = Number(l.fee) || 0;
+      if (l.side === "sell") { const avg = b.qty > 0 ? b.cost / b.qty : p; const u = Math.min(q, b.qty); b.realized += (p - avg) * u - fee; b.cost -= avg * u; b.qty -= u; }
+      else { b.qty += q; b.cost += p * q + fee; }
+    });
+    let mkt = 0, cost = 0, realized = 0, n = 0;
+    Object.values(book).forEach(b => {
+      realized += b.realized;
+      if (b.qty <= 1e-9) return;
+      n++;
+      const lp = sd.prices[b.pf + ":" + b.sym];
+      mkt += (lp && lp.price != null) ? lp.price * b.qty : b.cost;
+      cost += b.cost;
+    });
+    const cash = (Number(sd.cash.stock) || 0) + (Number(sd.cash.crypto) || 0);
+    return { n, value: mkt + cash, unreal: mkt - cost, realized, cash };
   }
 
   /* Elliott Wave chapter count from its IndexedDB (best effort) */
@@ -581,7 +607,12 @@
   /* ---------- render: app counts ---------- */
   function renderApps() {
     $("cntTrades").textContent = trades.length + " เทรดบันทึกไว้";
-    $("cntStock").textContent = (sd.watchlist.length) + " หุ้นติดตาม · " + (sd.log.length) + " การตัดสินใจ";
+    (function () {
+      const p = sdPortfolio();
+      $("cntStock").textContent = p.n
+        ? p.n + " รายการถือ · มูลค่า " + usd(p.value) + " · " + (p.unreal >= 0 ? "+" : "−") + usd(Math.abs(p.unreal)) + " ยังไม่ขาย"
+        : (sd.watchlist.length + " รายการติดตาม · ยังไม่มีของในพอร์ต");
+    })();
     $("cntEw").textContent = ewCount == null ? "…" : ewCount + " บทเรียน";
     const ewaSum = readLS("ewa_summary_v1", null);
     if (ewaSum && typeof ewaSum.total === "number") {
