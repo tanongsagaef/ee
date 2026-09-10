@@ -465,7 +465,7 @@
     <div class="metrics-grid" id="statsGrid"></div>
   </div>
   <div class="panel">
-    <h3>Performance Profile</h3>
+    <h3>โปรไฟล์ผลงาน</h3>
     <div class="chart-wrap" id="radarChartWrap"></div>
   </div>
   <div class="panel">
@@ -1835,11 +1835,11 @@
     const rrScaled = Math.max(0, Math.min(100, (rr / 3) * 100));
 
     return [
-      { label: "Win Rate", value: s.winRate },
-      { label: "Plan Adherence", value: planAdherence },
-      { label: "Recovery Factor", value: recoveryScaled },
-      { label: "Risk/Reward", value: rrScaled },
-      { label: "Consistency", value: consistency },
+      { label: "อัตราชนะ", value: s.winRate },
+      { label: "ทำตามแผน", value: planAdherence },
+      { label: "การฟื้นตัว", value: recoveryScaled },
+      { label: "กำไรต่อเสี่ยง", value: rrScaled },
+      { label: "ความสม่ำเสมอ", value: consistency },
     ];
   }
 
