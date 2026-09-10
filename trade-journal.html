@@ -227,9 +227,21 @@
   .calendar-day-count { font-size: 10px; color: var(--muted); margin-top: 1px; }
   .calendar-day-tags { display: flex; flex-wrap: wrap; gap: 3px; margin-top: auto; padding-top: 4px; }
   .calendar-tag { font-size: 8.5px; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; color: var(--muted); white-space: nowrap; font-weight: 600; }
+  .cal-chips { margin-top: 4px; display: flex; flex-direction: column; gap: 2px; }
+  .cal-chip { font-size: 9.5px; font-weight: 700; line-height: 1.35; padding: 1px 4px 1px 5px; border-radius: 4px;
+    background: var(--surface); border: 1px solid var(--border); border-left-width: 3px; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; cursor: grab; }
+  .cal-chip:active { cursor: grabbing; }
+  .cal-chip.dragging { opacity: .35; }
+  .cal-chip.win { border-left-color: var(--bull); }
+  .cal-chip.loss { border-left-color: var(--bear); }
+  .cal-chip.be { border-left-color: #d97706; }
+  .cal-chip.pending { border-left-color: var(--muted); font-style: italic; color: var(--muted); }
+  .cal-chip-more { font-size: 9px; color: var(--muted); font-weight: 700; margin-top: 1px; }
+  .calendar-day.drop-target { outline: 2px dashed var(--accent); outline-offset: -2px; background: var(--accent-soft); }
   @media (max-width: 720px) {
     .calendar-day { min-height: 58px; padding: 5px 6px; }
-    .calendar-day-tags, .calendar-day-num { display: none; }
+    .calendar-day-tags, .calendar-day-num, .cal-chips { display: none; }
     .calendar-day-pnl { font-size: 11px; margin-top: 2px; }
   }
 
@@ -1247,6 +1259,7 @@
         const key = dateKey(dt.getFullYear(), dt.getMonth(), dt.getDate());
         const div = document.createElement("div");
         div.className = "calendar-day";
+        div.dataset.key = key;
         if (!inMonth) {
           div.classList.add("other-month");
           div.innerHTML = `<div class="calendar-day-num">${dt.getDate()}</div>`;
@@ -1274,14 +1287,28 @@
             `</div>`;
         }
 
+        let chipsHtml = "";
+        if (dayTrades.length) {
+          const MAXCHIP = 4;
+          const ordered = dayTrades.slice().sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+          chipsHtml = `<div class="cal-chips">` + ordered.slice(0, MAXCHIP).map(t => {
+            const oc = tradeOutcome(t);
+            const money = isPending(t) ? "" : " " + fmtMoney(pnlNum(t.pnl)).replace(/\.00$/, "");
+            return `<div class="cal-chip ${oc}" draggable="true" data-tid="${t.id}" title="${escapeHtml(t.symbol || "")} — ลากไปวางวันอื่นเพื่อย้ายวันที่">${escapeHtml((t.symbol || "—").slice(0, 12))}${money}</div>`;
+          }).join("") +
+            (ordered.length > MAXCHIP ? `<div class="cal-chip-more">+${ordered.length - MAXCHIP} เทรด</div>` : "") +
+            `</div>`;
+        }
+
         div.innerHTML = `
           <div class="calendar-day-num">${dt.getDate()}</div>
           ${dayTrades.length ? `<div class="calendar-day-pnl ${dayHasClosed ? (dayTotal >= 0 ? "pos" : "neg") : ""} mono" ${dayHasClosed ? "" : 'style="color:var(--muted);font-style:italic;"'}>${dayHasClosed ? fmtMoney(dayTotal) : "รอผล"}</div>
           <div class="calendar-day-count">${dayTrades.length} เทรด</div>` : ""}
+          ${chipsHtml}
           ${tagsHtml}
         `;
         if (dayTrades.length) {
-          div.addEventListener("click", () => openDayModal(key));
+          div.addEventListener("click", (e) => { if (!e.target.closest(".cal-chip")) openDayModal(key); });
         }
         grid.appendChild(div);
       }
@@ -1332,6 +1359,56 @@
     calMonth = today.getMonth();
     renderCalendar();
   });
+
+  /* ---------- drag a trade chip to another day to re-date it ---------- */
+  (function wireCalendarDnD() {
+    const grid = document.getElementById("calendarGrid");
+    let dragId = null;
+    const clearTargets = () => grid.querySelectorAll(".calendar-day.drop-target").forEach(c => c.classList.remove("drop-target"));
+
+    grid.addEventListener("click", (e) => {
+      const chip = e.target.closest(".cal-chip");
+      if (chip && chip.dataset.tid) { e.stopPropagation(); openTradeModal(chip.dataset.tid); }
+    });
+    grid.addEventListener("dragstart", (e) => {
+      const chip = e.target.closest(".cal-chip");
+      if (!chip) return;
+      dragId = chip.dataset.tid;
+      chip.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+      try { e.dataTransfer.setData("text/plain", dragId); } catch (err) {}
+    });
+    grid.addEventListener("dragend", () => {
+      grid.querySelectorAll(".cal-chip.dragging").forEach(c => c.classList.remove("dragging"));
+      clearTargets();
+      dragId = null;
+    });
+    grid.addEventListener("dragover", (e) => {
+      if (!dragId) return;
+      const cell = e.target.closest(".calendar-day");
+      if (!cell || !cell.dataset.key) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      if (!cell.classList.contains("drop-target")) { clearTargets(); cell.classList.add("drop-target"); }
+    });
+    grid.addEventListener("drop", (e) => {
+      const cell = e.target.closest(".calendar-day");
+      const id = dragId || (e.dataTransfer ? e.dataTransfer.getData("text/plain") : "");
+      clearTargets();
+      if (!cell || !cell.dataset.key || !id) return;
+      e.preventDefault();
+      const t = trades.find(x => x.id === id);
+      if (!t || t.date === cell.dataset.key) return;
+      const from = t.date;
+      t.date = cell.dataset.key;
+      t.createdAt = t.createdAt || Date.now();
+      saveTrades();
+      renderCalendar();
+      if (currentTab === "overview") renderOverview();
+      if (currentTab === "log") renderLog();
+      successToast(`ย้าย ${t.symbol || "เทรด"}: ${from} → ${t.date}`);
+    });
+  })();
 
   /* ---------- day-detail modal ---------- */
   const dayModal = document.getElementById("dayModal");
