@@ -280,7 +280,10 @@
   <div class="panel hidden" id="anResult">
     <h2 id="anResName">—</h2>
     <div class="score-hero">
-      <div class="score-num mono" id="anScoreNum">—</div>
+      <div style="text-align:center;">
+        <div class="score-num mono" id="anScoreNum">—</div>
+        <div class="mono" id="anGrade" style="font-weight:900;font-size:13px;"></div>
+      </div>
       <div>
         <div class="badge" id="anVerdict" style="font-size:13px;">—</div>
         <div class="muted-note" id="anScoreLabel" style="margin-top:4px;"></div>
@@ -290,12 +293,16 @@
         <div class="muted-note" id="anPriceSub"></div>
       </div>
     </div>
-    <div class="tiles" style="margin-top:14px;" id="anMetrics"></div>
-    <div class="guide-box" id="anGuide"></div>
-    <details style="margin-top:12px;"><summary class="muted-note" style="cursor:pointer;font-weight:700;">รายละเอียดคะแนน</summary>
+    <div style="margin-top:14px;" id="anCats"></div>
+    <div class="guide-box" id="anPlan"></div>
+    <div class="frow" style="margin-top:12px;gap:18px;" id="anSW"></div>
+    <details style="margin-top:12px;"><summary style="cursor:pointer;font-weight:800;font-size:12.5px;color:var(--muted);">แนวรับ–แนวต้าน & ระดับสำคัญ</summary>
+      <div class="table-scroll" id="anLevels" style="margin-top:8px;"></div>
+    </details>
+    <div id="anGroups"></div>
+    <details style="margin-top:8px;"><summary style="cursor:pointer;font-weight:800;font-size:12.5px;color:var(--muted);">คะแนนแต่ละหมวด (รายละเอียด)</summary>
       <ul class="breakdown" id="anBreakdown" style="list-style:none;padding:0;margin:8px 0 0;"></ul>
     </details>
-    <div class="tiles hidden" style="margin-top:12px;" id="anQual"></div>
     <div class="frow" style="margin-top:14px;">
       <button class="ghost" id="anAddWatch">+ ใส่ Watchlist</button>
       <button class="primary" id="anBuyThis">ซื้อตัวนี้</button>
@@ -622,99 +629,361 @@
   renderQuota();
 
   /* =======================================================================
-     SCORING ENGINE  (ported from the previous version)
+     ANALYSIS ENGINE — multi-factor, category sub-scores, trade plan
+     All math runs on the already-fetched daily series (arrays are DESCENDING:
+     index 0 = most recent). No extra API calls.
      ======================================================================= */
+  const mean = (a) => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0;
+  const stdev = (a) => { if (a.length < 2) return 0; const m = mean(a); return Math.sqrt(a.reduce((x, y) => x + (y - m) * (y - m), 0) / (a.length - 1)); };
   function pctUpFromRecentLow(c, lb) { lb = lb || 126; const w = c.slice(0, Math.min(lb, c.length)); const lo = Math.min.apply(null, w); return ((c[0] - lo) / lo) * 100; }
-  function volumeSpikeRatio(v, lb) { lb = lb || 50; if (!v || v.length < 2) return null; const t = v[0]; const pw = v.slice(1, Math.min(lb + 1, v.length)); if (!pw.length) return null; const avg = pw.reduce((a, b) => a + b, 0) / pw.length; if (!avg) return null; return t / avg; }
-  function sma(c, p) { const s = c.slice(0, p); return s.length ? s.reduce((a, b) => a + b, 0) / s.length : null; }
+  function sma(c, p) { const s = c.slice(0, p); return s.length >= Math.min(p, 3) ? s.reduce((a, b) => a + b, 0) / s.length : null; }
   function emaSeriesAsc(asc, p) { if (asc.length < p) return []; const k = 2 / (p + 1); let prev = asc.slice(0, p).reduce((a, b) => a + b, 0) / p; const out = [prev]; for (let i = p; i < asc.length; i++) { prev = (asc[i] - prev) * k + prev; out.push(prev); } return out; }
+  function emaSeriesDesc(c, p) { return emaSeriesAsc(c.slice().reverse(), p).reverse(); }
   function ema(c, p) { const s = emaSeriesAsc(c.slice().reverse(), p); return s.length ? s[s.length - 1] : null; }
-  function rsi(c, p) { p = p || 14; const a = c.slice().reverse(); if (a.length < p + 1) return null; let g = 0, l = 0; for (let i = 1; i <= p; i++) { const d = a[i] - a[i - 1]; if (d >= 0) g += d; else l -= d; } let ag = g / p, al = l / p; for (let i = p + 1; i < a.length; i++) { const d = a[i] - a[i - 1]; ag = (ag * (p - 1) + (d > 0 ? d : 0)) / p; al = (al * (p - 1) + (d < 0 ? -d : 0)) / p; } if (al === 0) return 100; return 100 - 100 / (1 + ag / al); }
-  function macd(c, f, s, sig) { f = f || 12; s = s || 26; sig = sig || 9; const a = c.slice().reverse(); if (a.length < s + sig) return null; const ef = emaSeriesAsc(a, f), es = emaSeriesAsc(a, s); const off = ef.length - es.length; const ml = es.map((v, i) => ef[i + off] - v); const sg = emaSeriesAsc(ml, sig); if (!sg.length) return null; const m = ml[ml.length - 1], ss = sg[sg.length - 1]; return { macd: m, signal: ss, hist: m - ss }; }
+  function rsiSeriesDesc(c, p) {
+    p = p || 14; const a = c.slice().reverse();
+    if (a.length < p + 1) return [];
+    let g = 0, l = 0;
+    for (let i = 1; i <= p; i++) { const d = a[i] - a[i - 1]; if (d >= 0) g += d; else l -= d; }
+    let ag = g / p, al = l / p; const out = new Array(p).fill(null);
+    out.push(al === 0 ? 100 : 100 - 100 / (1 + ag / al));
+    for (let i = p + 1; i < a.length; i++) { const d = a[i] - a[i - 1]; ag = (ag * (p - 1) + (d > 0 ? d : 0)) / p; al = (al * (p - 1) + (d < 0 ? -d : 0)) / p; out.push(al === 0 ? 100 : 100 - 100 / (1 + ag / al)); }
+    return out.reverse();
+  }
+  function rsi(c, p) { const s = rsiSeriesDesc(c, p); return s.length ? s[0] : null; }
+  function macdAt(c, f, s, sig) {
+    f = f || 12; s = s || 26; sig = sig || 9; const a = c.slice().reverse();
+    if (a.length < s + sig) return null;
+    const ef = emaSeriesAsc(a, f), es = emaSeriesAsc(a, s), off = ef.length - es.length;
+    const ml = es.map((v, i) => ef[i + off] - v);
+    const sg = emaSeriesAsc(ml, sig);
+    if (!sg.length) return null;
+    const m = ml[ml.length - 1], ss = sg[sg.length - 1];
+    const prevHist = ml.length > 1 && sg.length > 1 ? (ml[ml.length - 2] - sg[sg.length - 2]) : null;
+    return { macd: m, signal: ss, hist: m - ss, histRising: prevHist == null ? null : (m - ss) > prevHist };
+  }
   function atr(h, l, c, p) { p = p || 14; if (!h || !l || !h.length) return null; const H = h.slice().reverse(), L = l.slice().reverse(), C = c.slice().reverse(); if (H.length < p + 1) return null; const tr = []; for (let i = 1; i < H.length; i++) tr.push(Math.max(H[i] - L[i], Math.abs(H[i] - C[i - 1]), Math.abs(L[i] - C[i - 1]))); let x = tr.slice(0, p).reduce((u, y) => u + y, 0) / p; for (let i = p; i < tr.length; i++) x = (x * (p - 1) + tr[i]) / p; return x; }
+  function adx(h, l, c, p) {
+    p = p || 14; if (!h || h.length < 2 * p) return null;
+    const H = h.slice().reverse(), L = l.slice().reverse(), C = c.slice().reverse();
+    const tr = [], pdm = [], ndm = [];
+    for (let i = 1; i < H.length; i++) {
+      const up = H[i] - H[i - 1], dn = L[i - 1] - L[i];
+      pdm.push(up > dn && up > 0 ? up : 0); ndm.push(dn > up && dn > 0 ? dn : 0);
+      tr.push(Math.max(H[i] - L[i], Math.abs(H[i] - C[i - 1]), Math.abs(L[i] - C[i - 1])));
+    }
+    const wilder = (arr) => { let s = arr.slice(0, p).reduce((a, b) => a + b, 0); const o = [s]; for (let i = p; i < arr.length; i++) { s = s - s / p + arr[i]; o.push(s); } return o; };
+    const trS = wilder(tr), pdmS = wilder(pdm), ndmS = wilder(ndm);
+    const dx = [];
+    for (let i = 0; i < trS.length; i++) {
+      const pdi = 100 * pdmS[i] / trS[i], ndi = 100 * ndmS[i] / trS[i];
+      dx.push(100 * Math.abs(pdi - ndi) / (pdi + ndi || 1));
+    }
+    if (dx.length < p) return null;
+    let adxV = dx.slice(0, p).reduce((a, b) => a + b, 0) / p;
+    for (let i = p; i < dx.length; i++) adxV = (adxV * (p - 1) + dx[i]) / p;
+    const li = trS.length - 1;
+    return { adx: adxV, pdi: 100 * pdmS[li] / trS[li], ndi: 100 * ndmS[li] / trS[li] };
+  }
+  function bbands(c, p, k) {
+    p = p || 20; k = k || 2; const w = c.slice(0, p); if (w.length < p) return null;
+    const m = mean(w), sd = stdev(w);
+    const up = m + k * sd, lo = m - k * sd;
+    return { mid: m, up, lo, width: m ? (up - lo) / m * 100 : 0, pctB: (up - lo) ? (c[0] - lo) / (up - lo) : 0.5 };
+  }
+  function stoch(h, l, c, kP, dP) {
+    kP = kP || 14; dP = dP || 3; if (h.length < kP + dP) return null;
+    const kArr = [];
+    for (let j = 0; j < dP + 2; j++) {
+      const hh = Math.max.apply(null, h.slice(j, j + kP)), ll = Math.min.apply(null, l.slice(j, j + kP));
+      kArr.push(hh > ll ? 100 * (c[j] - ll) / (hh - ll) : 50);
+    }
+    return { k: kArr[0], d: mean(kArr.slice(0, dP)) };
+  }
   function range52w(c, h, l) { const n = Math.min(252, c.length); const hs = (h && h.length ? h : c).slice(0, n), ls = (l && l.length ? l : c).slice(0, n); const hi = Math.max.apply(null, hs), lo = Math.min.apply(null, ls); const pos = hi > lo ? ((c[0] - lo) / (hi - lo)) * 100 : 50; return { high: hi, low: lo, pos: Math.max(0, Math.min(100, pos)) }; }
-  function annualizedVolatility(c, lb) { lb = lb || 30; const r = c.slice(0, lb + 1); const rr = []; for (let i = 0; i < r.length - 1; i++) rr.push((r[i] - r[i + 1]) / r[i + 1]); if (!rr.length) return 0; const m = rr.reduce((a, b) => a + b, 0) / rr.length; const v = rr.reduce((a, b) => a + Math.pow(b - m, 2), 0) / rr.length; return Math.sqrt(v) * Math.sqrt(252) * 100; }
+  function annualizedVolatility(c, lb) { lb = lb || 30; const r = c.slice(0, lb + 1); const rr = []; for (let i = 0; i < r.length - 1; i++) rr.push((r[i] - r[i + 1]) / r[i + 1]); if (!rr.length) return 0; return stdev(rr) * Math.sqrt(252) * 100; }
+  function downsideDev(c, lb) { lb = lb || 60; const r = c.slice(0, lb + 1); const rr = []; for (let i = 0; i < r.length - 1; i++) { const x = (r[i] - r[i + 1]) / r[i + 1]; if (x < 0) rr.push(x); } if (!rr.length) return 0; return Math.sqrt(mean(rr.map(x => x * x))) * Math.sqrt(252) * 100; }
   function drawdownFrom52wHigh(c) { const w = c.slice(0, Math.min(252, c.length)); const hi = Math.max.apply(null, w); return ((hi - c[0]) / hi) * 100; }
+  function maxDrawdown(c, lb) { const w = c.slice(0, Math.min(lb || 252, c.length)).slice().reverse(); let peak = w[0], mdd = 0; for (const v of w) { if (v > peak) peak = v; const dd = (peak - v) / peak; if (dd > mdd) mdd = dd; } return mdd * 100; }
   function periodReturn(c, d) { const i = Math.min(d, c.length - 1); return ((c[0] - c[i]) / c[i]) * 100; }
+  function betaVs(c, b, n) {
+    n = n || 120; if (!b || b.length < n + 1 || c.length < n + 1) return null;
+    const rc = [], rb = [];
+    for (let i = 0; i < n; i++) { rc.push((c[i] - c[i + 1]) / c[i + 1]); rb.push((b[i] - b[i + 1]) / b[i + 1]); }
+    const mb = mean(rb), mc = mean(rc);
+    let cov = 0, varb = 0;
+    for (let i = 0; i < n; i++) { cov += (rc[i] - mc) * (rb[i] - mb); varb += (rb[i] - mb) * (rb[i] - mb); }
+    return varb ? cov / varb : null;
+  }
+  function obvSlope(c, v, n) {
+    n = n || 20; if (!v || v.length < n + 5) return null;
+    const obv = [0];
+    for (let i = 1; i < Math.min(c.length, 140); i++) obv.push(obv[i - 1] + (c[i - 1] > c[i] ? v[i - 1] : c[i - 1] < c[i] ? -v[i - 1] : 0));
+    const recent = obv.slice(0, n); // descending (0 = newest)
+    const xs = recent.map((_, i) => i), ys = recent;
+    const mx = mean(xs), my = mean(ys);
+    let num = 0, den = 0;
+    for (let i = 0; i < n; i++) { num += (xs[i] - mx) * (ys[i] - my); den += (xs[i] - mx) * (xs[i] - mx); }
+    const slope = den ? num / den : 0;
+    const scale = mean(recent.map(Math.abs)) || 1;
+    return -slope / scale; // positive = OBV rising over time
+  }
+  function cmf(h, l, c, v, p) {
+    p = p || 20; if (!v || h.length < p) return null;
+    let mfv = 0, vol = 0;
+    for (let i = 0; i < p; i++) {
+      const hl = h[i] - l[i];
+      const m = hl ? ((c[i] - l[i]) - (h[i] - c[i])) / hl : 0;
+      mfv += m * v[i]; vol += v[i];
+    }
+    return vol ? mfv / vol : null;
+  }
+  function upDownVolRatio(c, v, p) {
+    p = p || 20; if (!v || c.length < p + 1) return null;
+    let up = 0, dn = 0;
+    for (let i = 0; i < p; i++) { if (c[i] > c[i + 1]) up += v[i]; else if (c[i] < c[i + 1]) dn += v[i]; }
+    return dn ? up / dn : (up > 0 ? 3 : 1);
+  }
+  function pivots(arr, left, right, wantHigh) {
+    const out = [];
+    for (let i = right; i < arr.length - left; i++) {
+      let ok = true;
+      for (let k = 1; k <= left && ok; k++) if (wantHigh ? arr[i] <= arr[i + k] : arr[i] >= arr[i + k]) ok = false;
+      for (let k = 1; k <= right && ok; k++) if (wantHigh ? arr[i] <= arr[i - k] : arr[i] >= arr[i - k]) ok = false;
+      if (ok) out.push({ i: i, price: arr[i] });
+    }
+    return out; // recent → older
+  }
+  function slopePct(seriesDesc, n) {
+    const w = seriesDesc.slice(0, n).filter(x => x != null);
+    if (w.length < 3) return 0;
+    const xs = w.map((_, i) => i), ys = w, mx = mean(xs), my = mean(ys);
+    let num = 0, den = 0;
+    for (let i = 0; i < w.length; i++) { num += (xs[i] - mx) * (ys[i] - my); den += (xs[i] - mx) * (xs[i] - mx); }
+    const slope = den ? num / den : 0;
+    return my ? (-slope / my) * 100 * n : 0; // ~% change over the window
+  }
 
-  function analyzeStock(closes, vols, benchCloses, overview, highs, lows) {
+  function proAnalyze(closes, highs, lows, vols, bench, overview, qual, isCrypto, skipQuality) {
     const price = closes[0];
-    const upFromLow = pctUpFromRecentLow(closes);
-    const volSpike = volumeSpikeRatio(vols);
-    const sma20 = sma(closes, 20), sma50 = sma(closes, 50);
-    const rsi14 = rsi(closes, 14);
-    const macdV = macd(closes);
-    const atr14 = atr(highs, lows, closes, 14);
-    const r52 = range52w(closes, highs, lows);
-    const vol = annualizedVolatility(closes);
-    const drawdown = drawdownFrom52wHigh(closes);
-    const ret3m = periodReturn(closes, 63);
-    const bench3m = benchCloses ? periodReturn(benchCloses, 63) : null;
-    const relStrength = bench3m !== null ? ret3m - bench3m : null;
     const pe = overview && overview.PERatio && overview.PERatio !== "None" ? parseFloat(overview.PERatio) : null;
-
-    let trendLabel = "เท่าตัวกลาง";
-    if (price > sma20 && sma20 > sma50) trendLabel = "ขาขึ้นชัดเจน";
-    else if (price < sma20 && sma20 < sma50) trendLabel = "ขาลงชัดเจน";
-    let momentumFlag = "ปกติ";
-    if (rsi14 !== null) { if (rsi14 > 70) momentumFlag = "ซื้อมากเกินไป (overbought)"; else if (rsi14 < 30) momentumFlag = "ขายมากเกินไป (oversold)"; }
-    let riskLevel = "ปานกลาง";
-    if (vol > 45 || drawdown > 25) riskLevel = "สูง"; else if (vol < 20 && drawdown < 10) riskLevel = "ต่ำ";
-
-    const sc = computeScore({ trendLabel, relStrength, rsi14, volSpike, vol, upFromLow, extendedFromHigh: drawdown, pe });
-    return {
-      price, sma20, sma50, ema12: ema(closes, 12), ema26: ema(closes, 26), rsi14, vol, drawdown, relStrength, pe,
-      macd: macdV, atr14, atrPct: (atr14 != null && price) ? (atr14 / price) * 100 : null, range52w: r52,
-      trendLabel, momentumFlag, riskLevel, extendedFromHigh: drawdown, upFromLow, volSpike,
-      name: (overview && overview.Name) || null, score: sc.score, scoreBreakdown: sc.breakdown,
+    const M = {
+      price,
+      sma20: sma(closes, 20), sma50: sma(closes, 50), sma100: sma(closes, 100), sma200: sma(closes, 200),
+      ema20: ema(closes, 20), ema50: ema(closes, 50),
+      rsi14: rsi(closes, 14), rsi7: rsi(closes, 7),
+      macd: macdAt(closes), stoch: stoch(highs, lows, closes),
+      adx: adx(highs, lows, closes), atr14: atr(highs, lows, closes),
+      bb: bbands(closes, 20, 2),
+      r52: range52w(closes, highs, lows),
+      vol20: annualizedVolatility(closes, 20), vol60: annualizedVolatility(closes, 60),
+      dd52: drawdownFrom52wHigh(closes), mdd126: maxDrawdown(closes, 126),
+      downDev: downsideDev(closes, 60),
+      upFromLow: pctUpFromRecentLow(closes),
+      roc1m: periodReturn(closes, 21), roc3m: periodReturn(closes, 63), roc6m: periodReturn(closes, 126), roc12m: periodReturn(closes, 252),
+      mom12_1: (closes.length > 252) ? ((closes[21] - closes[252]) / closes[252]) * 100 : null,
+      volRatio: vols && vols.length > 20 ? vols[0] / (mean(vols.slice(1, 21)) || 1) : null,
+      obvSl: obvSlope(closes, vols), cmf: cmf(highs, lows, closes, vols), udVol: upDownVolRatio(closes, vols),
+      beta: bench ? betaVs(closes, bench) : null,
+      pe: pe, qual: qual || null,
+      benchName: bench ? null : null,
     };
+    M._isCrypto = !!isCrypto;
+    M.atrPct = (M.atr14 != null && price) ? M.atr14 / price * 100 : null;
+    M.bbWidthPrev = (function () { const b = bbands(closes.slice(20), 20, 2); return b ? b.width : null; })();
+    M.squeeze = (M.bb && M.bbWidthPrev != null) ? (M.bb.width < M.bbWidthPrev * 0.75 && M.bb.width < (M._isCrypto ? 22 : 9)) : false;
+    M.ema20SlopePct = slopePct(emaSeriesDesc(closes, 20), 10);
+    M.ema50SlopePct = slopePct(emaSeriesDesc(closes, 50), 15);
+
+    // relative strength vs benchmark
+    if (bench && bench.length > 60) {
+      M.rs1m = M.roc1m - periodReturn(bench, 21);
+      M.rs3m = M.roc3m - periodReturn(bench, 63);
+      M.rs6m = M.roc6m - periodReturn(bench, 126);
+      M.rs12m = M.roc12m - periodReturn(bench, 252);
+      const rsLine = [];
+      for (let i = 0; i < Math.min(70, closes.length, bench.length); i++) rsLine.push(closes[i] / bench[i]);
+      M.rsLineNewHigh = rsLine.length > 20 && rsLine[0] >= Math.max.apply(null, rsLine.slice(0, 60));
+    } else { M.rs1m = M.rs3m = M.rs6m = M.rs12m = null; M.rsLineNewHigh = false; }
+
+    // market structure + divergence (on closes)
+    const ph = pivots(highs, 3, 3, true), pl = pivots(lows, 3, 3, false);
+    M.lastSwingHigh = ph[0] ? ph[0].price : null;
+    M.lastSwingLow = pl[0] ? pl[0].price : null;
+    M.priorSwingHigh = ph[1] ? ph[1].price : null;
+    M.priorSwingLow = pl[1] ? pl[1].price : null;
+    M.structure = "sideways";
+    if (M.lastSwingHigh && M.priorSwingHigh && M.lastSwingLow && M.priorSwingLow) {
+      if (M.lastSwingHigh > M.priorSwingHigh && M.lastSwingLow > M.priorSwingLow) M.structure = "uptrend";
+      else if (M.lastSwingHigh < M.priorSwingHigh && M.lastSwingLow < M.priorSwingLow) M.structure = "downtrend";
+    }
+    const rsiS = rsiSeriesDesc(closes, 14);
+    M.bearishDiv = M.bearishDiv = false; M.bullishDiv = false;
+    if (ph[0] && ph[1] && rsiS.length > ph[1].i) {
+      if (ph[0].price > ph[1].price && rsiS[ph[0].i] != null && rsiS[ph[1].i] != null && rsiS[ph[0].i] < rsiS[ph[1].i] - 2) M.bearishDiv = true;
+    }
+    if (pl[0] && pl[1] && rsiS.length > pl[1].i) {
+      if (pl[0].price < pl[1].price && rsiS[pl[0].i] != null && rsiS[pl[1].i] != null && rsiS[pl[0].i] > rsiS[pl[1].i] + 2) M.bullishDiv = true;
+    }
+    M.stretchATR = (M.sma200 && M.atr14) ? (price - M.sma200) / M.atr14 : null;
+    M.crossState = (M.sma50 && M.sma200) ? (M.sma50 > M.sma200 ? "golden" : "death") : null;
+
+    /* ---------- category sub-scores ---------- */
+    const cat = (name, weight) => ({ name, weight, score: 50, notes: [] });
+    const add = (c, pts, txt) => { c.score += pts; c.notes.push({ txt, good: pts > 0 ? 1 : pts < 0 ? -1 : 0, pts }); };
+    const clamp = (c) => { c.score = Math.max(0, Math.min(100, Math.round(c.score))); return c; };
+
+    const T = cat("เทรนด์", 0.24);
+    if (M.sma200 != null) add(T, price > M.sma200 ? 18 : -18, price > M.sma200 ? "ราคายืนเหนือ SMA200 (เทรนด์ใหญ่ขึ้น)" : "ราคาต่ำกว่า SMA200 (เทรนด์ใหญ่ลง)");
+    if (M.crossState) add(T, M.crossState === "golden" ? 10 : -10, M.crossState === "golden" ? "SMA50 > SMA200 (golden regime)" : "SMA50 < SMA200 (death regime)");
+    if (M.sma20 && M.sma50 && M.sma200) add(T, (price > M.sma20 && M.sma20 > M.sma50 && M.sma50 > M.sma200) ? 12 : (price < M.sma20 && M.sma20 < M.sma50 && M.sma50 < M.sma200) ? -12 : 0, (price > M.sma20 && M.sma20 > M.sma50 && M.sma50 > M.sma200) ? "MA เรียงตัวขาขึ้นครบ (20>50>200)" : "MA ยังไม่เรียงตัวขาขึ้น");
+    add(T, M.ema20SlopePct > 1 ? 8 : M.ema20SlopePct < -1 ? -8 : 0, "ความชัน EMA20 ~ " + M.ema20SlopePct.toFixed(1) + "% / 10 วัน");
+    if (M.adx) {
+      if (M.adx.adx > 25 && M.adx.pdi > M.adx.ndi) add(T, 12, "ADX " + M.adx.adx.toFixed(0) + " + DI+ นำ — เทรนด์ขึ้นแข็ง");
+      else if (M.adx.adx > 25 && M.adx.ndi > M.adx.pdi) add(T, -12, "ADX " + M.adx.adx.toFixed(0) + " + DI− นำ — เทรนด์ลงแข็ง");
+      else if (M.adx.adx < 18) add(T, -4, "ADX " + M.adx.adx.toFixed(0) + " — ตลาดไร้ทิศทาง (choppy)");
+    }
+    add(T, M.structure === "uptrend" ? 10 : M.structure === "downtrend" ? -10 : 0, "โครงสร้างราคา: " + ({ uptrend: "Higher High / Higher Low", downtrend: "Lower High / Lower Low", sideways: "ออกข้าง" }[M.structure]));
+    if (M.stretchATR != null && M.stretchATR > 8) add(T, -6, "ราคายืดจาก SMA200 " + M.stretchATR.toFixed(1) + " ATR — ยืดตัวมาก");
+    clamp(T);
+
+    const MO = cat("โมเมนตัม", 0.18);
+    if (M.rsi14 != null) {
+      if (M.rsi14 >= 75) add(MO, -8, "RSI " + M.rsi14.toFixed(0) + " — overbought มาก");
+      else if (M.rsi14 >= 55 && slopePct(rsiS, 5) >= 0) add(MO, 12, "RSI " + M.rsi14.toFixed(0) + " โซนแข็งแรงและยังยกตัว");
+      else if (M.rsi14 >= 45) add(MO, 4, "RSI " + M.rsi14.toFixed(0) + " โซนกลาง");
+      else if (M.rsi14 < 35) add(MO, -8, "RSI " + M.rsi14.toFixed(0) + " — โมเมนตัมอ่อน/oversold");
+    }
+    if (M.macd) {
+      add(MO, M.macd.macd > M.macd.signal ? 8 : -8, "MACD " + (M.macd.macd > M.macd.signal ? "อยู่เหนือ signal" : "อยู่ใต้ signal"));
+      if (M.macd.histRising != null) add(MO, M.macd.histRising ? 6 : -6, "Histogram " + (M.macd.histRising ? "กำลังขยาย (เร่งขึ้น)" : "กำลังหด (แผ่วลง)"));
+      add(MO, M.macd.macd > 0 ? 4 : -4, "MACD line " + (M.macd.macd > 0 ? "เหนือ 0" : "ใต้ 0"));
+    }
+    add(MO, M.roc3m > 0 ? 6 : -6, "ผลตอบแทน 3 เดือน " + pctS(M.roc3m));
+    add(MO, M.roc6m > 0 ? 6 : -4, "ผลตอบแทน 6 เดือน " + pctS(M.roc6m));
+    if (M.bearishDiv) add(MO, -14, "⚠ RSI bearish divergence (ราคาทำจุดสูงใหม่แต่ RSI ไม่ตาม)");
+    if (M.bullishDiv) add(MO, 8, "RSI bullish divergence (ราคาทำจุดต่ำใหม่แต่ RSI ยกตัว)");
+    if (M.stoch) { if (M.stoch.k > 90 && M.stoch.k < M.stoch.d) add(MO, -6, "Stochastic " + M.stoch.k.toFixed(0) + " กำลังม้วนลงจากโซนสูง"); else if (M.stoch.k < 80 && M.stoch.k > M.stoch.d) add(MO, 4, "Stochastic ยกตัว (%K>%D)"); }
+    clamp(MO);
+
+    const RS = cat("ความแข็งแกร่งเชิงเปรียบเทียบ", 0.18);
+    if (M.rs3m != null) {
+      add(RS, M.rs3m > 0 ? 12 : -12, "RS 3 เดือน เทียบตลาด " + pctS(M.rs3m));
+      if (M.rs3m > 10) add(RS, 6, "นำตลาดชัดเจน (RS 3m > +10%)");
+      add(RS, M.rs6m > 0 ? 8 : -6, "RS 6 เดือน " + pctS(M.rs6m));
+      add(RS, M.rs12m > 0 ? 8 : -6, "RS 12 เดือน " + pctS(M.rs12m));
+      if (M.mom12_1 != null) add(RS, M.mom12_1 > 0 ? 6 : -6, "โมเมนตัม 12-1 เดือน " + pctS(M.mom12_1));
+      if (M.rsLineNewHigh) add(RS, 8, "เส้น RS ทำจุดสูงใหม่ (leadership)");
+    } else RS.notes.push({ txt: "ไม่มีข้อมูลเทียบตลาด", good: 0, pts: 0 });
+    clamp(RS);
+
+    const V = cat("ความผันผวน & ความเสี่ยง", 0.15);
+    add(V, M.vol60 < 25 ? 12 : M.vol60 < 45 ? 2 : M.vol60 > 60 ? -14 : -4, "ความผันผวนต่อปี (60 วัน) " + M.vol60.toFixed(0) + "%");
+    add(V, M.dd52 < 10 ? 8 : M.dd52 < 20 ? 0 : M.dd52 > 30 ? -12 : -6, "ห่างจากจุดสูง 52 สัปดาห์ −" + M.dd52.toFixed(1) + "%");
+    if (M.atrPct != null) add(V, M.atrPct < 3 ? 6 : M.atrPct > 8 ? -8 : 0, "ATR " + M.atrPct.toFixed(1) + "% ของราคา (ช่วงแกว่งรายวัน)");
+    if (M.bb) { if (M.bb.pctB > 1.05) add(V, -6, "ราคาทะลุ Bollinger บน (%B " + M.bb.pctB.toFixed(2) + ") — ยืดตัว"); else if (M.bb.pctB > 0.2 && M.bb.pctB < 0.85) add(V, 4, "ราคาอยู่ในกรอบ Bollinger ปกติ"); }
+    if (M.squeeze) add(V, 4, "Bollinger squeeze — ความผันผวนบีบตัว (สะสมพลัง)");
+    if (M.downDev > 40) add(V, -6, "Downside deviation สูง (" + M.downDev.toFixed(0) + "%)");
+    if (M.beta != null) add(V, M.beta > 1.6 ? -4 : (M.beta >= 0.7 && M.beta <= 1.3) ? 2 : 0, "Beta เทียบตลาด " + M.beta.toFixed(2));
+    clamp(V);
+
+    const VOL = cat("วอลุ่ม & แรงมีส่วนร่วม", 0.13);
+    if (M.volRatio != null) add(VOL, M.volRatio > 1.3 ? 10 : M.volRatio < 0.6 ? -6 : 0, "วอลุ่มวันนี้ " + M.volRatio.toFixed(1) + "x ของเฉลี่ย 20 วัน");
+    if (M.obvSl != null) add(VOL, M.obvSl > 0.02 ? 10 : M.obvSl < -0.02 ? -8 : 0, "OBV " + (M.obvSl > 0 ? "ไหลขึ้น (สะสม)" : "ไหลลง (แจกจ่าย)"));
+    if (M.cmf != null) add(VOL, M.cmf > 0.05 ? 8 : M.cmf < -0.05 ? -8 : 0, "Chaikin Money Flow " + M.cmf.toFixed(2));
+    if (M.udVol != null) add(VOL, M.udVol > 1.3 ? 6 : M.udVol < 0.75 ? -6 : 0, "วอลุ่มวันขึ้น : วันลง = " + M.udVol.toFixed(2));
+    clamp(VOL);
+
+    let Q = null;
+    if (!M._isCrypto && !skipQuality) {
+      Q = cat("มูลค่า & คุณภาพ", 0.12);
+      if (M.pe == null) Q.notes.push({ txt: "ไม่มีข้อมูล P/E", good: 0, pts: 0 });
+      else if (M.pe < 0) add(Q, -12, "P/E ติดลบ (ขาดทุน)");
+      else if (M.pe < 18) add(Q, 12, "P/E " + M.pe.toFixed(1) + " — ไม่แพงเทียบกำไร");
+      else if (M.pe < 30) add(Q, 4, "P/E " + M.pe.toFixed(1) + " — ระดับกลาง");
+      else if (M.pe < 45) add(Q, -2, "P/E " + M.pe.toFixed(1) + " — ค่อนข้างแพง");
+      else add(Q, -12, "P/E " + M.pe.toFixed(1) + " — แพงมาก");
+      const q = M.qual;
+      if (q) {
+        if (q.roeTTM != null) add(Q, q.roeTTM > 15 ? 10 : q.roeTTM > 5 ? 3 : q.roeTTM < 0 ? -12 : 0, "ROE " + q.roeTTM.toFixed(1) + "%");
+        if (q.netMargin != null) add(Q, q.netMargin > 12 ? 8 : q.netMargin > 0 ? 2 : -12, "Net margin " + q.netMargin.toFixed(1) + "%");
+        if (q.grossMargin != null && q.grossMargin > 40) add(Q, 4, "Gross margin สูง " + q.grossMargin.toFixed(0) + "%");
+        if (q.totalDebtToEquity != null) add(Q, q.totalDebtToEquity < 100 ? 6 : q.totalDebtToEquity < 200 ? 0 : -10, "Debt/Equity " + (q.totalDebtToEquity / 100).toFixed(2));
+        if (q.currentRatio != null) add(Q, q.currentRatio > 1.5 ? 4 : q.currentRatio < 1 ? -6 : 0, "Current ratio " + q.currentRatio.toFixed(2));
+      } else Q.notes.push({ txt: "ใส่ Finnhub key เพื่อดู ROE / margin / หนี้สิน", good: 0, pts: 0 });
+      clamp(Q);
+    }
+
+    const cats = [T, MO, RS, V, VOL].concat(Q ? [Q] : []);
+    const wsum = cats.reduce((s, c) => s + c.weight, 0);
+    const overall = Math.round(cats.reduce((s, c) => s + c.score * c.weight, 0) / wsum);
+    const grade = overall >= 80 ? "A" : overall >= 66 ? "B" : overall >= 52 ? "C" : overall >= 40 ? "D" : "E";
+    let regimeLabel;
+    if (T.score >= 65 && overall >= 62) regimeLabel = "แข็งแกร่ง — ขาขึ้น";
+    else if (T.score >= 55) regimeLabel = "ขาขึ้น";
+    else if (T.score >= 42) regimeLabel = "ออกข้าง / ไม่ชัด";
+    else if (overall < 42) regimeLabel = "ขาลง — เลี่ยง";
+    else regimeLabel = "อ่อนแอ";
+
+    /* ---------- trade plan ---------- */
+    const atrv = M.atr14 || price * 0.02;
+    const nearSMA20 = M.sma20 ? Math.abs(price - M.sma20) / price < 0.04 : false;
+    const regimeUp = M.sma50 && M.sma200 && price > M.sma50 && M.sma50 > M.sma200;
+    let plan;
+    if (M.sma50 && M.sma200 && price < M.sma50 && M.sma50 < M.sma200 && M.rsi14 > 32) {
+      plan = { status: "avoid", setup: "เลี่ยง — เทรนด์ลง", note: "ราคาต่ำกว่า SMA50 และ SMA200 ยังเรียงตัวขาลง ไม่มี edge ฝั่งซื้อ รอ SMA50 ตัดขึ้นเหนือ SMA200 หรือราคายืนเหนือ SMA200 ก่อน" };
+    } else if (price < (M.sma200 || Infinity) && M.rsi14 != null && M.rsi14 < 32 && M.lastSwingLow && price <= M.lastSwingLow * 1.05) {
+      const entryRef = price, stop = Math.min(M.lastSwingLow * 0.985, price - 1.8 * atrv);
+      plan = { status: "watch", setup: "เก็งกำไรรีบาวด์ (oversold) — ความเสี่ยงสูง", note: "อยู่ในเทรนด์ลงแต่ RSI < 32 ที่แนวรับสวิง เป็นได้แค่เด้งสั้น ไม่ใช่กลับตัว ตั้ง SL แคบและรีบออกถ้าไม่ไป", entryRef, entryLow: price * 0.99, entryHigh: price * 1.01, stop, t1: entryRef + 1.5 * (entryRef - stop), t2: (M.sma50 || entryRef + 3 * (entryRef - stop)), timeframe: "ระยะสั้น 3–10 วัน" };
+    } else if (regimeUp && M.rsi14 != null && (M.rsi14 >= 74 || M.upFromLow > 92)) {
+      const zoneLo = (M.sma20 || price) * 0.985, zoneHi = (M.sma20 || price) * 1.02, entryRef = (zoneLo + zoneHi) / 2;
+      const stop = Math.min((M.sma50 || zoneLo) * 0.98, entryRef - 2 * atrv);
+      plan = { status: "wait", setup: "เทรนด์ดีแต่ยืดตัว — รอย่อเข้า SMA20", note: "โครงสร้างขาขึ้นดี แต่ RSI/ระยะวิ่งบอกว่าไล่ราคาตอนนี้ RR ไม่คุ้ม รอราคาย่อลงมาบริเวณ SMA20 แล้วมีแท่งกลับตัว", entryRef, entryLow: zoneLo, entryHigh: zoneHi, stop, t1: entryRef + 1.5 * (entryRef - stop), t2: entryRef + 3 * (entryRef - stop), timeframe: "สวิง 3–8 สัปดาห์" };
+    } else if (regimeUp && M.r52 && M.r52.pos > 90 && (M.squeeze || (M.bb && M.bb.width < (M._isCrypto ? 20 : 8))) && (M.volRatio == null || M.volRatio > 1)) {
+      const brk = Math.max(M.lastSwingHigh || price, price), entryRef = brk * 1.005;
+      const stop = Math.max(entryRef - 2 * atrv, (M.sma20 || entryRef) * 0.97);
+      plan = { status: "now", setup: "Breakout ต่อเนื่อง (ใกล้จุดสูง + บีบตัว)", note: "อยู่ใกล้จุดสูงสุด 52 สัปดาห์ ความผันผวนบีบตัว รอราคาปิดทะลุจุดสวิงสูงล่าสุดพร้อมวอลุ่มยืนยัน แล้วเข้าตามแรง", entryRef, entryLow: brk, entryHigh: brk * 1.03, stop, t1: entryRef + 1.6 * (entryRef - stop), t2: entryRef + 3.2 * (entryRef - stop), timeframe: "สวิง 2–8 สัปดาห์" };
+    } else if (regimeUp && M.rsi14 != null && M.rsi14 >= 40 && M.rsi14 <= 62) {
+      const zoneLo = Math.min(M.sma20 || price, price) * 0.99, zoneHi = Math.max(M.sma20 || price, price) * 1.01, entryRef = (zoneLo + zoneHi) / 2;
+      const stop = Math.min((M.sma50 || zoneLo) * 0.98, entryRef - 1.8 * atrv, (M.lastSwingLow || Infinity) * 0.99);
+      plan = { status: "now", setup: "ซื้อย่อในเทรนด์ (Trend pullback)", note: "เทรนด์ขาขึ้นเรียงตัว ราคาย่อเข้าใกล้ SMA20 และ RSI อยู่โซนกลาง — จุดที่ risk/reward มักคุ้มกว่าการไล่ราคา รอแท่งกลับตัวยืนยันก่อนเข้า", entryRef, entryLow: zoneLo, entryHigh: zoneHi, stop, t1: entryRef + 1.5 * (entryRef - stop), t2: entryRef + 3 * (entryRef - stop), timeframe: "สวิง 3–8 สัปดาห์" };
+    } else {
+      plan = { status: "neutral", setup: "รอสัญญาณชัด", note: "เทรนด์/โมเมนตัมยังไม่เข้าเงื่อนไขที่มี edge ชัด รอให้ MA เรียงตัว หรือราคายืนเหนือ SMA50/200 พร้อมโมเมนตัมหนุนก่อน", entryLow: M.sma50, entryHigh: M.sma20 };
+    }
+    if (plan.entryRef && plan.stop) {
+      const risk = plan.entryRef - plan.stop;
+      plan.riskPct = risk / plan.entryRef * 100;
+      plan.rr1 = plan.t1 ? (plan.t1 - plan.entryRef) / risk : null;
+      plan.rr2 = plan.t2 ? (plan.t2 - plan.entryRef) / risk : null;
+      plan.sizeHint = M.atrPct == null ? "เสี่ยง 0.75% ต่อไม้" : M.atrPct > 7 ? "ผันผวนสูง — เสี่ยง ≤ 0.5% ต่อไม้ ลดขนาด" : M.atrPct > 4 ? "เสี่ยง ~0.75% ต่อไม้" : "เสี่ยง ~1% ต่อไม้";
+      plan.invalidation = "ปิดวันต่ำกว่า " + usd(plan.stop, plan.stop < 1 ? 5 : 2) + (M.sma50 ? " หรือหลุด SMA50" : "");
+      plan.nextResistance = M.priorSwingHigh && M.priorSwingHigh > price ? M.priorSwingHigh : (M.r52 ? M.r52.high : null);
+    }
+
+    /* ---------- strengths / warnings ---------- */
+    const allNotes = cats.flatMap(c => c.notes.map(n => Object.assign({ cat: c.name }, n)));
+    const strengths = allNotes.filter(n => n.good === 1).sort((a, b) => b.pts - a.pts).slice(0, 7);
+    const warnings = allNotes.filter(n => n.good === -1).sort((a, b) => a.pts - b.pts).slice(0, 7);
+
+    /* ---------- key levels ---------- */
+    const lv = [];
+    const L = (label, v) => { if (v != null && isFinite(v)) lv.push({ label, value: v }); };
+    L("ราคาปัจจุบัน", price);
+    L("SMA20", M.sma20); L("SMA50", M.sma50); L("SMA200", M.sma200);
+    L("สวิงสูงล่าสุด", M.lastSwingHigh); L("สวิงต่ำล่าสุด", M.lastSwingLow);
+    L("สูงสุด 52 สัปดาห์", M.r52 && M.r52.high); L("ต่ำสุด 52 สัปดาห์", M.r52 && M.r52.low);
+    L("Bollinger บน", M.bb && M.bb.up); L("Bollinger ล่าง", M.bb && M.bb.lo);
+    if (plan.stop) L("จุด SL แนะนำ", plan.stop);
+    if (plan.t1) L("เป้า T1", plan.t1);
+    if (plan.t2) L("เป้า T2", plan.t2);
+    lv.sort((a, b) => b.value - a.value);
+
+    return Object.assign(M, {
+      name: (overview && overview.Name) || null,
+      cats, overall, grade, regimeLabel, plan, strengths, warnings, levels: lv,
+    });
   }
-  function computeScore(m) {
-    const items = [];
-    if (m.trendLabel === "ขาขึ้นชัดเจน") items.push({ label: "เทรนด์ขาขึ้น (ราคา>SMA20>SMA50)", points: 2 });
-    else if (m.trendLabel === "ขาลงชัดเจน") items.push({ label: "เทรนด์ขาลง (ราคา<SMA20<SMA50)", points: -2 });
-    else items.push({ label: "เทรนด์ไม่ชัดเจน", points: 0 });
-    if (m.relStrength === null) items.push({ label: "ไม่มีข้อมูล Relative Strength", points: 0 });
-    else if (m.relStrength > 10) items.push({ label: "แข็งแกร่งกว่าตลาดชัดเจน (RS > +10%)", points: 2 });
-    else if (m.relStrength > 1) items.push({ label: "แข็งแกร่งกว่าตลาดเล็กน้อย", points: 1 });
-    else if (m.relStrength >= -1) items.push({ label: "ใกล้เคียงตลาด", points: 0 });
-    else if (m.relStrength >= -10) items.push({ label: "อ่อนกว่าตลาดเล็กน้อย", points: -1 });
-    else items.push({ label: "อ่อนกว่าตลาดชัดเจน (RS < -10%)", points: -2 });
-    if (m.rsi14 === null) items.push({ label: "ไม่มีข้อมูล RSI", points: 0 });
-    else if (m.rsi14 >= 70) items.push({ label: "RSI overbought (≥70)", points: -1 });
-    else if (m.rsi14 >= 50) items.push({ label: "โมเมนตัมเอนเอียงบวก (50-70)", points: 1 });
-    else if (m.rsi14 > 30) items.push({ label: "โมเมนตัมอ่อน (30-50)", points: 0 });
-    else items.push({ label: "RSI oversold (≤30)", points: -1 });
-    if (m.volSpike === null) items.push({ label: "ไม่มีข้อมูล Volume", points: 0 });
-    else if (m.volSpike > 1.4) items.push({ label: "Volume พุ่ง (>1.4x)", points: 1 });
-    else if (m.volSpike < 0.7) items.push({ label: "Volume ต่ำกว่าเฉลี่ยมาก", points: -1 });
-    else items.push({ label: "Volume ปกติ", points: 0 });
-    if (m.vol < 20) items.push({ label: "ความผันผวนต่ำ (<20%)", points: 1 });
-    else if (m.vol > 45) items.push({ label: "ความผันผวนสูง (>45%)", points: -1 });
-    else items.push({ label: "ความผันผวนกลาง", points: 0 });
-    if (m.upFromLow > 80) items.push({ label: "วิ่งขึ้นมาเยอะแล้ว (>80% จากจุดต่ำ)", points: -1 });
-    else if (m.extendedFromHigh < 5 && m.upFromLow < 50) items.push({ label: "ใกล้จุดสูงแต่ยังไม่ยืนมาก", points: 1 });
-    else items.push({ label: "ระยะยืนตัวปกติ", points: 0 });
-    if (m.pe === null) items.push({ label: "ไม่มีข้อมูล P/E", points: 0 });
-    else if (m.pe > 0 && m.pe < 15) items.push({ label: "P/E ต่ำ (<15)", points: 1 });
-    else if (m.pe > 40 || m.pe < 0) items.push({ label: "P/E สูงมาก/ติดลบ", points: -1 });
-    else items.push({ label: "P/E ระดับกลาง", points: 0 });
-    const raw = items.reduce((s, it) => s + it.points, 0);
-    return { score: Math.max(0, Math.min(100, Math.round(((raw + 9) / 18) * 100))), breakdown: items };
-  }
-  function scoreLabel(s) {
-    if (s >= 70) return { text: "เอนเอียงบวก", color: "var(--bull)" };
-    if (s >= 45) return { text: "ปานกลาง", color: "var(--neutral)" };
-    return { text: "เอนเอียงลบ", color: "var(--bear)" };
-  }
-  function computeEntryGuidance(r) {
-    const price = r.price;
-    const overext = (r.rsi14 !== null && r.rsi14 >= 70) || r.upFromLow > 80;
-    if (r.trendLabel === "ขาลงชัดเจน") return { status: "avoid", title: "ยังไม่ควรเข้า", note: "เทรนด์เป็นขาลงชัดเจน รอราคากลับมายืนเหนือ SMA20 และ SMA20 ตัดขึ้นเหนือ SMA50 ก่อน", zoneLow: null, zoneHigh: null, stopRef: null };
-    if (r.trendLabel === "ขาขึ้นชัดเจน" && overext) return { status: "wait", title: "เทรนด์ดี แต่ราคายืนตัวมาก — รอย่อ", note: (r.rsi14 >= 70 ? "RSI " + r.rsi14.toFixed(1) + " เข้าเขต overbought " : "") + (r.upFromLow > 80 ? "ราคาขึ้นมา " + r.upFromLow.toFixed(0) + "% จากจุดต่ำ " : "") + "แนะนำรอราคาย่อลงใกล้ SMA20", zoneLow: r.sma20 * 0.97, zoneHigh: r.sma20 * 1.02, stopRef: r.atr14 != null ? price - 2 * r.atr14 : r.sma50 };
-    if (r.trendLabel === "ขาขึ้นชัดเจน") return { status: "now", title: "อยู่ในโซนที่พิจารณาเข้าได้", note: "เทรนด์ขาขึ้นและราคายังไม่ยืนตัวมาก อยู่ใกล้เหนือ SMA20 ซึ่งมักเป็นแนวรับเทรนด์", zoneLow: Math.min(r.sma20, price), zoneHigh: price * 1.02, stopRef: r.atr14 != null ? price - 2 * r.atr14 : r.sma50 };
-    return { status: "neutral", title: "สัญญาณยังไม่ชัดเจน — รอดูก่อน", note: "SMA20/SMA50 ยังไม่ตัดเรียงชัดเจน รอ 1-2 วันถัดไป", zoneLow: r.sma50, zoneHigh: r.sma20, stopRef: null };
-  }
+  function scoreColor(s) { return s >= 66 ? "var(--bull)" : s >= 45 ? "var(--neutral)" : "var(--bear)"; }
 
   /* ---------- data for the analyze tab ---------- */
   async function tdFetch(endpoint, params) {
@@ -788,9 +1057,10 @@
         else [overview, qual] = await Promise.all([fetchOverview(sym), fhMetric(sym)]);
       }
       const bench = await getBench(market);
-      const r = analyzeStock(series.closes, series.volumes, bench, overview, series.highs, series.lows);
+      const r = proAnalyze(series.closes, series.highs, series.lows, series.volumes, bench, overview, qual, market === "crypto", !!opts.lite);
       r._sym = sym; r._market = market; r._qual = qual;
       msg.textContent = "";
+      stashScore(r);
       if (!opts.quiet) renderAnalyzeResult(r);
       return r;
     } catch (e) {
@@ -799,55 +1069,107 @@
     }
   }
 
+  function catBar(label, sc) {
+    return `<div style="margin:6px 0;">
+      <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;"><span>${esc(label)}</span><span class="mono" style="color:${scoreColor(sc)}">${sc}</span></div>
+      <div style="height:7px;background:var(--surface-alt);border-radius:999px;overflow:hidden;margin-top:3px;"><div style="height:100%;width:${sc}%;background:${scoreColor(sc)};"></div></div>
+    </div>`;
+  }
   function renderAnalyzeResult(r) {
     state.result = r;
+    const px = (v, d) => usd(v, d != null ? d : (v != null && v < 1 ? 5 : 2));
     $("anResult").classList.remove("hidden");
     $("anResName").textContent = (r.name || r._sym) + "  ·  " + r._sym;
-    $("anScoreNum").textContent = r.score;
-    const lab = scoreLabel(r.score);
-    $("anScoreNum").style.color = lab.color;
-    $("anScoreLabel").textContent = lab.text;
+    $("anScoreNum").textContent = r.overall;
+    $("anScoreNum").style.color = scoreColor(r.overall);
+    $("anGrade").textContent = "เกรด " + r.grade;
+    $("anGrade").style.color = scoreColor(r.overall);
     const vb = $("anVerdict");
-    vb.textContent = r.trendLabel;
-    vb.className = "badge " + (r.trendLabel === "ขาขึ้นชัดเจน" ? "up" : r.trendLabel === "ขาลงชัดเจน" ? "down" : "warn");
-    $("anPrice").textContent = usd(r.price, r.price < 1 ? 5 : 2);
-    $("anPriceSub").textContent = r.range52w ? ("ในกรอบ 52 สัปดาห์ที่ " + r.range52w.pos.toFixed(0) + "%") : "";
-    const t = (k, v, cls) => `<div class="tile"><div class="k">${k}</div><div class="v small ${cls || ""}">${v}</div></div>`;
-    $("anMetrics").innerHTML = [
-      t("RSI(14)", r.rsi14 == null ? "—" : r.rsi14.toFixed(1), r.rsi14 >= 70 ? "neg" : r.rsi14 <= 30 ? "neg" : r.rsi14 >= 50 ? "pos" : ""),
-      t("SMA20 / 50", num(r.sma20, 2) + " / " + num(r.sma50, 2)),
-      t("MACD hist", r.macd ? r.macd.hist.toFixed(3) : "—", r.macd && r.macd.hist > 0 ? "pos" : "neg"),
-      t("ATR%", r.atrPct == null ? "—" : r.atrPct.toFixed(2) + "%"),
-      t("ผันผวน (ปี)", r.vol.toFixed(0) + "%", r.vol > 45 ? "neg" : r.vol < 20 ? "pos" : ""),
-      t("ห่างจุดสูง 52w", "−" + r.drawdown.toFixed(1) + "%"),
-      t("RS vs " + (r._market === "crypto" ? "BTC" : "SPY"), r.relStrength == null ? "—" : pctS(r.relStrength), r.relStrength == null ? "" : r.relStrength >= 0 ? "pos" : "neg"),
-      t("P/E", r.pe == null ? "—" : r.pe.toFixed(1)),
-      t("ความเสี่ยง", r.riskLevel, r.riskLevel === "สูง" ? "neg" : r.riskLevel === "ต่ำ" ? "pos" : ""),
-    ].join("");
-    const g = computeEntryGuidance(r);
-    const gcol = g.status === "now" ? "var(--bull)" : g.status === "avoid" ? "var(--bear)" : "var(--neutral)";
-    $("anGuide").innerHTML = `<b style="color:${gcol}">${esc(g.title)}</b><br>${esc(g.note)}` +
-      (g.zoneLow ? `<br><span class="muted-note">โซนพิจารณา ~ ${usd(g.zoneLow)} – ${usd(g.zoneHigh)}${g.stopRef ? " · จุดอ้างอิง SL ~ " + usd(g.stopRef) : ""}</span>` : "");
-    $("anBreakdown").innerHTML = r.scoreBreakdown.map(it => `<li><span>${esc(it.label)}</span><span class="mono ${it.points > 0 ? "pos" : it.points < 0 ? "neg" : "muted-note"}">${it.points > 0 ? "+" : ""}${it.points}</span></li>`).join("");
-    const q = r._qual, qEl = $("anQual");
-    if (q) {
-      const p = (v) => v == null ? "—" : (v).toFixed(1) + "%";
-      qEl.classList.remove("hidden");
-      qEl.innerHTML = [
-        t("ROE (TTM)", p(q.roeTTM), q.roeTTM == null ? "" : q.roeTTM > 15 ? "pos" : q.roeTTM < 0 ? "neg" : ""),
-        t("Net Margin", p(q.netMargin), q.netMargin == null ? "" : q.netMargin > 10 ? "pos" : q.netMargin < 0 ? "neg" : ""),
-        t("Gross Margin", p(q.grossMargin)),
-        t("Debt/Equity", q.totalDebtToEquity == null ? "—" : q.totalDebtToEquity.toFixed(2), q.totalDebtToEquity > 200 ? "neg" : ""),
-        t("Current Ratio", q.currentRatio == null ? "—" : q.currentRatio.toFixed(2), q.currentRatio < 1 ? "neg" : "pos"),
-      ].join("");
-    } else qEl.classList.add("hidden");
-    // stash score for a held position / watchlist chip
-    stashScore(r);
+    vb.textContent = r.regimeLabel;
+    vb.className = "badge " + (/แข็งแกร่ง|ขาขึ้น/.test(r.regimeLabel) ? "up" : /ขาลง|อ่อนแอ/.test(r.regimeLabel) ? "down" : "warn");
+    $("anScoreLabel").textContent = "รวมจาก " + r.cats.length + " หมวด · โครงสร้าง " + ({ uptrend: "HH/HL", downtrend: "LH/LL", sideways: "ออกข้าง" }[r.structure] || "-");
+    $("anPrice").textContent = px(r.price);
+    $("anPriceSub").textContent = r.r52 ? ("ในกรอบ 52 สัปดาห์ " + r.r52.pos.toFixed(0) + "% · −" + r.dd52.toFixed(1) + "% จากจุดสูง") : "";
+
+    $("anCats").innerHTML = r.cats.map(c => catBar(c.name, c.score)).join("");
+
+    const p = r.plan;
+    const pcol = p.status === "now" ? "var(--bull)" : p.status === "avoid" ? "var(--bear)" : "var(--neutral)";
+    const line = (k, v) => v == null ? "" : `<div style="display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:3px 0;"><span class="muted-note">${k}</span><span class="mono" style="font-weight:700;text-align:right;">${v}</span></div>`;
+    $("anPlan").innerHTML =
+      `<div style="font-weight:900;font-size:14px;color:${pcol};margin-bottom:4px;">แผนเทรด · ${esc(p.setup)}</div>` +
+      `<div style="font-size:13px;line-height:1.6;margin-bottom:8px;">${esc(p.note)}</div>` +
+      (p.entryRef ? (
+        line("โซนเข้า", px(p.entryLow) + " – " + px(p.entryHigh)) +
+        line("จุด SL", px(p.stop) + "  (เสี่ยง " + p.riskPct.toFixed(1) + "%)") +
+        line("เป้า T1 / T2", px(p.t1) + " (R " + (p.rr1 || 0).toFixed(1) + ")  ·  " + px(p.t2) + " (R " + (p.rr2 || 0).toFixed(1) + ")") +
+        (p.nextResistance ? line("แนวต้านถัดไป", px(p.nextResistance)) : "") +
+        line("ขนาดโพสิชัน", p.sizeHint) +
+        line("กรอบเวลา", p.timeframe || "-") +
+        line("จุดยกเลิกแผน", p.invalidation || "-")
+      ) : (p.entryLow ? line("โซนสังเกต", px(p.entryLow) + " – " + px(p.entryHigh)) : ""));
+
+    const col = (title, arr, c) => `<div style="flex:1;min-width:200px;">
+      <div class="lbl" style="color:${c}">${title}</div>
+      ${arr.length ? "<ul style='margin:4px 0 0;padding-left:18px;font-size:12.5px;line-height:1.7;'>" + arr.map(n => `<li>${esc(n.txt)}</li>`).join("") + "</ul>" : "<div class='muted-note'>—</div>"}</div>`;
+    $("anSW").innerHTML = col("จุดแข็ง", r.strengths, "var(--bull)") + col("จุดที่ต้องระวัง", r.warnings, "var(--bear)");
+
+    $("anLevels").innerHTML = "<table><tbody>" + r.levels.map(l => {
+      const near = Math.abs(l.value - r.price) / r.price < 0.012;
+      return `<tr${near ? ' style="background:var(--grad-soft)"' : ""}><td>${esc(l.label)}</td><td class="num mono">${px(l.value)}</td><td class="num mono muted-note">${pctS((l.value - r.price) / r.price * 100)}</td></tr>`;
+    }).join("") + "</tbody></table>";
+
+    const g = (k, v, cls) => `<div class="tile"><div class="k">${k}</div><div class="v small ${cls || ""}">${v}</div></div>`;
+    const groups = [
+      ["เทรนด์", [
+        g("SMA 20/50/200", num(r.sma20, 2) + " / " + num(r.sma50, 2) + " / " + num(r.sma200, 2)),
+        g("ADX / DI", r.adx ? r.adx.adx.toFixed(0) + "  (+" + r.adx.pdi.toFixed(0) + " / −" + r.adx.ndi.toFixed(0) + ")" : "—", r.adx && r.adx.adx > 25 ? (r.adx.pdi > r.adx.ndi ? "pos" : "neg") : ""),
+        g("ระยะจาก SMA200", r.stretchATR == null ? "—" : r.stretchATR.toFixed(1) + " ATR"),
+        g("ความชัน EMA20", r.ema20SlopePct.toFixed(1) + "%", r.ema20SlopePct > 0 ? "pos" : "neg"),
+      ]],
+      ["โมเมนตัม", [
+        g("RSI 14 / 7", (r.rsi14 == null ? "—" : r.rsi14.toFixed(0)) + " / " + (r.rsi7 == null ? "—" : r.rsi7.toFixed(0)), r.rsi14 >= 70 || r.rsi14 <= 30 ? "neg" : r.rsi14 >= 50 ? "pos" : ""),
+        g("MACD hist", r.macd ? r.macd.hist.toFixed(3) + (r.macd.histRising ? " ↑" : " ↓") : "—", r.macd && r.macd.hist > 0 ? "pos" : "neg"),
+        g("Stochastic %K/%D", r.stoch ? r.stoch.k.toFixed(0) + " / " + r.stoch.d.toFixed(0) : "—"),
+        g("ผลตอบแทน 1/3/6/12ด", pctS(r.roc1m) + " · " + pctS(r.roc3m) + " · " + pctS(r.roc6m) + " · " + pctS(r.roc12m)),
+        g("Divergence", r.bearishDiv ? "⚠ Bearish" : r.bullishDiv ? "Bullish" : "ไม่มี", r.bearishDiv ? "neg" : r.bullishDiv ? "pos" : ""),
+      ]],
+      ["เชิงเปรียบเทียบ (RS vs " + (r._market === "crypto" ? "BTC" : "SPY") + ")", [
+        g("RS 3 / 6 / 12 เดือน", r.rs3m == null ? "—" : pctS(r.rs3m) + " · " + pctS(r.rs6m) + " · " + pctS(r.rs12m), r.rs3m == null ? "" : r.rs3m >= 0 ? "pos" : "neg"),
+        g("โมเมนตัม 12-1", r.mom12_1 == null ? "—" : pctS(r.mom12_1)),
+        g("RS line จุดสูงใหม่", r.rsLineNewHigh ? "ใช่ (leadership)" : "ไม่", r.rsLineNewHigh ? "pos" : ""),
+      ]],
+      ["ความผันผวน & ความเสี่ยง", [
+        g("ผันผวน 20/60 วัน (ปี)", r.vol20.toFixed(0) + "% / " + r.vol60.toFixed(0) + "%", r.vol60 > 50 ? "neg" : r.vol60 < 25 ? "pos" : ""),
+        g("ATR %", r.atrPct == null ? "—" : r.atrPct.toFixed(2) + "%"),
+        g("Bollinger %B / กว้าง", r.bb ? r.bb.pctB.toFixed(2) + " / " + r.bb.width.toFixed(1) + "%" : "—"),
+        g("Max DD 6ด / Downside dev", r.mdd126.toFixed(1) + "% / " + r.downDev.toFixed(0) + "%"),
+        g("Beta", r.beta == null ? "—" : r.beta.toFixed(2)),
+        g("Squeeze", r.squeeze ? "ใช่ (บีบตัว)" : "ไม่"),
+      ]],
+      ["วอลุ่ม", [
+        g("วอลุ่มวันนี้", r.volRatio == null ? "—" : r.volRatio.toFixed(2) + "x", r.volRatio > 1.3 ? "pos" : r.volRatio < 0.7 ? "neg" : ""),
+        g("OBV / CMF", (r.obvSl == null ? "—" : (r.obvSl > 0 ? "ขึ้น" : "ลง")) + " / " + (r.cmf == null ? "—" : r.cmf.toFixed(2)), r.cmf > 0 ? "pos" : r.cmf < 0 ? "neg" : ""),
+        g("วอลุ่มขึ้น:ลง", r.udVol == null ? "—" : r.udVol.toFixed(2)),
+      ]],
+    ];
+    if (!r._isCrypto) groups.push(["มูลค่า & คุณภาพ", [
+      g("P/E", r.pe == null ? "—" : r.pe.toFixed(1)),
+      g("ROE / Net margin", r.qual && r.qual.roeTTM != null ? r.qual.roeTTM.toFixed(0) + "% / " + (r.qual.netMargin != null ? r.qual.netMargin.toFixed(0) + "%" : "—") : "— (ใส่ Finnhub key)"),
+      g("Debt/Equity / Current", r.qual && r.qual.totalDebtToEquity != null ? (r.qual.totalDebtToEquity / 100).toFixed(2) + " / " + (r.qual.currentRatio != null ? r.qual.currentRatio.toFixed(2) : "—") : "—"),
+    ]]);
+    $("anGroups").innerHTML = groups.map(([title, tiles]) =>
+      `<details style="margin-top:8px;"><summary style="cursor:pointer;font-weight:800;font-size:12.5px;color:var(--muted);">${esc(title)}</summary><div class="tiles" style="margin-top:8px;">${tiles.join("")}</div></details>`).join("");
+
+    $("anBreakdown").innerHTML = r.cats.map(c =>
+      `<li style="border:none;padding:8px 0 2px;"><b>${esc(c.name)} — ${c.score}</b></li>` +
+      c.notes.map(n => `<li style="display:flex;justify-content:space-between;gap:10px;border-bottom:1px dashed var(--border);padding:4px 0;font-size:12.5px;"><span>${esc(n.txt)}</span><span class="mono ${n.good > 0 ? "pos" : n.good < 0 ? "neg" : "muted-note"}">${n.pts > 0 ? "+" : ""}${n.pts || ""}</span></li>`).join("")
+    ).join("");
   }
   function stashScore(r) {
-    const rec = { price: r.price, score: r.score, verdict: r.trendLabel, rsi14: r.rsi14, updatedAt: Date.now() };
+    const rec = { price: r.price, score: r.overall, grade: r.grade, verdict: r.regimeLabel, rsi14: r.rsi14, updatedAt: Date.now() };
     state.watchlistScores[r._market + ":" + r._sym] = rec;
-    state.watchlistScores[r._sym] = rec; // legacy plain-key too
+    state.watchlistScores[r._sym] = rec;
     saveWatchlistScores();
   }
   function scoreFor(pf, sym) {
@@ -1098,8 +1420,7 @@
       $("scanStamp").textContent = "กำลังสแกน " + sym + " (" + market + ")… " + (done + 1) + "/" + syms.length;
       const r = await runAnalyze(sym, market, { quiet: true, lite: true });
       if (r) {
-        const g = computeEntryGuidance(r);
-        results.push({ sym, market, price: r.price, score: r.score, trendLabel: r.trendLabel, rsi14: r.rsi14, relStrength: r.relStrength, guide: g.status, guideTitle: g.title, at: Date.now() });
+        results.push({ sym, market, price: r.price, score: r.overall, grade: r.grade, trendLabel: r.regimeLabel, rsi14: r.rsi14, relStrength: r.rs3m, guide: r.plan.status, guideTitle: r.plan.setup, at: Date.now() });
         state.scanResults = results.slice();
         renderScanTable();
       }
@@ -1141,7 +1462,7 @@
       return `<tr>
         <td><b>${esc(r.sym)}</b> <span class="chip">${r.market === "crypto" ? "คริปโต" : "หุ้น"}</span>${held.has(k) ? ' <span class="badge up" style="font-size:9px;">ถืออยู่</span>' : ""}</td>
         <td class="num mono">${usd(r.price, r.price < 1 ? 5 : 2)}</td>
-        <td class="num"><span class="badge ${scls}">${r.score}</span></td>
+        <td class="num"><span class="badge ${scls}">${r.score}${r.grade ? " " + r.grade : ""}</span></td>
         <td>${esc(r.trendLabel)}</td>
         <td class="num mono ${r.rsi14 >= 70 || r.rsi14 <= 30 ? "neg" : ""}">${r.rsi14 == null ? "—" : r.rsi14.toFixed(0)}</td>
         <td class="num mono ${r.relStrength == null ? "" : r.relStrength >= 0 ? "pos" : "neg"}">${r.relStrength == null ? "—" : pctS(r.relStrength)}</td>
