@@ -53,12 +53,12 @@
   .board {
     flex: 1; position: relative; background: var(--felt);
     display: flex; flex-direction: column; justify-content: center;
-    padding: 10px clamp(6px, 2vw, 26px); gap: 8px; min-height: 0;
+    padding: 8px clamp(6px, 2vw, 26px); gap: 5px; min-height: 0;
   }
   .lane { display: flex; align-items: center; gap: clamp(4px, 1vw, 10px); min-height: 0; }
   .minions-row {
     flex: 0 0 auto; justify-content: center; flex-wrap: nowrap;
-    align-self: stretch; min-height: 104px;
+    align-self: stretch; min-height: 88px;
   }
   .hero-row { justify-content: center; gap: 26px; }
   .midline { height: 2px; align-self: stretch; margin: 2px clamp(40px, 20vw, 260px);
@@ -106,48 +106,76 @@
   .cry { width: 13px; height: 13px; border-radius: 3px; transform: rotate(45deg);
     background: #2a2f44; border: 1px solid #3a4058; }
   .cry.on { background: var(--mana); border-color: #bfe9ff; box-shadow: 0 0 6px rgba(56,182,255,.7); }
+  .cry.lock { background: #5a3a3a; border-color: #9a6a6a; box-shadow: none; }
   .mana-num { font-weight: 800; font-size: 13px; color: var(--mana); min-width: 42px; }
 
-  /* ---------- card ---------- */
+  /* ---------- elemental art tints (shared) ---------- */
+  .el-fire    { --art: radial-gradient(circle at 50% 30%, #ff9a4a, #a52c12 62%, #2c0a04); --elc: #d0602c; }
+  .el-frost   { --art: radial-gradient(circle at 50% 30%, #a9e6ff, #1f66b8 62%, #0a1c33); --elc: #4a93cf; }
+  .el-arcane  { --art: radial-gradient(circle at 50% 30%, #c9adf5, #5a30bd 62%, #1c0d33); --elc: #9058e6; }
+  .el-holy    { --art: radial-gradient(circle at 50% 30%, #ffe6a0, #c98a25 62%, #452a08); --elc: #cf9d3e; }
+  .el-nature  { --art: radial-gradient(circle at 50% 30%, #a6e89a, #237e3d 62%, #0c2a15); --elc: #43a862; }
+  .el-shadow  { --art: radial-gradient(circle at 50% 30%, #ac96cf, #3d2560 62%, #100822); --elc: #7d5cae; }
+  .el-neutral { --art: radial-gradient(circle at 50% 30%, #b7bfd0, #48506b 62%, #191d29); --elc: #6f788f; }
+
+  /* ---------- board minion ---------- */
   .minion {
-    position: relative; width: clamp(72px, 10.5vw, 96px); aspect-ratio: 3/4;
-    border-radius: 12px; background: linear-gradient(180deg, #2b2140, #1a1526);
-    border: 2px solid #4a3f66; box-shadow: var(--shadow);
-    display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
-    padding-top: 8px; font-size: 30px; flex: none; transition: transform .12s, box-shadow .12s, filter .12s;
+    position: relative; width: clamp(70px, 9.6vw, 88px); aspect-ratio: 24/33;
+    border-radius: 10px; overflow: hidden; flex: none;
+    background: linear-gradient(180deg, #322a44, #14111c);
+    border: 2px solid color-mix(in srgb, var(--elc, #6b6480) 42%, #423c58);
+    box-shadow: var(--shadow), inset 0 0 0 1px rgba(255,255,255,.05);
+    display: flex; flex-direction: column;
+    transition: transform .12s, box-shadow .12s, filter .12s;
   }
-  .minion .art { line-height: 1; filter: drop-shadow(0 2px 3px rgba(0,0,0,.5)); }
-  .minion .nm { font-size: 8.5px; font-weight: 700; color: #d9d2f0; margin-top: auto; padding: 0 3px 2px;
-    text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-  .minion .atk, .minion .hp {
-    position: absolute; bottom: -7px; width: 24px; height: 24px; border-radius: 50%;
-    display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px; color: #fff;
+  .minion .m-art {
+    height: 56%; margin: 3px 3px 0; border-radius: 7px; display: flex; align-items: center; justify-content: center;
+    font-size: 27px; background: var(--art, #2a2338);
+    border: 1px solid rgba(0,0,0,.5);
+    box-shadow: inset 0 -10px 14px -5px rgba(0,0,0,.8), inset 0 0 16px rgba(0,0,0,.55);
+    filter: saturate(.92) brightness(.9);
   }
-  .minion .atk { left: -7px; background: #caa23c; border: 2px solid #ffe08a; }
-  .minion .hp  { right: -7px; background: #c0243a; border: 2px solid #ff8ba0; }
-  .minion .hp.dmg { background: #7a1020; }
-  .minion .hp.buff { background: #1c7a4a; border-color: #57e0a0; }
-  .minion .atk.buff { background: #1c7a4a; border-color: #57e0a0; }
-  .minion.taunt { border-color: #8a97ab; box-shadow: 0 0 0 3px rgba(160,175,200,.25), var(--shadow); }
-  .minion.taunt::before {
-    content: "🛡"; position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
-    font-size: 15px; filter: drop-shadow(0 1px 2px #000);
+  .minion .m-art span { filter: drop-shadow(0 2px 3px rgba(0,0,0,.7)); }
+  .minion .m-name {
+    flex: 1; font-size: 7.5px; font-weight: 800; color: #efe9ff; text-align: center; padding: 3px;
+    display: flex; align-items: center; justify-content: center; line-height: 1.05;
+    overflow: hidden;
   }
-  .minion.shield { border-color: var(--gold); box-shadow: 0 0 12px rgba(255,204,85,.55), var(--shadow); }
-  .minion.sick { filter: grayscale(.55) brightness(.82); }
-  .minion.ready { border-color: var(--bull); box-shadow: 0 0 0 3px rgba(46,230,168,.35), var(--shadow); cursor: pointer; }
+  .minion .kwrow {
+    position: absolute; top: 2px; left: 0; right: 0; display: flex; justify-content: center; gap: 2px;
+    pointer-events: none;
+  }
+  .minion .kb {
+    width: 14px; height: 14px; border-radius: 4px; font-size: 9px; line-height: 14px; text-align: center;
+    background: rgba(6,7,14,.72); box-shadow: 0 1px 2px rgba(0,0,0,.5);
+  }
+  .minion .s-atk, .minion .s-hp {
+    position: absolute; bottom: -6px; width: 23px; height: 23px; z-index: 2;
+    display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 12.5px; color: #fff;
+    text-shadow: 0 1px 2px rgba(0,0,0,.7);
+  }
+  .minion .s-atk { left: -5px; background: radial-gradient(circle at 35% 30%, #ffe08a, #a87322);
+    border: 2px solid #ffe9ab; clip-path: polygon(50% 0, 100% 27%, 100% 73%, 50% 100%, 0 73%, 0 27%); }
+  .minion .s-hp  { right: -5px; background: radial-gradient(circle at 35% 30%, #ff8a9c, #98122a);
+    border: 2px solid #ffb3bf; clip-path: polygon(50% 0, 100% 40%, 82% 100%, 18% 100%, 0 40%); }
+  .minion .s-atk.up { background: radial-gradient(circle at 35% 30%, #7ff0c4, #128a58); border-color: #a6f5d8; }
+  .minion .s-hp.dn  { background: radial-gradient(circle at 35% 30%, #ff7080, #6c0c1c); }
+  .minion .s-hp.up  { background: radial-gradient(circle at 35% 30%, #7ff0c4, #128a58); border-color: #a6f5d8; }
+  .minion.taunt { box-shadow: 0 0 0 3px rgba(150,165,190,.4), var(--shadow); }
+  .minion.taunt::before { content: ""; position: absolute; inset: -2px; border-radius: 11px; pointer-events: none;
+    border: 2px solid rgba(170,185,210,.55); }
+  .minion.shield { box-shadow: 0 0 13px rgba(255,204,85,.65), 0 0 0 2px rgba(255,204,85,.6), var(--shadow); }
+  .minion.frozen { filter: brightness(.9) saturate(.6); box-shadow: 0 0 0 2px rgba(140,210,255,.7), 0 0 14px rgba(120,190,255,.5), var(--shadow); }
+  .minion.frozen::after { content: "❄"; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 22px; color: rgba(210,240,255,.85); pointer-events: none; }
+  .minion.sick { filter: grayscale(.5) brightness(.82); }
+  .minion.ready { box-shadow: 0 0 0 3px rgba(46,230,168,.5), var(--shadow); cursor: pointer; }
   .minion.ready:hover { transform: translateY(-4px); }
-  .minion.sel { border-color: #fff; box-shadow: 0 0 0 3px #fff, var(--shadow-lg); transform: translateY(-6px); }
-  .minion.tgt { border-color: var(--bear); box-shadow: 0 0 0 3px rgba(255,107,138,.5), var(--shadow); cursor: pointer; }
+  .minion.sel { box-shadow: 0 0 0 3px #fff, var(--shadow-lg); transform: translateY(-6px); }
+  .minion.tgt { box-shadow: 0 0 0 3px rgba(255,107,138,.7), var(--shadow); cursor: pointer; }
   .minion.tgt:hover { transform: translateY(-4px); }
+  .minion.legendary { border-color: var(--gold); }
   .minion.striking { z-index: 30; filter: brightness(1.15) drop-shadow(0 0 14px rgba(124,92,255,.7)); }
-  .minion.hitshake { animation: hitshake .32s ease-out; }
-  @keyframes hitshake {
-    0%,100% { transform: translate(0,0); }
-    20% { transform: translate(-5px, 3px) rotate(-3deg); }
-    45% { transform: translate(6px, -2px) rotate(3deg); }
-    70% { transform: translate(-3px, 2px) rotate(-1deg); }
-  }
 
   /* ---------- combat / spell FX ---------- */
   .fx-ring {
@@ -178,6 +206,8 @@
   .bolt-arcane { background: radial-gradient(circle at 38% 32%, #fff, #c4a6ff 45%, #7c5cff); box-shadow: 0 0 22px 7px rgba(150,110,255,.85); }
   .bolt-heal   { background: radial-gradient(circle at 38% 32%, #fff, #9df3d3 45%, #2ee6a8); box-shadow: 0 0 20px 6px rgba(60,230,170,.8); }
   .bolt-buff   { background: radial-gradient(circle at 38% 32%, #fff, #c4a6ff 45%, #8bd0ff); box-shadow: 0 0 20px 6px rgba(140,180,255,.8); }
+  .bolt-nature { background: radial-gradient(circle at 38% 32%, #fff, #7ff09a 45%, #2e9d4f); box-shadow: 0 0 20px 6px rgba(70,220,120,.8); }
+  .bolt-holy   { background: radial-gradient(circle at 38% 32%, #fff, #ffe9a8 45%, #e0a63a); box-shadow: 0 0 20px 6px rgba(255,210,110,.8); }
 
   .fx-corpse {
     position: absolute; display: flex; align-items: center; justify-content: center; font-size: 30px;
@@ -205,7 +235,9 @@
     background: linear-gradient(90deg, transparent, var(--sc), transparent); animation: fxsweep .5s ease-out forwards; }
   .sweep-fire   { --sc: rgba(255,120,60,.55); }
   .sweep-arcane { --sc: rgba(150,110,255,.5); }
-  .sweep-buff   { --sc: rgba(120,220,180,.5); }
+  .sweep-frost  { --sc: rgba(120,200,255,.5); }
+  .sweep-buff, .sweep-holy { --sc: rgba(255,210,120,.5); }
+  .sweep-nature { --sc: rgba(90,220,130,.5); }
   @keyframes fxsweep { to { inset: 0 -60% 0 100%; } }
 
   @media (prefers-reduced-motion: reduce) {
@@ -213,37 +245,95 @@
     .minion, .turnbanner.show { animation-duration: .01ms !important; }
   }
 
-  /* ---------- hand ---------- */
-  .hand-wrap { flex: none; padding: 4px 8px 16px; display: flex; flex-direction: column; align-items: center;
-    gap: 4px; min-height: 208px; background: linear-gradient(0deg, #10121c, transparent); }
+  /* ---------- hand card ---------- */
+  .hand-wrap { flex: none; padding: 4px 8px 18px; display: flex; flex-direction: column; align-items: center;
+    gap: 4px; min-height: 214px; background: linear-gradient(0deg, #10121c, transparent); }
   .hand { display: flex; justify-content: center; align-items: flex-end; }
   .hcard {
-    width: 116px; height: 158px; margin: 0 -14px; border-radius: 14px;
-    background: linear-gradient(180deg, #241d38, #17121f); border: 2px solid #4a3f66;
-    box-shadow: var(--shadow); position: relative; padding: 26px 9px 9px;
-    display: flex; flex-direction: column; align-items: center; text-align: center;
+    width: 122px; height: 176px; margin: 0 -15px; border-radius: 13px; overflow: hidden;
+    background: linear-gradient(180deg, #2b2338, #15111d);
+    border: 2px solid #7f8aa3; box-shadow: var(--shadow); position: relative;
+    display: flex; flex-direction: column;
     transition: transform .14s, margin .14s, box-shadow .14s; flex: none;
   }
-  .hand .hcard:hover { transform: translateY(-24px) scale(1.05); margin: 0 4px; z-index: 8; box-shadow: var(--shadow-lg); }
-  .hcard .cost { position: absolute; top: -9px; left: -9px; width: 28px; height: 28px; border-radius: 50%;
-    background: var(--mana); color: #04222f; font-weight: 800; font-size: 15px;
-    display: flex; align-items: center; justify-content: center; border: 2px solid #bfe9ff; }
-  .hcard .cost.cheap { background: var(--bull); border-color: #9df3d3; }
-  .hcard .cost.pricey { background: var(--bear); border-color: #ffc2ce; }
-  .hcard .cname { font-size: 10.5px; font-weight: 800; line-height: 1.12; min-height: 24px;
-    white-space: normal; overflow-wrap: anywhere; }
-  .hcard .cart { font-size: 32px; margin: 2px 0; }
-  .hcard .ctext { font-size: 9px; color: #cfc8e6; line-height: 1.25; flex: 1; overflow: hidden; }
-  .hcard .ctype { font-size: 8px; letter-spacing: .5px; text-transform: uppercase; color: var(--muted); font-weight: 800; }
-  .hcard .catk, .hcard .chp {
-    position: absolute; bottom: -8px; width: 26px; height: 26px; border-radius: 50%;
-    display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px; color: #fff;
+  .hand .hcard:hover { transform: translateY(-30px) scale(1.12); margin: 0 8px; z-index: 8; box-shadow: var(--shadow-lg); }
+  .hcard .mana-gem {
+    position: absolute; top: -8px; left: -8px; width: 27px; height: 27px; border-radius: 50%; z-index: 4;
+    background: radial-gradient(circle at 35% 28%, #8fdcff, #1f7fd6 70%, #0c3f70); color: #04202f;
+    font-weight: 900; font-size: 14px; display: flex; align-items: center; justify-content: center;
+    border: 2px solid #cdefff; box-shadow: 0 2px 6px rgba(0,0,0,.55);
   }
-  .hcard .catk { left: -8px; background: #caa23c; border: 2px solid #ffe08a; }
-  .hcard .chp  { right: -8px; background: #c0243a; border: 2px solid #ff8ba0; }
-  .hcard.playable { cursor: pointer; border-color: var(--bull); box-shadow: 0 0 0 2px rgba(46,230,168,.4), var(--shadow); }
-  .hcard.unplayable { filter: grayscale(.5) brightness(.7); }
-  .hcard.sel { border-color: #fff; box-shadow: 0 0 0 3px #fff, var(--shadow-lg); transform: translateY(-26px) scale(1.06); margin: 0 6px; }
+  .hcard .art {
+    height: 54px; margin: 8px 8px 0; border-radius: 8px; position: relative; overflow: hidden;
+    display: flex; align-items: center; justify-content: center; font-size: 33px;
+    background: var(--art, #2a2338); border: 1px solid rgba(0,0,0,.55);
+    box-shadow: inset 0 0 20px rgba(0,0,0,.65), inset 0 -14px 16px -6px rgba(0,0,0,.7);
+    filter: saturate(.95) brightness(.92);
+  }
+  .hcard .art span { filter: drop-shadow(0 2px 4px rgba(0,0,0,.65)); }
+  .hcard .ribbon {
+    margin: 5px 5px 0; padding: 3px 6px; min-height: 24px; display: flex; align-items: center; justify-content: center; gap: 4px;
+    font-size: 9px; font-weight: 900; line-height: 1.05; text-align: center; color: #fff;
+    background: linear-gradient(180deg, #3d3652, #241d33);
+    border-top: 1px solid rgba(255,255,255,.09); border-bottom: 1px solid rgba(0,0,0,.55);
+    overflow: hidden;
+  }
+  .hcard .ribbon .rn { overflow: hidden; text-overflow: ellipsis;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .hcard .rgem { width: 6px; height: 6px; transform: rotate(45deg); flex: none;
+    background: #8a93ab; border: 1px solid rgba(255,255,255,.45); }
+  .hcard .tribe { font-size: 7px; letter-spacing: .5px; text-transform: uppercase; color: #8f87a6; font-weight: 800;
+    text-align: center; margin-top: 1px; }
+  .hcard .txt { flex: 1; margin: 2px 6px 0; font-size: 8.4px; line-height: 1.24; color: #d9d2e8;
+    text-align: center; overflow: hidden; }
+  .hcard .txt b { color: #fff; }
+  .hcard .kw { font-weight: 900; }
+  .hcard .kw.taunt { color: #b9c4d8; } .hcard .kw.shield { color: var(--gold); }
+  .hcard .kw.charge, .hcard .kw.rush { color: #66e6a0; } .hcard .kw.windfury { color: #79dfff; }
+  .hcard .kw.lifesteal { color: #ff8fae; } .hcard .kw.poison { color: #9be84a; }
+  .hcard .kw.spd { color: #c4a6ff; } .hcard .kw.enrage { color: #ffab5c; }
+  .hcard .flav { font-size: 6.8px; font-style: italic; color: #7d7792; margin: 1px 6px 5px; line-height: 1.16;
+    max-height: 17px; overflow: hidden; text-align: center; }
+  .hcard .s-atk, .hcard .s-hp {
+    position: absolute; bottom: -7px; width: 27px; height: 27px; z-index: 4;
+    display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 14px; color: #fff;
+    text-shadow: 0 1px 2px rgba(0,0,0,.7);
+  }
+  .hcard .s-atk { left: -6px; background: radial-gradient(circle at 35% 30%, #ffe08a, #a87322);
+    border: 2px solid #ffe9ab; clip-path: polygon(50% 0, 100% 27%, 100% 73%, 50% 100%, 0 73%, 0 27%); }
+  .hcard .s-hp  { right: -6px; background: radial-gradient(circle at 35% 30%, #ff8a9c, #98122a);
+    border: 2px solid #ffb3bf; clip-path: polygon(50% 0, 100% 40%, 82% 100%, 18% 100%, 0 40%); }
+  .hcard .s-atk.up { background: radial-gradient(circle at 35% 30%, #7ff0c4, #128a58); border-color: #a6f5d8; }
+  .hcard .s-hp.up  { background: radial-gradient(circle at 35% 30%, #7ff0c4, #128a58); border-color: #a6f5d8; }
+  /* rarity */
+  .hcard.rar-rare      { border-color: #4aa3ff; box-shadow: 0 0 0 1px rgba(74,163,255,.35), var(--shadow); }
+  .hcard.rar-epic      { border-color: #b46bff; box-shadow: 0 0 0 1px rgba(180,107,255,.4), var(--shadow); }
+  .hcard.rar-legendary { border-color: var(--gold); box-shadow: 0 0 14px rgba(255,204,85,.45), var(--shadow); }
+  .hcard.rar-rare .rgem      { background: #4aa3ff; }
+  .hcard.rar-epic .rgem      { background: #b46bff; }
+  .hcard.rar-legendary .rgem { background: var(--gold); }
+  .hcard.rar-legendary .ribbon::before { content: "♛"; color: var(--gold); font-size: 9px; margin-right: 2px; }
+  .hcard.rar-legendary::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none; border-radius: 13px;
+    background: linear-gradient(115deg, transparent 42%, rgba(255,255,255,.20) 50%, transparent 58%);
+    background-size: 260% 260%; animation: foil 3.6s linear infinite;
+  }
+  @keyframes foil { to { background-position: -190% 0; } }
+  .hcard.playable { cursor: pointer; box-shadow: 0 0 0 2px rgba(46,230,168,.55), var(--shadow); }
+  .hcard.unplayable { filter: grayscale(.5) brightness(.66); }
+  .hcard.sel { box-shadow: 0 0 0 3px #fff, var(--shadow-lg); transform: translateY(-32px) scale(1.13); margin: 0 10px; z-index: 9; }
+
+  /* ---------- choose one ---------- */
+  .choose-opts { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+  .choose-opt {
+    flex: 1 1 200px; max-width: 260px; min-height: 84px; padding: 14px 16px; text-align: left;
+    background: var(--surface-alt); border: 2px solid var(--acc); border-radius: 14px; color: var(--text);
+    font-size: 13px; font-weight: 700; line-height: 1.4; transition: .14s;
+  }
+  .choose-opt:hover:not(:disabled) { transform: translateY(-3px); box-shadow: var(--shadow-lg); }
+  .choose-opt:disabled { opacity: .4; border-color: var(--border); }
+  .choose-cancel { background: none; border: 1px solid var(--border); color: var(--muted); border-radius: 999px;
+    padding: 8px 18px; font-weight: 700; margin-top: 14px; }
 
   .enemy-hand { display: flex; justify-content: center; gap: 3px; padding: 3px 0; flex: none; }
   .enemy-hand .cb { width: 30px; height: 42px; border-radius: 6px;
@@ -314,7 +404,8 @@
   @media (max-width: 780px) {
     .log { display: none; }
     #endturn { width: 72px; height: 72px; font-size: 11px; right: 8px; }
-    .hcard { width: 96px; height: 140px; }
+    .hcard { width: 104px; height: 152px; margin: 0 -18px; }
+    .hcard .art { height: 52px; font-size: 30px; }
   }
   .hint { text-align: center; font-size: 12.5px; color: var(--muted); font-weight: 700;
     flex: 0 0 auto; display: flex; align-items: center; justify-content: center; min-height: 26px;
@@ -372,19 +463,40 @@
 
 <!-- how to play -->
 <div class="veil" id="howVeil" hidden>
-  <div class="modal" style="text-align:left;">
-    <h2 style="text-align:center;">วิธีเล่น</h2>
+  <div class="modal" style="text-align:left; max-width:720px;">
+    <h2 style="text-align:center;">วิธีเล่น · คำศัพท์การ์ด</h2>
     <p style="color:var(--text);">
-      • ฮีโร่มีเลือด 30 · แต่ละเทิร์นได้คริสตัลมานาเพิ่ม 1 (สูงสุด 10) และเติมเต็ม<br>
-      • แตะการ์ดบนมือเพื่อลง — มินเนียนลงสนาม, สเปลใช้แล้วทิ้ง (บางใบต้องเลือกเป้า)<br>
-      • มินเนียนที่เพิ่งลงต้องรอเทิร์นถัดไปถึงจะตีได้ (ยกเว้น <b>Charge</b>)<br>
-      • แตะมินเนียนของคุณ (ขอบเขียว) แล้วแตะศัตรูเพื่อโจมตี — ตีกันเสียเลือดทั้งคู่<br>
-      • <b>Taunt</b> ต้องเคลียร์ก่อนถึงตีตัวอื่น/หน้าฮีโร่ได้ · <b>Divine Shield</b> กันดาเมจครั้งแรก<br>
-      • <b>Battlecry</b> ทำงานตอนลง · <b>Deathrattle</b> ทำงานตอนตาย<br>
-      • พลังฮีโร่ (วงกลมข้างฮีโร่) ใช้ได้เทิร์นละครั้ง เสีย 2 มานา<br>
-      • สำรับหมด = โดน Fatigue เสียเลือดเพิ่มขึ้นเรื่อย ๆ · ฮีโร่ศัตรูเลือด 0 = ชนะ
+      • ฮีโร่เลือด 30 · แต่ละเทิร์นได้มานา +1 (สูงสุด 10) เติมเต็มทุกเทิร์น<br>
+      • แตะการ์ดบนมือเพื่อลง (มินเนียนลงสนาม · สเปลใช้แล้วทิ้ง · บางใบต้องเลือกเป้า)<br>
+      • แตะมินเนียนขอบเขียวแล้วแตะศัตรูเพื่อโจมตี — ตีกันเสียเลือดทั้งคู่ · สำรับหมด = Fatigue
     </p>
-    <div style="text-align:center;"><button class="pill solid" id="howClose">เข้าใจแล้ว</button></div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px 18px; font-size:12px; color:var(--text); line-height:1.7;">
+      <div>🛡 <b>Taunt</b> — ต้องตีตัวนี้ก่อน</div>
+      <div>✨ <b>Divine Shield</b> — กันดาเมจครั้งแรก</div>
+      <div>⚡ <b>Charge</b> — ลงแล้วตีได้ทันที (ตีหน้าได้)</div>
+      <div>🐾 <b>Rush</b> — ลงแล้วตีมินเนียนได้ทันที (ตีหน้าไม่ได้)</div>
+      <div>🌀 <b>Windfury</b> — ตีได้ 2 ครั้งต่อเทิร์น</div>
+      <div>🩸 <b>Lifesteal</b> — ดาเมจที่ทำ ดูดเป็นเลือดฮีโร่</div>
+      <div>☠ <b>Poisonous</b> — โดนดาเมจจากตัวนี้ = มินเนียนตายทันที</div>
+      <div>❄ <b>Freeze</b> — เป้าที่โดนแช่แข็ง งดโจมตี 1 เทิร์น</div>
+      <div>✦ <b>Spell Damage +N</b> — สเปลของคุณแรงขึ้น N</div>
+      <div>😤 <b>Enrage</b> — พลังโจมตีเพิ่มเมื่อเลือดไม่เต็ม</div>
+      <div>💠 <b>Aura</b> — บัฟมินเนียนตัวอื่นของคุณตลอดที่ยังอยู่</div>
+      <div>⏳ <b>Overload (N)</b> — เทิร์นหน้ามานาถูกล็อก N</div>
+      <div>⚔ <b>Battlecry</b> — ทำงานตอนลง</div>
+      <div>💀 <b>Deathrattle</b> — ทำงานตอนตาย</div>
+      <div>❖ <b>Choose One</b> — เลือก 1 จาก 2 ผลตอนลง</div>
+      <div>🟡/🔵/🟣/🟠 = Common / Rare / Epic / Legendary</div>
+    </div>
+    <div style="text-align:center; margin-top:16px;"><button class="pill solid" id="howClose">เข้าใจแล้ว</button></div>
+  </div>
+</div>
+
+<!-- choose one -->
+<div class="veil" id="chooseVeil" hidden>
+  <div class="modal">
+    <h2 id="chooseTitle">Choose One</h2>
+    <div class="choose-opts" id="chooseOpts"></div>
   </div>
 </div>
 
@@ -408,109 +520,208 @@
   /* ============================ CARD POOL ============================ */
   // minion: {type:'minion', cost, atk, hp, emoji, keywords:[], text, battlecry?, deathrattle?, needTarget?}
   // spell:  {type:'spell', cost, emoji, text, target, cast(g,tgt)}
+  // keyword flags come from `keywords`; extras: element, tribe, rarity, flavor, aura, spellDamage, enrage,
+  // battlecry/deathrattle/onAttack/onSpellCast/startTurn/endTurn(g,self[,tgt]); spells: cast(g,tgt,caster), overload, aoe, choose[]
   const CARDS = {
-    /* ---- minions ---- */
-    wisp:        { name: "Wisp", type: "minion", cost: 0, atk: 1, hp: 1, emoji: "✨", text: "" },
-    squire:      { name: "Squire", type: "minion", cost: 1, atk: 1, hp: 2, emoji: "🗡️", text: "" },
-    footman:     { name: "Footman", type: "minion", cost: 1, atk: 2, hp: 1, emoji: "🪖", text: "" },
-    argent:      { name: "Argent Squire", type: "minion", cost: 1, atk: 1, hp: 1, emoji: "⚜️", keywords: ["Divine Shield"], text: "Divine Shield" },
-    snapper:     { name: "River Snapper", type: "minion", cost: 2, atk: 2, hp: 3, emoji: "🐢", text: "" },
-    shieldbearer:{ name: "Shieldbearer", type: "minion", cost: 2, atk: 0, hp: 4, emoji: "🧱", keywords: ["Taunt"], text: "Taunt" },
-    engineer:    { name: "Novice Engineer", type: "minion", cost: 2, atk: 1, hp: 1, emoji: "🔧", text: "Battlecry: จั่วการ์ด 1 ใบ",
-                   battlecry: (g, self) => draw(self.side, 1) },
-    spider:      { name: "Nerubian", type: "minion", cost: 2, atk: 2, hp: 2, emoji: "🕷️", text: "Deathrattle: เรียก Spiderling 1/1",
-                   deathrattle: (g, self) => summon(self.side, "spiderling", 1) },
-    raider:      { name: "Wolfrider", type: "minion", cost: 3, atk: 3, hp: 1, emoji: "🐺", keywords: ["Charge"], text: "Charge" },
-    grizzly:     { name: "Ironfur Grizzly", type: "minion", cost: 3, atk: 3, hp: 3, emoji: "🐻", keywords: ["Taunt"], text: "Taunt" },
-    crusader:    { name: "Scarlet Crusader", type: "minion", cost: 3, atk: 3, hp: 1, emoji: "🛡️", keywords: ["Divine Shield"], text: "Divine Shield" },
-    acolyte:     { name: "Temple Acolyte", type: "minion", cost: 3, atk: 3, hp: 2, emoji: "🙏", text: "Battlecry: ฟื้นเลือดฮีโร่คุณ 3",
-                   battlecry: (g, self) => healChar(g.players[self.side].hero, 3) },
-    knight:      { name: "Silver Hand Knight", type: "minion", cost: 4, atk: 4, hp: 4, emoji: "🐎", text: "Battlecry: เรียก Squire 2/2",
-                   battlecry: (g, self) => summon(self.side, "squireling", 1) },
-    senjin:      { name: "Sen'jin Shieldmasta", type: "minion", cost: 4, atk: 3, hp: 5, emoji: "🗿", keywords: ["Taunt"], text: "Taunt" },
-    drake:       { name: "Azure Drake", type: "minion", cost: 5, atk: 4, hp: 4, emoji: "🐉", text: "Battlecry: จั่วการ์ด 1 ใบ",
-                   battlecry: (g, self) => draw(self.side, 1) },
-    berserker:   { name: "Gurubashi Berserker", type: "minion", cost: 5, atk: 2, hp: 7, emoji: "😡", text: "" },
-    abom:        { name: "Abomination", type: "minion", cost: 5, atk: 4, hp: 4, emoji: "🧟", keywords: ["Taunt"], text: "Taunt · Deathrattle: ดาเมจ 2 ทุกตัว",
-                   deathrattle: (g) => { charList().forEach(c => dealDamage(c, 2)); } },
-    elemental:   { name: "Fire Elemental", type: "minion", cost: 6, atk: 6, hp: 5, emoji: "🔥", text: "Battlecry: ดาเมจ 3", needTarget: "any",
-                   battlecry: (g, self, tgt) => { if (tgt) dealDamage(tgt, 3); } },
-    ogre:        { name: "Boulderfist Ogre", type: "minion", cost: 6, atk: 6, hp: 7, emoji: "👹", text: "" },
-    golem:       { name: "War Golem", type: "minion", cost: 7, atk: 7, hp: 7, emoji: "🪨", text: "" },
-    /* tokens */
-    spiderling:  { name: "Spiderling", type: "minion", cost: 1, atk: 1, hp: 1, emoji: "🕸️", text: "", token: true },
-    squireling:  { name: "Squire", type: "minion", cost: 2, atk: 2, hp: 2, emoji: "🥚", text: "", token: true },
-    sheep:       { name: "Sheep", type: "minion", cost: 1, atk: 0, hp: 1, emoji: "🐑", text: "", token: true },
-    recruit:     { name: "Recruit", type: "minion", cost: 1, atk: 1, hp: 1, emoji: "🧍", text: "", token: true },
+    /* ---------- tokens ---------- */
+    sheep:        { name: "Sheep", type: "minion", cost: 1, atk: 0, hp: 1, emoji: "🐑", element: "nature", token: true },
+    treant:       { name: "Treant", type: "minion", cost: 2, atk: 2, hp: 2, emoji: "🌳", element: "nature", token: true },
+    phoenixling:  { name: "Phoenix", type: "minion", cost: 3, atk: 3, hp: 2, emoji: "🐦‍🔥", element: "fire", tribe: "Beast", token: true },
+    footmanToken: { name: "Oathbound Footman", type: "minion", cost: 1, atk: 1, hp: 1, emoji: "🪖", element: "holy", keywords: ["Taunt"], token: true },
+    coin:         { name: "The Coin", type: "spell", cost: 0, emoji: "🪙", element: "arcane", text: "ได้มานา 1 หน่วยเทิร์นนี้", token: true,
+                    cast: (g, t, c) => { g.players[c].mana = Math.min(10, g.players[c].mana + 1); } },
 
-    /* ---- spells ---- */
-    arcaneshot:  { name: "Arcane Shot", type: "spell", cost: 1, emoji: "🏹", text: "ดาเมจ 2", target: "any", fx: "arcane",
-                   cast: (g, t) => dealDamage(t, 2) },
-    blessing:    { name: "Blessing of Might", type: "spell", cost: 1, emoji: "💠", text: "มินเนียนตัวหนึ่ง +2/+2", target: "minion", fx: "buff",
-                   cast: (g, t) => buff(t, 2, 2) },
-    frostbolt:   { name: "Frostbolt", type: "spell", cost: 2, emoji: "❄️", text: "ดาเมจ 3", target: "any", fx: "frost",
-                   cast: (g, t) => dealDamage(t, 3) },
-    arcaneexpl:  { name: "Arcane Explosion", type: "spell", cost: 2, emoji: "💥", text: "ดาเมจ 1 ให้มินเนียนศัตรูทั้งหมด",
-                   cast: (g, t, caster) => enemyMinions(caster).forEach(m => dealDamage(m, 1)) },
-    healtouch:   { name: "Healing Touch", type: "spell", cost: 3, emoji: "💚", text: "ฟื้นเลือด 8", target: "friendly", fx: "heal",
-                   cast: (g, t) => healChar(t, 8) },
-    fireball:    { name: "Fireball", type: "spell", cost: 4, emoji: "🔥", text: "ดาเมจ 6", target: "any", fx: "fire",
-                   cast: (g, t) => dealDamage(t, 6) },
-    hex:         { name: "Hex", type: "spell", cost: 4, emoji: "🐑", text: "เปลี่ยนมินเนียนเป็นแกะ 0/1", target: "minion",
-                   cast: (g, t) => transform(t, "sheep") },
-    holynova:    { name: "Holy Nova", type: "spell", cost: 5, emoji: "🌟", text: "ดาเมจ 2 ศัตรูทั้งหมด · ฟื้น 2 ฝ่ายเรา",
-                   cast: (g, t, caster) => {
-                     const foe = other(caster);
-                     [g.players[foe].hero, ...g.players[foe].board].forEach(c => dealDamage(c, 2));
-                     [g.players[caster].hero, ...g.players[caster].board].forEach(c => healChar(c, 2));
-                   } },
-    flamestrike: { name: "Flamestrike", type: "spell", cost: 7, emoji: "🌋", text: "ดาเมจ 4 ให้มินเนียนศัตรูทั้งหมด",
-                   cast: (g, t, caster) => enemyMinions(caster).forEach(m => dealDamage(m, 4)) },
-    coin:        { name: "The Coin", type: "spell", cost: 0, emoji: "🪙", text: "ได้มานา 1 หน่วยในเทิร์นนี้", token: true,
-                   cast: (g, t, caster) => { g.players[caster].mana = Math.min(10, g.players[caster].mana + 1); } },
+    /* ---------- neutral minions ---------- */
+    emberImp:     { name: "Ember Imp", type: "minion", cost: 1, atk: 2, hp: 1, emoji: "👺", element: "fire", rarity: "common",
+                    flavor: "หลุดจากเตาหลอมแล้วยังไม่ยอมดับ" },
+    duskWolf:     { name: "Dusk Wolf", type: "minion", cost: 2, atk: 3, hp: 2, emoji: "🐺", element: "nature", tribe: "Beast", rarity: "common",
+                    keywords: ["Rush"], flavor: "ล่าเป็นฝูง คิดเป็นตัวเดียว" },
+    goblinSapper: { name: "Goblin Sapper", type: "minion", cost: 2, atk: 2, hp: 2, emoji: "💣", element: "neutral", rarity: "common",
+                    text: "<b>Deathrattle:</b> ดาเมจ 2 ใส่ศัตรูสุ่ม", flavor: "จุดชนวนก่อนคิด ทุกครั้ง",
+                    deathrattle: (g, self) => { const t = randEnemy(self.side); if (t) dealDamage(t, 2); } },
+    runeSentry:   { name: "Rune Sentry", type: "minion", cost: 3, atk: 2, hp: 5, emoji: "🗿", element: "arcane", rarity: "common",
+                    keywords: ["Taunt"], flavor: "เฝ้าประตูที่ไม่มีอยู่จริงมา 300 ปี" },
+    galeHarpy:    { name: "Gale Harpy", type: "minion", cost: 3, atk: 2, hp: 3, emoji: "🦅", element: "frost", tribe: "Beast", rarity: "rare",
+                    keywords: ["Windfury"], flavor: "ปีกสองข้าง กรงเล็บสี่ชุด" },
+    stoneWarden:  { name: "Stone Warden", type: "minion", cost: 5, atk: 3, hp: 7, emoji: "🛡️", element: "nature", rarity: "epic",
+                    keywords: ["Taunt"], enrage: { atk: 3 }, text: "<b>Enrage:</b> +3 พลังโจมตี", flavor: "ยิ่งเจ็บ ยิ่งอยากตอบแทน" },
+    wailingBanshee:{ name: "Wailing Banshee", type: "minion", cost: 5, atk: 3, hp: 5, emoji: "👻", element: "shadow", tribe: "Undead", rarity: "rare",
+                    keywords: ["Lifesteal"], flavor: "ร้องไห้ให้คนอื่น แล้วดูดชีวิตพวกเขา" },
+    ashColossus:  { name: "Colossus of Ash", type: "minion", cost: 8, atk: 8, hp: 8, emoji: "🌋", element: "fire", tribe: "Elemental", rarity: "legendary",
+                    keywords: ["Taunt"], text: "<b>Battlecry:</b> ดาเมจ 4 ใส่ศัตรูสุ่ม 2 ครั้ง", flavor: "ภูเขาที่เดินได้ และโกรธ",
+                    battlecry: (g, self) => { for (let i = 0; i < 2; i++) { const t = randEnemy(self.side); if (t) dealDamage(t, 4, { src: self }); } } },
+
+    /* ---------- Embercaller ---------- */
+    manaWisp:     { name: "Mana Wisp", type: "minion", cost: 1, atk: 1, hp: 2, emoji: "✨", element: "arcane", tribe: "Elemental", rarity: "epic",
+                    spellDamage: 1, flavor: "ก้อนเวทย์ที่ลืมว่าเคยเป็นใคร" },
+    frostAdept:   { name: "Frostweave Adept", type: "minion", cost: 2, atk: 2, hp: 3, emoji: "🧊", element: "frost", rarity: "common",
+                    needTarget: "enemy-minion", bcFx: "frost", text: "<b>Battlecry:</b> Freeze มินเนียนศัตรู 1 ตัว", flavor: "ทักทายด้วยลมหนาว",
+                    battlecry: (g, self, t) => { if (t) freeze(t); } },
+    recklessPyro: { name: "Reckless Pyromancer", type: "minion", cost: 3, atk: 3, hp: 2, emoji: "🔥", element: "fire", rarity: "rare",
+                    text: "<b>Battlecry:</b> ดาเมจ 1 ใส่มินเนียนทุกตัว", flavor: "ไฟไม่เลือกที่ลง",
+                    battlecry: (g, self) => { [...g.players.you.board, ...g.players.ai.board].forEach(m => { if (m !== self) dealDamage(m, 1); }); } },
+    flamewaker:   { name: "Flamewaker Acolyte", type: "minion", cost: 3, atk: 2, hp: 4, emoji: "🕯️", element: "fire", rarity: "epic",
+                    text: "หลังคุณร่ายสเปล: ดาเมจ 2 ใส่ศัตรูสุ่ม", flavor: "สวดมนต์ด้วยถ่านร้อน",
+                    onSpellCast: (g, self) => { const t = randEnemy(self.side); if (t) dealDamage(t, 2, { src: self }); } },
+    battlemage:   { name: "Sellsword Battlemage", type: "minion", cost: 4, atk: 3, hp: 5, emoji: "🗡️", element: "arcane", rarity: "rare",
+                    spellDamage: 1, flavor: "เรียนเวทย์ครึ่งเทอม ที่เหลือเรียนจากสนามรบ" },
+    emberColossus:{ name: "Ember Colossus", type: "minion", cost: 5, atk: 5, hp: 4, emoji: "🌡️", element: "fire", tribe: "Elemental", rarity: "rare",
+                    needTarget: "any", bcFx: "fire", text: "<b>Battlecry:</b> ดาเมจ 3", flavor: "ก้าวเดินทิ้งรอยไหม้",
+                    battlecry: (g, self, t) => { if (t) dealDamage(t, 3, { src: self }); } },
+    archmage:     { name: "Archmage Vaelin", type: "minion", cost: 6, atk: 4, hp: 6, emoji: "🧙", element: "arcane", rarity: "legendary",
+                    spellDamage: 2, text: "<b>Battlecry:</b> จั่วการ์ด 2 ใบ", flavor: "อ่านทุกเล่มในหอคอย รวมเล่มต้องห้าม",
+                    battlecry: (g, self) => draw(self.side, 2) },
+
+    arcaneSpark:  { name: "Arcane Spark", type: "spell", cost: 1, emoji: "🔹", element: "arcane", rarity: "common", target: "any", fx: "arcane",
+                    text: "ดาเมจ 2", flavor: "ประกายเดียวก็จุดไฟได้", cast: (g, t, c) => dealDamage(t, sd(c, 2)) },
+    frostbolt:    { name: "Frostbolt", type: "spell", cost: 2, emoji: "❄️", element: "frost", rarity: "common", target: "any", fx: "frost",
+                    text: "ดาเมจ 3 และ <b>Freeze</b> เป้า", flavor: "แช่แข็งทั้งร่างและแผนการ",
+                    cast: (g, t, c) => { dealDamage(t, sd(c, 3)); freeze(t); } },
+    arcaneBarrage:{ name: "Arcane Barrage", type: "spell", cost: 2, emoji: "🌠", element: "arcane", rarity: "rare", aoe: "arcane",
+                    text: "ยิงดาเมจ 1 สามครั้ง ใส่ศัตรูสุ่ม", flavor: "เล็งไม่เก่ง แต่ยิงรัว",
+                    cast: (g, t, c) => { for (let i = 0; i < 3; i++) { const e = randEnemy(c); if (e) dealDamage(e, sd(c, 1)); } } },
+    emberBlast:   { name: "Ember Blast", type: "spell", cost: 3, emoji: "☄️", element: "fire", rarity: "common", target: "any", fx: "fire",
+                    text: "ดาเมจ 4", flavor: "ลูกไฟฝึกหัด", cast: (g, t, c) => dealDamage(t, sd(c, 4)) },
+    cinderNova:   { name: "Cinder Nova", type: "spell", cost: 4, emoji: "💥", element: "fire", rarity: "rare", aoe: "fire", overload: 1,
+                    text: "ดาเมจ 3 ใส่มินเนียนศัตรูทั้งหมด · <b>Overload (1)</b>", flavor: "ระเบิดที่ต้องจ่ายทีหลัง",
+                    cast: (g, t, c) => g.players[other(c)].board.slice().forEach(m => dealDamage(m, sd(c, 3))) },
+    pyroblast:    { name: "Pyroblast", type: "spell", cost: 5, emoji: "🔆", element: "fire", rarity: "epic", target: "any", fx: "fire",
+                    text: "ดาเมจ 7", flavor: "ท่าไม้ตายของหอคอย", cast: (g, t, c) => dealDamage(t, sd(c, 7)) },
+    meteor:       { name: "Meteor", type: "spell", cost: 5, emoji: "🪐", element: "fire", rarity: "epic", target: "minion", fx: "fire",
+                    text: "ดาเมจ 6 ใส่มินเนียน 1 ตัว · 2 ใส่ที่เหลือของศัตรู", flavor: "เล็งจากอวกาศ",
+                    cast: (g, t, c) => { dealDamage(t, sd(c, 6)); g.players[other(c)].board.slice().forEach(m => { if (m !== t) dealDamage(m, sd(c, 2)); }); } },
+    polymorph:    { name: "Ovine Curse", type: "spell", cost: 4, emoji: "🐑", element: "arcane", rarity: "rare", target: "minion",
+                    text: "เปลี่ยนมินเนียนเป็นแกะ 0/1", flavor: "แพะรับบาปตัวจริง", cast: (g, t) => transform(t, "sheep") },
+    blizzard:     { name: "Blizzard", type: "spell", cost: 6, emoji: "🌨️", element: "frost", rarity: "epic", aoe: "frost",
+                    text: "ดาเมจ 2 และ <b>Freeze</b> มินเนียนศัตรูทั้งหมด", flavor: "พายุที่ไม่รีบไปไหน",
+                    cast: (g, t, c) => g.players[other(c)].board.slice().forEach(m => { dealDamage(m, sd(c, 2)); freeze(m); }) },
+    manaSurge:    { name: "Mana Surge", type: "spell", cost: 0, emoji: "🔮", element: "arcane", rarity: "rare", overload: 2,
+                    text: "ได้มานา 2 หน่วยเทิร์นนี้ · <b>Overload (2)</b>", flavor: "ยืมพลังจากพรุ่งนี้",
+                    cast: (g, t, c) => { g.players[c].mana = Math.min(10, g.players[c].mana + 2); } },
+    wildSurge:    { name: "Wild Surge", type: "spell", cost: 2, emoji: "🌀", element: "arcane", rarity: "epic",
+                    text: "<b>Choose One</b>", flavor: "เวทย์ป่าเถื่อน ไม่เลือกทาง",
+                    choose: [
+                      { label: "ดาเมจ 3 ให้ศัตรู", need: "enemy", fx: "arcane", apply: (g, t, c) => dealDamage(t, sd(c, 3)) },
+                      { label: "ฟื้นเลือดฮีโร่ 5 + จั่วการ์ด", apply: (g, t, c) => { healChar(g.players[c].hero, 5); draw(c, 1); } },
+                    ] },
+
+    /* ---------- Ironoath ---------- */
+    oathFootman:  { name: "Oathbound Footman", type: "minion", cost: 1, atk: 1, hp: 3, emoji: "🪖", element: "holy", rarity: "common",
+                    keywords: ["Taunt"], flavor: "ปฏิญาณข้อแรก: ยืนตรงนี้" },
+    silverSquire: { name: "Silverhand Squire", type: "minion", cost: 1, atk: 1, hp: 2, emoji: "⚜️", element: "holy", rarity: "common",
+                    keywords: ["Divine Shield"], flavor: "ยังฝึกอยู่ แต่โล่ศักดิ์สิทธิ์ไม่สน" },
+    battleChaplain:{ name: "Battle Chaplain", type: "minion", cost: 2, atk: 2, hp: 3, emoji: "⛪", element: "holy", rarity: "common",
+                    needTarget: "friendly", bcFx: "holy", text: "<b>Battlecry:</b> ฟื้นเลือด 4", flavor: "สวดไป ปิดแผลไป",
+                    battlecry: (g, self, t) => { if (t) healChar(t, 4); } },
+    thornBear:    { name: "Thornhide Bear", type: "minion", cost: 3, atk: 2, hp: 4, emoji: "🐻", element: "nature", tribe: "Beast", rarity: "common",
+                    keywords: ["Taunt"], flavor: "ขนหนามอย่างเดียวก็เจ็บแล้ว" },
+    houndmaster:  { name: "Wilds Houndmaster", type: "minion", cost: 3, atk: 3, hp: 3, emoji: "🏹", element: "nature", rarity: "rare",
+                    needTarget: "friendly-minion", bcFx: "nature", text: "<b>Battlecry:</b> ให้มินเนียนฝ่ายเรา +2/+2 และ Taunt", flavor: "หมาของเขาดุกว่าเขา",
+                    battlecry: (g, self, t) => { if (t) { buff(t, 2, 2); grant(t, "Taunt"); } } },
+    dawnPaladin:  { name: "Dawnbringer Paladin", type: "minion", cost: 4, atk: 3, hp: 4, emoji: "🌅", element: "holy", rarity: "rare",
+                    keywords: ["Divine Shield", "Lifesteal"], flavor: "แสงอรุณไม่เคยพลาดนัด" },
+    bloodBerserker:{ name: "Bloodhowl Berserker", type: "minion", cost: 4, atk: 3, hp: 6, emoji: "😤", element: "shadow", rarity: "rare",
+                    enrage: { atk: 3 }, text: "<b>Enrage:</b> +3 พลังโจมตี", flavor: "ยิ่งเลือดออก ยิ่งยิ้มกว้าง" },
+    groveWarden:  { name: "Grove Warden", type: "minion", cost: 5, atk: 3, hp: 6, emoji: "🌿", element: "nature", rarity: "epic",
+                    aura: { atk: 1, hp: 1 }, text: "<b>Aura:</b> มินเนียนอื่นของคุณ +1/+1", flavor: "ต้นไม้โตเพราะมีคนรดน้ำ" },
+    sunTemplar:   { name: "Sunsteel Templar", type: "minion", cost: 5, atk: 4, hp: 5, emoji: "☀️", element: "holy", rarity: "epic",
+                    keywords: ["Divine Shield", "Windfury"], flavor: "ดาบสองเล่ม ศรัทธาไม่สั่นคลอน" },
+    ironCommander:{ name: "Ironoath Commander", type: "minion", cost: 6, atk: 4, hp: 6, emoji: "🎖️", element: "holy", rarity: "legendary",
+                    aura: { atk: 2 }, text: "<b>Aura:</b> มินเนียนอื่นของคุณ +2 พลังโจมตี · <b>Battlecry:</b> ให้ทั้งหมด Divine Shield",
+                    flavor: "คำสั่งเดียว: อย่าถอย",
+                    battlecry: (g, self) => { g.players[self.side].board.forEach(m => { if (m !== self) grant(m, "Divine Shield"); }); } },
+    ancientGrove: { name: "Ancient of the Grove", type: "minion", cost: 8, atk: 6, hp: 9, emoji: "🌲", element: "nature", rarity: "legendary",
+                    keywords: ["Taunt"], text: "<b>Deathrattle:</b> เรียก Treant 2/2 สองตัว · ฟื้นเลือดฮีโร่ 5", flavor: "ล้มแล้วยังให้ร่มเงา",
+                    deathrattle: (g, self) => { summon(self.side, "treant", 2); healChar(g.players[self.side].hero, 5); } },
+
+    smite:        { name: "Smite", type: "spell", cost: 1, emoji: "🌟", element: "holy", rarity: "common", target: "any", fx: "holy",
+                    text: "ดาเมจ 2", flavor: "แสงลงโทษ", cast: (g, t, c) => dealDamage(t, sd(c, 2)) },
+    blessMight:   { name: "Blessing of Might", type: "spell", cost: 1, emoji: "💪", element: "holy", rarity: "common", target: "minion", fx: "holy",
+                    text: "มินเนียน +3 พลังโจมตี", flavor: "พละกำลังจากเบื้องบน", cast: (g, t) => buff(t, 3, 0) },
+    handProtect:  { name: "Hand of Protection", type: "spell", cost: 1, emoji: "🙌", element: "holy", rarity: "common", target: "minion", fx: "holy",
+                    text: "ให้มินเนียน <b>Divine Shield</b>", flavor: "โล่ที่มองไม่เห็น", cast: (g, t) => grant(t, "Divine Shield") },
+    blessKings:   { name: "Blessing of Kings", type: "spell", cost: 4, emoji: "👑", element: "holy", rarity: "rare", target: "minion", fx: "holy",
+                    text: "มินเนียน +4/+4", flavor: "ราชาเลือกคุณแล้ว", cast: (g, t) => buff(t, 4, 4) },
+    consecrate:   { name: "Consecration", type: "spell", cost: 4, emoji: "🕊️", element: "holy", rarity: "common", aoe: "holy",
+                    text: "ดาเมจ 2 ใส่ศัตรูทั้งหมด", flavor: "ชำระล้างด้วยแสง",
+                    cast: (g, t, c) => allEnemies(c).forEach(e => dealDamage(e, sd(c, 2))) },
+    healRain:     { name: "Healing Rain", type: "spell", cost: 3, emoji: "🌧️", element: "nature", rarity: "common",
+                    text: "ฟื้นเลือด 3 ให้ฝ่ายเราทั้งหมด", flavor: "ฝนที่รักษาได้",
+                    cast: (g, t, c) => [g.players[c].hero, ...g.players[c].board].forEach(x => healChar(x, 3)) },
+    wildGrowth:   { name: "Wild Growth", type: "spell", cost: 2, emoji: "🌱", element: "nature", rarity: "common",
+                    text: "ได้คริสตัลมานาถาวร +1 (เต็ม 10 แล้ว = จั่วการ์ด)", flavor: "ปลูกวันนี้ เก็บเกี่ยวพรุ่งนี้",
+                    cast: (g, t, c) => { const p = g.players[c]; if (p.maxMana >= 10) draw(c, 1); else p.maxMana++; } },
+    swipe:        { name: "Swipe", type: "spell", cost: 4, emoji: "🍃", element: "nature", rarity: "rare", target: "enemy", fx: "nature",
+                    text: "ดาเมจ 4 ใส่ศัตรู 1 · 1 ใส่ที่เหลือ", flavor: "กวาดทีเดียวโดนหมด",
+                    cast: (g, t, c) => { dealDamage(t, sd(c, 4)); allEnemies(c).forEach(e => { if (e !== t) dealDamage(e, sd(c, 1)); }); } },
+    equality:     { name: "Dawn's Equality", type: "spell", cost: 3, emoji: "⚖️", element: "holy", rarity: "epic",
+                    text: "เปลี่ยนเลือดสูงสุดของมินเนียนทั้งหมดเป็น 1", flavor: "ต่อหน้าแสง ทุกคนเท่ากัน",
+                    cast: () => { ["you", "ai"].forEach(sd => G.players[sd].board.forEach(m => { m._coreMax = 1; m.maxHp = 1; m.hp = Math.min(m.hp, 1); })); refreshStats(); } },
+    rally:        { name: "Rally!", type: "spell", cost: 3, emoji: "📯", element: "holy", rarity: "rare",
+                    text: "เรียก Footman 1/1 <b>Taunt</b> สองตัว", flavor: "ตั้งแนว!", cast: (g, t, c) => summon(c, "footmanToken", 2) },
+    wildshape:    { name: "Wildshape", type: "spell", cost: 2, emoji: "🐾", element: "nature", rarity: "epic",
+                    text: "<b>Choose One</b>", flavor: "ร่างเปลี่ยนได้ตามใจ",
+                    choose: [
+                      { label: "+2/+2 และ Taunt ให้มินเนียนฝ่ายเรา", need: "friendly-minion", fx: "nature", apply: (g, t) => { buff(t, 2, 2); grant(t, "Taunt"); } },
+                      { label: "ดาเมจ 2 และ Freeze ศัตรู", need: "enemy", fx: "frost", apply: (g, t, c) => { dealDamage(t, sd(c, 2)); freeze(t); } },
+                    ] },
   };
 
+  let IID = 0;
   function mk(id) {
     const d = CARDS[id];
-    const c = { iid: ++IID, id, name: d.name, type: d.type, cost: d.cost, emoji: d.emoji, text: d.text,
-      keywords: (d.keywords || []).slice() };
+    const c = {
+      iid: ++IID, id, name: d.name, type: d.type, cost: d.cost, emoji: d.emoji,
+      element: d.element || "neutral", tribe: d.tribe || null, rarity: d.rarity || "common",
+      text: d.text || "", flavor: d.flavor || "", keywords: (d.keywords || []).slice(),
+    };
     if (d.type === "minion") {
-      c.atk = d.atk; c.hp = d.hp; c.maxHp = d.hp;
-      c.baseAtk = d.atk;
+      c._coreAtk = d.atk; c._coreMax = d.hp;
+      c.atk = d.atk; c.maxHp = d.hp; c.hp = d.hp; c.baseAtk = d.atk;
       c.taunt = c.keywords.includes("Taunt");
       c.divineShield = c.keywords.includes("Divine Shield");
       c.charge = c.keywords.includes("Charge");
-      c.sick = true; c.hasAttacked = false;
-      c.battlecry = d.battlecry; c.deathrattle = d.deathrattle; c.needTarget = d.needTarget || null;
+      c.rush = c.keywords.includes("Rush");
+      c.windfury = c.keywords.includes("Windfury");
+      c.lifesteal = c.keywords.includes("Lifesteal");
+      c.poisonous = c.keywords.includes("Poisonous");
+      c.spellDamage = d.spellDamage || 0;
+      c.aura = d.aura || null;
+      c.enrage = d.enrage || null;
+      c.frozen = false; c.sick = true; c.hasAttacked = false; c.attacksThisTurn = 0;
+      c.battlecry = d.battlecry; c.deathrattle = d.deathrattle;
+      c.onAttack = d.onAttack; c.onSpellCast = d.onSpellCast; c.startTurn = d.startTurn; c.endTurn = d.endTurn;
+      c.needTarget = d.needTarget || null; c.bcFx = d.bcFx || null;
     } else {
       c.target = d.target || null; c.cast = d.cast; c.fx = d.fx || null;
+      c.overload = d.overload || 0; c.aoe = d.aoe || null; c.choose = d.choose || null;
     }
     return c;
   }
-  let IID = 0;
 
   /* ============================ DECKS ============================ */
   const DECKS = {
-    arcanist: {
-      name: "Arcanist", emoji: "🧙", hp: "fireblast",
-      desc: "สายเวทย์ · เบิร์นเยอะ เคลียร์บอร์ดแรง พลังฮีโร่ยิงดาเมจ 1",
-      list: { arcaneshot: 2, frostbolt: 2, fireball: 2, arcaneexpl: 2, flamestrike: 1, hex: 1,
-              wisp: 2, argent: 2, engineer: 2, snapper: 2, raider: 2, drake: 2, elemental: 2, ogre: 2, senjin: 2, golem: 1, spider: 1 },
+    embercaller: {
+      name: "Embercaller", emoji: "🔥", hp: "emberHP",
+      desc: "เวทย์ไฟ / น้ำแข็ง / อาร์เคน — เบิร์นหนัก แช่แข็ง Spell Damage และ Overload · พลังฮีโร่ยิงดาเมจ 1",
+      list: { arcaneSpark: 2, frostbolt: 2, arcaneBarrage: 2, emberBlast: 2, cinderNova: 1, polymorph: 1, pyroblast: 1, meteor: 1, blizzard: 1, wildSurge: 1, manaSurge: 1,
+              manaWisp: 2, frostAdept: 2, flamewaker: 2, battlemage: 2, emberColossus: 2, recklessPyro: 1, galeHarpy: 1, goblinSapper: 1, archmage: 1, ashColossus: 1 },
     },
-    vanguard: {
-      name: "Vanguard", emoji: "🛡️", hp: "reinforce",
-      desc: "สายบุก · มินเนียนแน่น Taunt เยอะ พลังฮีโร่เรียกทหาร 1/1",
-      list: { squire: 2, footman: 2, argent: 2, shieldbearer: 2, grizzly: 2, crusader: 2, acolyte: 2,
-              knight: 2, senjin: 2, berserker: 2, abom: 2, ogre: 2, raider: 2, golem: 1, blessing: 2, healtouch: 1 },
+    ironoath: {
+      name: "Ironoath", emoji: "🛡️", hp: "musterHP",
+      desc: "ศักดิ์สิทธิ์ / ธรรมชาติ — Taunt แน่น Lifesteal, Aura, Enrage, Divine Shield · พลังฮีโร่เรียก Footman",
+      list: { smite: 1, blessMight: 2, handProtect: 1, blessKings: 1, consecrate: 1, healRain: 1, wildGrowth: 1, swipe: 1, equality: 1, rally: 1, wildshape: 1,
+              oathFootman: 2, silverSquire: 2, battleChaplain: 2, thornBear: 2, dawnPaladin: 2, houndmaster: 1, bloodBerserker: 1, stoneWarden: 1, groveWarden: 1, sunTemplar: 1, wailingBanshee: 1, ironCommander: 1, ancientGrove: 1 },
     },
   };
   const HERO_POWERS = {
-    fireblast: { name: "Fireblast", emoji: "🔥", cost: 2, target: "any", use: (g, t) => dealDamage(t, 1) },
-    reinforce: { name: "Reinforce", emoji: "🧍", cost: 2, target: null, use: (g, t, side) => summon(side, "recruit", 1) },
+    emberHP:  { name: "Ember Blast", emoji: "🔥", cost: 2, target: "any", use: (g, t, side) => dealDamage(t, sd(side, 1)) },
+    musterHP: { name: "Muster", emoji: "🛡️", cost: 2, target: null, use: (g, t, side) => summon(side, "footmanToken", 1) },
   };
   function buildDeck(key) {
     const out = [];
     Object.entries(DECKS[key].list).forEach(([id, n]) => { for (let i = 0; i < n; i++) out.push(mk(id)); });
+    if (out.length !== 30) console.warn("deck", key, "size", out.length);
     return shuffle(out);
   }
 
@@ -520,41 +731,90 @@
     return { isHero: true, side, name: DECKS[deckKey].name, emoji: DECKS[deckKey].emoji, hp: 30, maxHp: 30, armor: 0 };
   }
   function other(side) { return side === "you" ? "ai" : "you"; }
-  function charList() {
-    if (!G) return [];
-    return [G.players.you.hero, G.players.ai.hero, ...G.players.you.board, ...G.players.ai.board];
-  }
-  function enemyMinions(side) { return G.players[other(side)].board.slice(); }
   function log(html) { G.log.unshift(html); if (G.log.length > 40) G.log.pop(); }
+
+  function spellPow(side) { return G.players[side].board.reduce((s, m) => s + (m.spellDamage || 0), 0); }
+  function sd(side, base) { return base + spellPow(side); }
+  function allEnemies(side) { const f = other(side); return [...G.players[f].board, G.players[f].hero]; }
+  function randEnemy(side) { const a = allEnemies(side); return a.length ? a[rnd(a.length)] : null; }
+  function randEnemyMinion(side) { const a = G.players[other(side)].board; return a.length ? a[rnd(a.length)] : null; }
+
+  /* ---- derived stats: enrage bonus + friendly auras, recomputed on demand ---- */
+  function refreshStats() {
+    if (!G) return;
+    ["you", "ai"].forEach(sd2 => G.players[sd2].board.forEach(m => {
+      let aA = 0, aH = 0;
+      G.players[sd2].board.forEach(src => {
+        if (src === m || !src.aura) return;
+        aA += src.aura.atk || 0; aH += src.aura.hp || 0;
+      });
+      const enr = (m.enrage && m.hp < m.maxHp) ? (m.enrage.atk || 0) : 0;
+      m.atk = Math.max(0, (m._coreAtk || 0) + aA + enr);
+      const newMax = (m._coreMax || 1) + aH;
+      if (newMax !== m.maxHp) {
+        const diff = newMax - m.maxHp;
+        m.maxHp = newMax;
+        if (diff > 0) m.hp += diff; else m.hp = Math.min(m.hp, m.maxHp);
+      }
+    }));
+  }
 
   /* ============================ EFFECT HELPERS ============================ */
   function nm(c) { return c.isHero ? `<b>${c.name}</b> (ฮีโร่${c.side === "you" ? "คุณ" : "ศัตรู"})` : `${c.emoji} <b>${c.name}</b>`; }
-
-  function dealDamage(c, amt) {
-    if (!c || amt <= 0) return;
-    if (!c.isHero && !G.players[c.side].board.includes(c)) return; // already dead/removed
-    if (!c.isHero && c.divineShield) { c.divineShield = false; c.keywords = c.keywords.filter(k => k !== "Divine Shield");
-      log(`${nm(c)} เสีย Divine Shield`); FX.push({ c, txt: "🛡️✖", cls: "buff" }); return; }
+  function grant(m, kw) {
+    if (!m || m.isHero) return;
+    if (kw === "Divine Shield") m.divineShield = true;
+    if (kw === "Taunt") m.taunt = true;
+    if (kw === "Rush") m.rush = true;
+    if (kw === "Windfury") m.windfury = true;
+    if (kw === "Lifesteal") m.lifesteal = true;
+    if (kw === "Poisonous") m.poisonous = true;
+    if (!m.keywords.includes(kw)) m.keywords.push(kw);
+  }
+  function freeze(c) {
+    if (!c || c.isHero) return;
+    c.frozen = true; c._thawAtEnd = false;
+    log(`${nm(c)} ถูกแช่แข็ง`);
+    FX.push({ c, txt: "❄", cls: "buff" });
+  }
+  function dealDamage(c, amt, opts) {
+    opts = opts || {};
+    if (!c || amt <= 0) return 0;
+    if (!c.isHero && !G.players[c.side].board.includes(c)) return 0;
+    if (!c.isHero && c.divineShield) {
+      c.divineShield = false; c.keywords = c.keywords.filter(k => k !== "Divine Shield");
+      log(`${nm(c)} เสีย Divine Shield`); FX.push({ c, txt: "✨", cls: "buff" }); return 0;
+    }
     if (c.isHero && c.armor > 0) { const a = Math.min(c.armor, amt); c.armor -= a; amt -= a; }
-    if (amt <= 0) return;
+    if (amt <= 0) return 0;
     c.hp -= amt;
     log(`${nm(c)} รับดาเมจ ${amt}`);
     FX.push({ c, txt: "-" + amt, cls: "dmg" });
+    const src = opts.src;
+    if (src && !src.isHero) {
+      if (src.lifesteal) healChar(G.players[src.side].hero, amt);
+      if (src.poisonous && !c.isHero && c.hp > 0) { c.hp = 0; log(`${nm(c)} โดนพิษ — ตายทันที`); }
+    }
+    refreshStats();
+    return amt;
   }
   function healChar(c, amt) {
     if (!c || amt <= 0) return;
-    const max = c.isHero ? c.maxHp : c.maxHp;
-    if (c.hp >= max) return;
-    const real = Math.min(amt, max - c.hp);
+    if (c.hp >= c.maxHp) return;
+    const real = Math.min(amt, c.maxHp - c.hp);
     c.hp += real;
     log(`${nm(c)} ฟื้นเลือด ${real}`);
     FX.push({ c, txt: "+" + real, cls: "heal" });
+    refreshStats();
   }
   function buff(m, a, h) {
     if (!m || m.isHero) return;
-    m.atk += a; m.hp += h; m.maxHp += h; m.buffed = true;
+    m._coreAtk = (m._coreAtk || 0) + a;
+    m._coreMax = (m._coreMax || 1) + h;
+    m.hp += h;
     log(`${nm(m)} ได้ +${a}/+${h}`);
     FX.push({ c: m, txt: `+${a}/+${h}`, cls: "buff" });
+    refreshStats();
   }
   function transform(m, tokenId) {
     if (!m || m.isHero) return;
@@ -562,9 +822,10 @@
     const idx = board.indexOf(m);
     if (idx < 0) return;
     const fresh = mk(tokenId);
-    fresh.side = m.side; fresh.sick = true; fresh.hasAttacked = true; fresh.canAttack = false;
+    fresh.side = m.side; fresh.sick = true; fresh.hasAttacked = true; fresh.attacksThisTurn = 99;
     board[idx] = fresh;
     log(`${nm(m)} ถูกแปลงเป็น ${nm(fresh)}`);
+    refreshStats();
   }
   function summon(side, id, count) {
     for (let i = 0; i < (count || 1); i++) {
@@ -572,11 +833,11 @@
       if (board.length >= 7) return;
       const m = mk(id);
       m.side = side;
-      m.sick = !m.charge; m.hasAttacked = false;
-      m.canAttack = m.charge && m.atk > 0;
+      m.sick = !m.charge; m.hasAttacked = false; m.attacksThisTurn = 0;
       board.push(m);
       log(`${side === "you" ? "คุณ" : "ศัตรู"}เรียก ${nm(m)}`);
     }
+    refreshStats();
   }
   function draw(side, count) {
     const p = G.players[side];
@@ -596,8 +857,9 @@
   /* ============================ DEATHS / GAME OVER ============================ */
   function resolveDeaths() {
     let again = true, guard = 0;
-    while (again && guard++ < 20) {
+    while (again && guard++ < 30) {
       again = false;
+      refreshStats();
       for (const side of ["you", "ai"]) {
         const board = G.players[side].board;
         for (let i = board.length - 1; i >= 0; i--) {
@@ -605,7 +867,8 @@
             const m = board.splice(i, 1)[0];
             log(`${nm(m)} ตาย`);
             FX.push({ c: m, death: true });
-            if (m.deathrattle) { again = true; m.deathrattle(G, m); }
+            if (m.deathrattle) m.deathrattle(G, m);
+            again = true;
           }
         }
       }
@@ -620,18 +883,34 @@
   }
 
   /* ============================ TURN FLOW ============================ */
+  function endActiveTurn() {
+    const p = G.players[G.active];
+    p.board.slice().forEach(m => { if (p.board.includes(m) && m.endTurn) m.endTurn(G, m); });
+    p.board.forEach(m => { if (m._thawAtEnd) { m.frozen = false; m._thawAtEnd = false; log(`${nm(m)} ละลายจากน้ำแข็ง`); } });
+    resolveDeaths();
+  }
   async function beginTurn(side) {
     G.active = side;
     const p = G.players[side];
+    if (side === "you" || side === "ai") G.turn = (G.turn || 1) + (side === G.firstSide ? 1 : 0);
     p.maxMana = Math.min(10, p.maxMana + 1);
-    p.mana = p.maxMana;
+    const locked = p.overloadNext || 0;
+    p.overloadLocked = locked;
+    p.overloadNext = 0;
+    p.mana = Math.max(0, p.maxMana - locked);
     p.powerUsed = false;
-    p.board.forEach(m => { m.sick = false; m.hasAttacked = false; m.canAttack = m.atk > 0; });
+    p.board.forEach(m => {
+      m.sick = false; m.hasAttacked = false; m.attacksThisTurn = 0;
+      if (m.frozen) m._thawAtEnd = true;
+    });
+    refreshStats();
     clearSel();
     render();
     banner(side === "you" ? "เทิร์นของคุณ" : "เทิร์นศัตรู");
     await sleep(500);
     draw(side, 1);
+    p.board.slice().forEach(m => { if (p.board.includes(m) && m.startTurn) m.startTurn(G, m); });
+    resolveDeaths();
     if (checkOver()) return finish();
     await flushFx();
     if (side === "ai") { await sleep(600); aiTurn(); }
@@ -639,6 +918,11 @@
   async function endTurn() {
     if (G.over || G.active !== "you" || G.busy) return;
     clearSel();
+    G.busy = true;
+    endActiveTurn();
+    await flushFx();
+    if (checkOver()) { G.busy = false; return finish(); }
+    G.busy = false;
     await beginTurn("ai");
   }
 
@@ -647,11 +931,12 @@
     const p = G.players.you;
     if (card.cost > p.mana) return false;
     if (card.type === "minion" && p.board.length >= 7) return false;
+    if (card.choose) return card.choose.some(o => !o.need || targetsFor(o.need, "you").length);
     if (card.type === "spell" && card.target && !targetsFor(card.target, "you").length) return false;
     if (card.type === "minion" && card.needTarget && !targetsFor(card.needTarget, "you").length) return false;
     return true;
   }
-  async function playCard(side, handIdx, target) {
+  async function playCard(side, handIdx, target, chosenK) {
     const p = G.players[side];
     const card = p.hand[handIdx];
     if (!card) return;
@@ -660,34 +945,40 @@
     G.busy = true;
     if (card.type === "minion") {
       card.side = side;
-      card.sick = !card.charge; card.hasAttacked = false; card.canAttack = card.charge && card.atk > 0;
+      card.sick = !card.charge; card.hasAttacked = false; card.attacksThisTurn = 0;
       p.board.push(card);
       log(`${side === "you" ? "คุณ" : "ศัตรู"}ลง ${nm(card)}`);
-      render(); // render() plays the summon pop for new minions
+      refreshStats();
+      render();
       const c = centerOf(card);
       if (!REDUCED) spawnBurst(c.x, c.y, "buff", 2);
       await sleep(300);
       if (card.battlecry) {
         if (card.needTarget && target) {
-          await projectile(centerOf(card), centerOf(target), "fire");
-          spawnBurst(centerOf(target).x, centerOf(target).y, "fire", 4);
+          await projectile(centerOf(card), centerOf(target), card.bcFx || "arcane");
+          spawnBurst(centerOf(target).x, centerOf(target).y, card.bcFx || "arcane", 4);
           screenShake(7);
         }
         card.battlecry(G, card, target);
       }
     } else {
-      log(`${side === "you" ? "คุณ" : "ศัตรู"}ร่าย ${nm(card)}`);
-      if (card.fx && target) {
+      const runner = (card.choose && chosenK != null) ? card.choose[chosenK] : card;
+      log(`${side === "you" ? "คุณ" : "ศัตรู"}ร่าย ${nm(card)}${(card.choose && chosenK != null) ? " — " + runner.label : ""}`);
+      const fx = runner.fx || card.fx;
+      if (fx && target) {
         const from = centerOf(G.players[side].hero), to = centerOf(target);
-        await projectile(from, to, card.fx);
-        spawnBurst(to.x, to.y, card.fx, card.fx === "fire" ? 6 : 4);
-        if (card.fx === "fire" || card.fx === "frost" || card.fx === "arcane") { screenShake(card.fx === "fire" ? 12 : 8); if (target.isHero) heroFlash(target.side); }
-      } else if (["flamestrike", "arcaneexpl", "holynova"].includes(card.id)) {
-        const kind = card.id === "flamestrike" ? "fire" : card.id === "holynova" ? "buff" : "arcane";
-        await aoeSweep(other(side), kind);
-        if (card.id === "holynova") G.players[side].board.forEach(m => { const c = centerOf(m); spawnBurst(c.x, c.y, "heal", 2); });
+        await projectile(from, to, fx);
+        spawnBurst(to.x, to.y, fx, fx === "fire" ? 6 : 4);
+        if (["fire", "frost", "arcane", "nature", "holy"].includes(fx)) {
+          screenShake(fx === "fire" ? 12 : 8);
+          if (target.isHero) heroFlash(target.side);
+        }
+      } else if (card.aoe) {
+        await aoeSweep(other(side), card.aoe);
       }
-      if (card.cast) card.cast(G, target, side);
+      (runner.apply || runner.cast || card.cast) && (runner.apply || runner.cast || card.cast)(G, target, side);
+      if (card.overload) p.overloadNext = (p.overloadNext || 0) + card.overload;
+      p.board.slice().forEach(m => { if (p.board.includes(m) && m.onSpellCast) m.onSpellCast(G, m); });
     }
     resolveDeaths();
     await flushFx();
@@ -697,36 +988,48 @@
   }
 
   function tauntWall(side) { return G.players[side].board.filter(m => m.taunt); }
-  function attackTargets(attackerSide) {
-    const foe = other(attackerSide);
+  function canAttackNow(m) {
+    if (!m || m.frozen) return false;
+    if (m.atk <= 0) return false;
+    if ((m.attacksThisTurn || 0) >= (m.windfury ? 2 : 1)) return false;
+    if (m.sick && !m.charge && !m.rush) return false;
+    return true;
+  }
+  function attackTargets(side, attacker) {
+    const foe = other(side);
     const wall = tauntWall(foe);
-    if (wall.length) return wall;
-    return [...G.players[foe].board, G.players[foe].hero];
+    let pool = wall.length ? wall.slice() : [...G.players[foe].board, G.players[foe].hero];
+    if (attacker && attacker.sick && attacker.rush && !attacker.charge) pool = pool.filter(t => !t.isHero);
+    return pool;
   }
   async function doAttack(attacker, defender) {
     if (G.busy || !attacker || !defender) return;
-    if (!attacker.canAttack || attacker.sick || attacker.atk <= 0) return;
-    if (!attackTargets(attacker.side).includes(defender)) return;
+    refreshStats();
+    if (!canAttackNow(attacker)) return;
+    if (!attackTargets(attacker.side, attacker).includes(defender)) return;
     G.busy = true; clearSel(); render();
     const aEl = cardEl(attacker);
     const from = centerOf(attacker), to = centerOf(defender);
+    const aAtk = attacker.atk;
     const retaliate = defender.isHero ? 0 : defender.atk;
-    const power = Math.max(attacker.atk, retaliate);
+    const power = Math.max(aAtk, retaliate);
     await travelAttack(aEl, from, to, {
       hold: power >= 4 ? 240 : 160,
       onImpact: () => {
         spawnBurst(to.x, to.y, "clash", power);
         screenShake(power >= 5 ? 16 : power >= 3 ? 10 : 6);
         if (defender.isHero) heroFlash(defender.side);
-        dealDamage(defender, attacker.atk);
-        if (retaliate) dealDamage(attacker, retaliate);
+        dealDamage(defender, aAtk, { src: attacker });
+        if (retaliate) dealDamage(attacker, retaliate, { src: defender });
+        if (attacker.onAttack) attacker.onAttack(G, attacker, defender);
         const dEl = cardEl(defender);
         if (dEl && !REDUCED) dEl.animate(
           [{ transform: "translate(0,0)" }, { transform: "translate(-6px,4px)" }, { transform: "translate(7px,-3px)" }, { transform: "translate(0,0)" }],
           { duration: 260, easing: "ease-out" });
       },
     });
-    attacker.hasAttacked = true; attacker.canAttack = false;
+    attacker.attacksThisTurn = (attacker.attacksThisTurn || 0) + 1;
+    attacker.hasAttacked = true;
     resolveDeaths();
     await flushFx();
     if (checkOver()) { G.busy = false; return finish(); }
@@ -740,6 +1043,12 @@
     p.mana -= hp.cost; p.powerUsed = true;
     G.busy = true; clearSel();
     log(`${side === "you" ? "คุณ" : "ศัตรู"}ใช้พลังฮีโร่ <b>${hp.name}</b>`);
+    if (hp.target && target) {
+      await projectile(centerOf(G.players[side].hero), centerOf(target), "fire");
+      spawnBurst(centerOf(target).x, centerOf(target).y, "fire", 3);
+      screenShake(6);
+      if (target.isHero) heroFlash(target.side);
+    }
     hp.use(G, target, side);
     resolveDeaths();
     await flushFx();
@@ -761,24 +1070,42 @@
       default: return [];
     }
   }
-  let SEL = null; // {kind:'hand',i} | {kind:'attacker',iid} | {kind:'power'} ; plus SEL.targets[]
+  let SEL = null;
   function clearSel() { SEL = null; }
   function pickHand(i) {
     if (G.over || G.busy || G.active !== "you") return;
     const card = G.players.you.hand[i];
     if (!card || !canPlay(card)) return;
-    if (SEL && SEL.kind === "hand" && SEL.i === i) { clearSel(); render(); return; }
+    if (SEL && (SEL.kind === "hand" || SEL.kind === "chooseHand") && SEL.i === i) { clearSel(); render(); return; }
+    if (card.choose) { openChoose(i); return; }
     const spec = card.type === "spell" ? card.target : card.needTarget;
     if (spec) { SEL = { kind: "hand", i, targets: targetsFor(spec, "you") }; }
     else { clearSel(); playCard("you", i, null); return; }
     render();
   }
+  function openChoose(i) {
+    const card = G.players.you.hand[i];
+    $("chooseTitle").textContent = card.name + " — เลือก 1";
+    $("chooseOpts").innerHTML = card.choose.map((o, k) => {
+      const ok = !o.need || targetsFor(o.need, "you").length;
+      return `<button class="choose-opt" data-k="${k}" ${ok ? "" : "disabled"}>${o.label}</button>`;
+    }).join("") + `<button class="choose-cancel" data-k="-1">ยกเลิก</button>`;
+    $("chooseVeil").hidden = false;
+    $("chooseOpts").querySelectorAll("[data-k]").forEach(b => b.addEventListener("click", () => {
+      const k = +b.dataset.k;
+      $("chooseVeil").hidden = true;
+      if (k < 0) { clearSel(); render(); return; }
+      const opt = card.choose[k];
+      if (opt.need) { SEL = { kind: "chooseHand", i, k, targets: targetsFor(opt.need, "you") }; render(); }
+      else { clearSel(); playCard("you", i, null, k); }
+    }));
+  }
   function pickAttacker(iid) {
     if (G.over || G.busy || G.active !== "you") return;
     const m = G.players.you.board.find(x => x.iid === iid);
-    if (!m || !m.canAttack || m.sick || m.atk <= 0) return;
+    if (!m || !canAttackNow(m)) return;
     if (SEL && SEL.kind === "attacker" && SEL.iid === iid) { clearSel(); render(); return; }
-    SEL = { kind: "attacker", iid, targets: attackTargets("you") };
+    SEL = { kind: "attacker", iid, targets: attackTargets("you", m) };
     render();
   }
   function pickPower() {
@@ -793,6 +1120,7 @@
     if (!SEL || !SEL.targets || !SEL.targets.includes(ref)) return;
     const s = SEL; clearSel();
     if (s.kind === "hand") playCard("you", s.i, ref);
+    else if (s.kind === "chooseHand") playCard("you", s.i, ref, s.k);
     else if (s.kind === "attacker") { const a = G.players.you.board.find(x => x.iid === s.iid); doAttack(a, ref); }
     else if (s.kind === "power") heroPower("you", ref);
   }
@@ -800,107 +1128,135 @@
   /* ============================ AI ============================ */
   async function aiTurn() {
     if (G.over) return;
-    const me = G.players.ai, foe = G.players.you;
+    const me = G.players.ai;
     G.busy = false;
-    // 1) play cards (greedy, biggest useful spend first)
+    refreshStats();
     let acted = true, safety = 0;
-    while (acted && safety++ < 20 && !G.over) {
+    while (acted && safety++ < 24 && !G.over) {
       acted = false;
+      refreshStats();
       const options = me.hand.map((c, i) => ({ c, i })).filter(o => aiCanPlay(o.c));
       if (!options.length) break;
       const choice = aiChoosePlay(options);
       if (!choice) break;
       const tgt = choice.target !== undefined ? choice.target : aiPickTarget(choice.c);
       await sleep(420);
-      await playCard("ai", me.hand.indexOf(choice.c), tgt);
+      await playCard("ai", me.hand.indexOf(choice.c), tgt, choice.chosenK);
       acted = true;
       render();
     }
-    // 2) hero power
     const hp = HERO_POWERS[me.powerId];
     if (!me.powerUsed && me.mana >= hp.cost) {
       const t = aiPowerTarget();
       if (t !== false) { await sleep(400); await heroPower("ai", t); render(); }
     }
-    // 3) attacks
     await sleep(320);
     await aiAttacks();
     if (G.over) return;
-    await sleep(300);
+    endActiveTurn();
+    await flushFx();
+    if (checkOver()) return finish();
+    await sleep(280);
     await beginTurn("you");
   }
   function aiCanPlay(c) {
-    if (c.cost > G.players.ai.mana) return false;
-    if (c.type === "minion" && G.players.ai.board.length >= 7) return false;
+    const me = G.players.ai;
+    if (c.cost > me.mana) return false;
+    if (c.type === "minion" && me.board.length >= 7) return false;
+    if (c.choose) return c.choose.some(o => !o.need || aiTargets(o.need).length);
     if (c.type === "spell" && c.target && !aiTargets(c.target).length) return false;
     if (c.type === "minion" && c.needTarget && !aiTargets(c.needTarget).length) return false;
-    if (c.id === "coin") return G.players.ai.hand.some(x => x !== c && x.cost === G.players.ai.mana + 1);
+    if (c.id === "coin") return me.hand.some(x => x !== c && x.cost === me.mana + 1);
     return true;
   }
   function aiTargets(spec) {
     const me = G.players.ai, foe = G.players.you;
-    const mine = [me.hero, ...me.board], en = [foe.hero, ...foe.board];
-    if (spec === "any") return [...mine, ...en];
-    if (spec === "enemy") return en;
-    if (spec === "friendly") return mine;
+    if (spec === "any") return [me.hero, ...me.board, foe.hero, ...foe.board];
+    if (spec === "enemy") return [foe.hero, ...foe.board];
+    if (spec === "friendly") return [me.hero, ...me.board];
     if (spec === "minion") return [...me.board, ...foe.board];
     if (spec === "enemy-minion") return foe.board.slice();
     if (spec === "friendly-minion") return me.board.slice();
     return [];
   }
   function biggestEnemyMinion() {
-    return G.players.you.board.slice().sort((a, b) => (b.atk + b.hp) - (a.atk + a.hp))[0] || null;
+    return G.players.you.board.slice().sort((a, b) => (b.atk + b.hp + (b.aura ? 6 : 0) + (b.spellDamage ? 4 : 0)) - (a.atk + a.hp + (a.aura ? 6 : 0) + (a.spellDamage ? 4 : 0)))[0] || null;
   }
+  const AI_DMG = { arcaneSpark: 2, frostbolt: 3, emberBlast: 4, pyroblast: 7, meteor: 6, smite: 2, swipe: 4, emberColossus: 3, emberHP: 1 };
   function aiChoosePlay(options) {
     const me = G.players.ai, foe = G.players.you;
-    // hard removal on a scary minion
+    const has = id => options.find(o => o.c.id === id);
     const threat = biggestEnemyMinion();
-    if (threat && (threat.atk >= 4 || threat.taunt || threat.divineShield)) {
-      const hex = options.find(o => o.c.id === "hex");
-      if (hex && (threat.atk >= 5 || threat.hp >= 5)) return { c: hex.c, target: threat };
-      const fb = options.find(o => o.c.id === "fireball");
-      if (fb && threat.hp <= 6) return { c: fb.c, target: threat };
+    if (threat && (threat.atk >= 5 || threat.taunt || threat.aura || threat.divineShield || threat.spellDamage)) {
+      const poly = has("polymorph"); if (poly) return { c: poly.c, target: threat };
+      for (const id of ["pyroblast", "meteor", "emberBlast"]) {
+        const s = has(id); if (!s) continue;
+        if ((AI_DMG[id] + spellPow("ai")) >= threat.hp) return { c: s.c, target: threat };
+      }
     }
-    // board clears when behind on board
     if (foe.board.length >= 3) {
-      const fs = options.find(o => o.c.id === "flamestrike"); if (fs) return { c: fs.c, target: null };
-      const hn = options.find(o => o.c.id === "holynova"); if (hn && me.board.length <= foe.board.length) return { c: hn.c, target: null };
-      const ax = options.find(o => o.c.id === "arcaneexpl"); if (ax && foe.board.filter(m => m.hp === 1).length >= 2) return { c: ax.c, target: null };
+      for (const id of ["blizzard", "cinderNova", "consecrate", "equality", "arcaneBarrage"]) {
+        const s = has(id); if (s) return { c: s.c, target: s.c.target ? aiPickTarget(s.c) : null };
+      }
     }
-    // coin to ramp
-    const coin = options.find(o => o.c.id === "coin");
-    if (coin) return { c: coin.c, target: null };
-    // heal if low
-    if (me.hero.hp <= 12) {
-      const ht = options.find(o => o.c.id === "healtouch"); if (ht) return { c: ht.c, target: me.hero };
+    if (me.maxMana <= 4) {
+      const wg = has("wildGrowth"); if (wg) return { c: wg.c, target: null };
+      const ms = has("manaSurge"); if (ms && me.hand.some(x => x.cost === me.mana + 2)) return { c: ms.c, target: null };
+      const coin = has("coin"); if (coin) return { c: coin.c, target: null };
     }
-    // buff a decent minion
-    const bl = options.find(o => o.c.id === "blessing");
-    if (bl && me.board.some(m => !m.sick && m.atk >= 2)) {
-      const t = me.board.filter(m => m.atk >= 2).sort((a, b) => b.atk - a.atk)[0];
-      return { c: bl.c, target: t };
+    if (me.hero.hp <= 13) {
+      const hr = has("healRain"); if (hr) return { c: hr.c, target: null };
+      const ch = has("battleChaplain"); if (ch) return { c: ch.c, target: me.hero };
     }
-    // otherwise: spend mana on the most expensive playable minion, else any minion, else burn spell to face
+    for (const id of ["blessKings", "houndmaster", "blessMight", "handProtect"]) {
+      const s = has(id); if (!s) continue;
+      const t = me.board.filter(m => !m.sick && m.atk >= 2 && !m.divineShield).sort((a, b) => (b.atk + b.hp) - (a.atk + a.hp))[0];
+      if (t) return { c: s.c, target: t };
+    }
+    const co = options.find(o => o.c.choose);
+    if (co) {
+      const k = aiChooseOption(co.c);
+      const opt = co.c.choose[k];
+      return { c: co.c, target: opt.need ? aiPickTarget({ id: co.c.id, _need: opt.need }) : null, chosenK: k };
+    }
     const minions = options.filter(o => o.c.type === "minion").sort((a, b) => b.c.cost - a.c.cost);
-    if (minions.length) return { c: minions[0].c, target: minions[0].c.needTarget ? aiPickTarget(minions[0].c) : undefined };
-    const burn = options.filter(o => ["arcaneshot", "frostbolt", "fireball"].includes(o.c.id)).sort((a, b) => b.c.cost - a.c.cost);
-    if (burn.length) {
-      const kill = burn.find(o => { const d = { arcaneshot: 2, frostbolt: 3, fireball: 6 }[o.c.id]; const m = biggestEnemyMinion(); return m && m.hp <= d && m.atk >= 3; });
-      if (kill) return { c: kill.c, target: biggestEnemyMinion() };
-      if (foe.hero.hp <= 8) return { c: burn[0].c, target: foe.hero };
+    if (minions.length) {
+      const m = minions[0].c;
+      return { c: m, target: m.needTarget ? aiPickTarget(m) : undefined };
     }
-    return options[0] ? { c: options[0].c, target: options[0].c.needTarget ? aiPickTarget(options[0].c) : undefined } : null;
+    const burn = options.filter(o => ["arcaneSpark", "frostbolt", "emberBlast", "smite", "pyroblast"].includes(o.c.id)).sort((a, b) => b.c.cost - a.c.cost);
+    for (const b of burn) {
+      const dmg = (AI_DMG[b.c.id] || 2) + spellPow("ai");
+      const k = biggestEnemyMinion();
+      if (k && k.hp <= dmg && (k.atk >= 3 || k.taunt || k.aura)) return { c: b.c, target: k };
+      if (foe.hero.hp <= dmg + 2) return { c: b.c, target: foe.hero };
+    }
+    const first = options[0];
+    if (!first) return null;
+    return { c: first.c,
+      target: first.c.needTarget ? aiPickTarget(first.c) : (first.c.choose ? null : undefined),
+      chosenK: first.c.choose ? aiChooseOption(first.c) : undefined };
+  }
+  function aiChooseOption(card) {
+    const me = G.players.ai, foe = G.players.you;
+    if (card.id === "wildSurge") {
+      if (foe.board.some(m => m.hp <= 3 + spellPow("ai") && (m.atk >= 3 || m.taunt)) || foe.hero.hp <= 4) return 0;
+      if (me.hero.hp <= 20) return 1;
+      return 0;
+    }
+    if (card.id === "wildshape") return me.board.some(m => !m.sick && m.atk >= 2) ? 0 : 1;
+    return 0;
   }
   function aiPickTarget(card) {
-    const spec = card.type === "spell" ? card.target : card.needTarget;
+    const spec = card._need || (card.type === "spell" ? card.target : card.needTarget);
     if (!spec) return null;
     const foe = G.players.you, me = G.players.ai;
-    if (card.id === "healtouch" || spec === "friendly") return me.hero.hp < me.hero.maxHp ? me.hero : (me.board[0] || me.hero);
-    if (spec === "minion") return biggestEnemyMinion() || me.board[0] || null;
-    // damage: kill a minion if possible else face
-    const dmg = { arcaneshot: 2, frostbolt: 3, fireball: 6, elemental: 3 }[card.id] || 2;
+    if (spec === "friendly" || card.id === "battleChaplain") return me.hero.hp < me.hero.maxHp ? me.hero : (me.board[0] || me.hero);
+    if (spec === "friendly-minion") return me.board.filter(m => !m.sick).sort((a, b) => (b.atk + b.hp) - (a.atk + a.hp))[0] || me.board[0] || null;
+    if (spec === "minion" || spec === "enemy-minion") return biggestEnemyMinion() || (spec === "minion" ? me.board[0] : null) || null;
+    const dmg = (AI_DMG[card.id] || 2) + spellPow("ai");
     const killable = foe.board.filter(m => m.hp <= dmg && !m.divineShield).sort((a, b) => (b.atk + b.hp) - (a.atk + a.hp))[0];
-    if (killable && (killable.atk >= 3 || killable.taunt)) return killable;
+    if (killable && (killable.atk >= 3 || killable.taunt || killable.aura)) return killable;
     if (foe.hero.hp <= dmg) return foe.hero;
     return killable || foe.hero;
   }
@@ -908,42 +1264,49 @@
     const me = G.players.ai, foe = G.players.you;
     const hp = HERO_POWERS[me.powerId];
     if (!hp.target) return null;
-    const k = foe.board.find(m => m.hp === 1 && !m.divineShield && m.atk >= 2);
+    const dmg = 1 + spellPow("ai");
+    const k = foe.board.find(m => m.hp <= dmg && !m.divineShield && (m.atk >= 2 || m.aura));
     if (k) return k;
-    if (foe.hero.hp <= 3) return foe.hero;
-    return false; // save it
+    if (foe.hero.hp <= 4) return foe.hero;
+    return false;
   }
   async function aiAttacks() {
     const me = G.players.ai, foe = G.players.you;
     let guard = 0;
-    while (guard++ < 20 && !G.over) {
-      const ready = me.board.filter(m => m.canAttack && !m.sick && m.atk > 0);
+    while (guard++ < 26 && !G.over) {
+      refreshStats();
+      const ready = me.board.filter(canAttackNow);
       if (!ready.length) break;
       const wall = tauntWall("you");
-      // lethal?
       if (!wall.length) {
-        const swing = ready.reduce((s, m) => s + m.atk, 0);
+        const swing = ready.reduce((s, m) => s + m.atk * ((m.windfury ? 2 : 1) - (m.attacksThisTurn || 0)), 0);
         if (swing >= foe.hero.hp) {
-          for (const m of ready) { if (G.over) break; await sleep(240); await doAttack(m, foe.hero); }
+          for (const m of ready) {
+            if (G.over) break;
+            while (canAttackNow(m) && attackTargets("ai", m).includes(foe.hero)) {
+              await sleep(240); await doAttack(m, foe.hero);
+              if (G.over) break;
+            }
+          }
           break;
         }
       }
       const attacker = ready[0];
+      const opts = attackTargets("ai", attacker);
       let best = null, bestScore = -1e9;
-      const opts = wall.length ? wall : [...foe.board, foe.hero];
       for (const t of opts) {
         let score;
-        if (t.isHero) score = attacker.atk - 0.1;
+        if (t.isHero) score = attacker.atk * 0.5 - 0.1 + (attacker.lifesteal ? 1.5 : 0);
         else {
-          const kills = attacker.atk >= t.hp && !t.divineShield;
+          const kills = attacker.poisonous || (attacker.atk >= t.hp && !t.divineShield);
           const dies = t.atk >= attacker.hp && !attacker.divineShield;
-          score = (kills ? (t.atk + t.hp) : t.hp * 0.3) - (dies ? attacker.atk + attacker.hp : 0) + (t.taunt ? 3 : 0);
+          score = (kills ? (t.atk + t.hp + (t.taunt ? 3 : 0) + (t.aura ? 5 : 0) + (t.spellDamage ? 3 : 0)) : t.hp * 0.3)
+            - (dies ? (attacker.atk + attacker.hp) * (attacker.poisonous ? 0.35 : 1) : 0);
         }
         if (score > bestScore) { bestScore = score; best = t; }
       }
       if (!best) break;
-      // if nothing good to trade and no taunt, just go face
-      if (!wall.length && !best.isHero && bestScore < 0) best = foe.hero;
+      if (!wall.length && !best.isHero && bestScore < 0 && attackTargets("ai", attacker).includes(foe.hero)) best = foe.hero;
       await sleep(260);
       await doAttack(attacker, best);
     }
@@ -1165,48 +1528,85 @@
       </button>`;
   }
   function manaHtml(p) {
+    const locked = p.overloadLocked || 0;
     let cr = "";
-    for (let i = 0; i < 10; i++) cr += `<span class="cry ${i < p.mana ? "on" : ""}"></span>`;
-    return `<div class="mana-strip">${cr}</div><div class="mana-num">${p.mana}/${p.maxMana}</div>`;
+    for (let i = 0; i < 10; i++) {
+      const on = i < p.mana;
+      const lk = i >= p.maxMana - locked && i < p.maxMana;
+      cr += `<span class="cry ${on ? "on" : ""} ${lk && !on ? "lock" : ""}"></span>`;
+    }
+    return `<div class="mana-strip">${cr}</div><div class="mana-num">${p.mana}/${p.maxMana}${locked ? ` 🔒${locked}` : ""}</div>`;
+  }
+  const KB = { Taunt: "🛡", "Divine Shield": "✨", Charge: "⚡", Rush: "🐾", Windfury: "🌀", Lifesteal: "🩸", Poisonous: "☠" };
+  const KW_CLASS = { Taunt: "taunt", "Divine Shield": "shield", Charge: "charge", Rush: "rush", Windfury: "windfury", Lifesteal: "lifesteal", Poisonous: "poison" };
+  const KW_ORDER = ["Taunt", "Divine Shield", "Charge", "Rush", "Windfury", "Lifesteal", "Poisonous"];
+  function typeLine(c) {
+    const t = c.type === "minion" ? "มินเนียน" : (c.choose ? "สเปล ❖" : "สเปล");
+    return c.tribe ? `${t} · ${c.tribe}` : t;
+  }
+  function describe(c) {
+    const kw = [];
+    KW_ORDER.forEach(k => { if ((c.keywords || []).includes(k)) kw.push(`<span class="kw ${KW_CLASS[k]}">${k}</span>`); });
+    if (c.spellDamage) kw.push(`<span class="kw spd">Spell Damage +${c.spellDamage}</span>`);
+    if (c.enrage && !/Enrage/.test(c.text || "")) kw.push(`<span class="kw enrage">Enrage</span>`);
+    if (c.aura && !/Aura/.test(c.text || "")) kw.push(`<span class="kw spd">Aura</span>`);
+    if (c.overload && !/Overload/.test(c.text || "")) kw.push(`<span class="kw">Overload (${c.overload})</span>`);
+    const line = kw.join(" · ");
+    return (line ? line + (c.text ? "<br>" : "") : "") + (c.text || "");
+  }
+  function cardFaceHtml(c, ex) {
+    ex = ex || {};
+    const cls = ["hcard", "el-" + (c.element || "neutral"), "rar-" + (c.rarity || "common")];
+    if (ex.playable) cls.push("playable");
+    if (ex.unplayable) cls.push("unplayable");
+    if (ex.sel) cls.push("sel");
+    if (ex.toss) cls.push("toss");
+    return `<div class="${cls.join(" ")}" ${ex.attr || ""}>
+      <div class="mana-gem">${c.cost}</div>
+      <div class="art"><span>${c.emoji}</span></div>
+      <div class="ribbon"><span class="rgem"></span><span class="rn">${c.name}</span></div>
+      <div class="tribe">${typeLine(c)}</div>
+      <div class="txt">${describe(c)}</div>
+      <div class="flav">${c.flavor || ""}</div>
+      ${c.type === "minion" ? `<div class="s-atk">${c.atk}</div><div class="s-hp">${c.hp}</div>` : ""}
+    </div>`;
   }
   function minionHtml(m, side) {
-    const cls = ["minion"];
+    const cls = ["minion", "el-" + (m.element || "neutral")];
     if (m.taunt) cls.push("taunt");
     if (m.divineShield) cls.push("shield");
+    if (m.frozen) cls.push("frozen");
+    if (m.rarity === "legendary") cls.push("legendary");
     if (side === "you") {
-      if (m.canAttack && !m.sick && m.atk > 0 && G.active === "you" && !G.busy) cls.push("ready");
-      if (m.sick || !m.canAttack || m.atk <= 0) cls.push("sick");
+      if (canAttackNow(m) && G.active === "you" && !G.busy) cls.push("ready"); else cls.push("sick");
       if (SEL && SEL.kind === "attacker" && SEL.iid === m.iid) cls.push("sel");
-    } else {
-      if (SEL && SEL.targets && SEL.targets.includes(m)) cls.push("tgt");
-    }
-    const atkCls = m.atk > m.baseAtk ? "buff" : "";
-    const hpCls = m.hp < m.maxHp ? "dmg" : (m.hp > (CARDS[m.id].hp || m.hp) ? "buff" : "");
+    } else if (SEL && SEL.targets && SEL.targets.includes(m)) cls.push("tgt");
+    const badges = [];
+    KW_ORDER.forEach(k => { if ((m.keywords || []).includes(k)) badges.push(KB[k]); });
+    if (m.enrage) badges.push("😤");
+    if (m.spellDamage) badges.push("✦");
+    if (m.aura) badges.push("💠");
+    const atkCls = m.atk > m._coreAtk ? "up" : "";
+    const hpCls = m.hp < m.maxHp ? "dn" : (m.maxHp > m._coreMax ? "up" : "");
     return `<div class="${cls.join(" ")}" data-iid="${m.iid}" data-ref="minion:${m.iid}">
-      <span class="art">${m.emoji}</span>
-      <span class="nm">${m.name}</span>
-      <span class="atk ${atkCls}">${m.atk}</span>
-      <span class="hp ${hpCls}">${m.hp}</span>
+      <div class="kwrow">${badges.slice(0, 5).map(b => `<span class="kb">${b}</span>`).join("")}</div>
+      <div class="m-art"><span>${m.emoji}</span></div>
+      <div class="m-name">${m.name}</div>
+      <div class="s-atk ${atkCls}">${m.atk}</div>
+      <div class="s-hp ${hpCls}">${m.hp}</div>
     </div>`;
   }
   function handHtml() {
     const p = G.players.you;
     return p.hand.map((c, i) => {
       const ok = canPlay(c) && G.active === "you" && !G.busy;
-      const sel = SEL && SEL.kind === "hand" && SEL.i === i;
-      const costCls = c.cost <= 1 ? "cheap" : c.cost >= 7 ? "pricey" : "";
-      return `<div class="hcard ${ok ? "playable" : "unplayable"} ${sel ? "sel" : ""}" data-hand="${i}">
-        <span class="cost ${costCls}">${c.cost}</span>
-        <div class="cname">${c.name}</div>
-        <div class="cart">${c.emoji}</div>
-        <div class="ctext">${c.text || ""}</div>
-        <div class="ctype">${c.type === "minion" ? "มินเนียน" : "สเปล"}</div>
-        ${c.type === "minion" ? `<span class="catk">${c.atk}</span><span class="chp">${c.hp}</span>` : ""}
-      </div>`;
+      const sel = SEL && (SEL.kind === "hand" || SEL.kind === "chooseHand") && SEL.i === i;
+      return cardFaceHtml(c, { playable: ok, unplayable: !ok, sel, attr: `data-hand="${i}"` });
     }).join("");
   }
   function render() {
     if (!G) return;
+    refreshStats();
     $("enemyHeroRow").innerHTML = heroHtml("ai");
     $("youHeroRow").innerHTML = heroHtml("you");
     $("enemyBoard").innerHTML = G.players.ai.board.map(m => minionHtml(m, "ai")).join("");
@@ -1233,7 +1633,7 @@
     let hint = "";
     if (G.over) hint = "";
     else if (G.active !== "you") hint = "ศัตรูกำลังคิด…";
-    else if (SEL && SEL.kind === "hand") hint = "เลือกเป้าหมายของการ์ด (แตะการ์ดเดิมเพื่อยกเลิก)";
+    else if (SEL && (SEL.kind === "hand" || SEL.kind === "chooseHand")) hint = "เลือกเป้าหมายของการ์ด (แตะการ์ดเดิมเพื่อยกเลิก)";
     else if (SEL && SEL.kind === "attacker") hint = "เลือกศัตรูที่จะโจมตี";
     else if (SEL && SEL.kind === "power") hint = "เลือกเป้าหมายของพลังฮีโร่";
     else hint = "แตะการ์ดบนมือเพื่อลง · แตะมินเนียนขอบเขียวเพื่อโจมตี";
@@ -1268,6 +1668,10 @@
   $("endturn").addEventListener("click", endTurn);
   $("howBtn").addEventListener("click", () => $("howVeil").hidden = false);
   $("howClose").addEventListener("click", () => $("howVeil").hidden = true);
+  $("howVeil").addEventListener("click", (e) => { if (e.target === $("howVeil")) $("howVeil").hidden = true; });
+  $("chooseVeil").addEventListener("click", (e) => {
+    if (e.target === $("chooseVeil")) { $("chooseVeil").hidden = true; clearSel(); render(); }
+  });
   $("restartBtn").addEventListener("click", () => location.reload());
   $("overAgain").addEventListener("click", () => location.reload());
 
@@ -1282,10 +1686,10 @@
       b.addEventListener("click", () => startGame(b.dataset.deck)));
   }
   function startGame(youKey) {
-    const aiKey = youKey === "arcanist" ? "vanguard" : "arcanist";
+    const aiKey = youKey === "embercaller" ? "ironoath" : "embercaller";
     IID = 0;
     G = {
-      turn: 1, active: "you", over: false, result: null, busy: true, log: [],
+      turn: 0, active: "you", over: false, result: null, busy: true, log: [],
       players: {
         you: { hero: newHero("you", youKey), deck: buildDeck(youKey), hand: [], board: [],
                mana: 0, maxMana: 0, fatigue: 0, powerId: DECKS[youKey].hp, powerUsed: false, deckKey: youKey },
@@ -1306,15 +1710,8 @@
     const toss = new Set();
     const wrap = $("mullCards");
     function paint() {
-      wrap.innerHTML = G.players.you.hand.map((c, i) => `
-        <div class="hcard ${toss.has(i) ? "toss" : ""}" data-m="${i}">
-          <span class="cost">${c.cost}</span>
-          <div class="cname">${c.name}</div>
-          <div class="cart">${c.emoji}</div>
-          <div class="ctext">${c.text || ""}</div>
-          <div class="ctype">${c.type === "minion" ? "มินเนียน" : "สเปล"}</div>
-          ${c.type === "minion" ? `<span class="catk">${c.atk}</span><span class="chp">${c.hp}</span>` : ""}
-        </div>`).join("");
+      wrap.innerHTML = G.players.you.hand.map((c, i) =>
+        cardFaceHtml(c, { toss: toss.has(i), attr: `data-m="${i}"` })).join("");
       wrap.querySelectorAll("[data-m]").forEach(el => el.addEventListener("click", () => {
         const i = +el.dataset.m;
         if (G.players.you.hand[i].id === "coin") return;
