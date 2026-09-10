@@ -1,0 +1,1095 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>Aether Clash · เกมการ์ดต่อสู้</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&display=swap">
+<style>
+  :root {
+    --bg: #0a0b12; --surface: #14151f; --surface-alt: #1b1d2b; --border: #282a3d;
+    --text: #eef0ff; --muted: #9296b5;
+    --acc: #7c5cff; --acc-soft: #241f45;
+    --grad: linear-gradient(120deg, #7c5cff 0%, #b74bff 48%, #ff5ca8 100%);
+    --bull: #2ee6a8; --bear: #ff6b8a; --gold: #ffcc55; --mana: #38b6ff;
+    --felt: radial-gradient(1200px 600px at 50% 40%, #1c2a3a, #101722 70%, #0a0d14);
+    --shadow: 0 2px 8px rgba(0,0,0,.4), 0 18px 44px -16px rgba(0,0,0,.6);
+    --shadow-lg: 0 10px 30px -8px rgba(120,80,255,.45);
+    --radius: 16px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: "Sarabun", "Noto Sans Thai", system-ui, sans-serif;
+    overflow: hidden; user-select: none; -webkit-user-select: none;
+  }
+  button { font-family: inherit; color: inherit; cursor: pointer; }
+
+  #app { display: flex; flex-direction: column; height: 100dvh; }
+
+  .topbar {
+    display: flex; align-items: center; gap: 10px; padding: 8px 14px;
+    background: color-mix(in srgb, var(--surface) 82%, transparent);
+    -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border); z-index: 30; flex: none;
+  }
+  .brand { font-weight: 800; font-size: 15px; letter-spacing: .3px;
+    background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .topbar .sp { flex: 1; }
+  .pill {
+    background: var(--surface); border: 1px solid var(--border); color: var(--text);
+    padding: 7px 13px; border-radius: 999px; font-size: 12.5px; font-weight: 700; text-decoration: none;
+    display: inline-flex; align-items: center; gap: 6px; transition: .14s;
+  }
+  .pill:hover { border-color: var(--acc); color: var(--acc); transform: translateY(-1px); }
+  .pill.solid { background: var(--grad); color: #fff; border-color: transparent; box-shadow: var(--shadow-lg); }
+  .pill.solid:hover { color: #fff; filter: brightness(1.06); }
+
+  /* ---------- board ---------- */
+  .board {
+    flex: 1; position: relative; background: var(--felt);
+    display: flex; flex-direction: column; justify-content: center;
+    padding: 10px clamp(6px, 2vw, 26px); gap: 8px; min-height: 0;
+  }
+  .lane { display: flex; align-items: center; gap: clamp(4px, 1vw, 10px); min-height: 0; }
+  .minions-row {
+    flex: 0 0 auto; justify-content: center; flex-wrap: nowrap;
+    align-self: stretch; min-height: 104px;
+  }
+  .hero-row { justify-content: center; gap: 26px; }
+  .midline { height: 2px; align-self: stretch; margin: 2px clamp(40px, 20vw, 260px);
+    background: linear-gradient(90deg, transparent, rgba(124,92,255,.5), transparent); border-radius: 2px; }
+
+  /* hero */
+  .hero {
+    position: relative; width: 118px; height: 92px; border-radius: 14px;
+    background: var(--surface-alt); border: 2px solid var(--border);
+    display: flex; align-items: center; justify-content: center; font-size: 42px;
+    box-shadow: var(--shadow); transition: .14s;
+  }
+  .hero .hp {
+    position: absolute; right: -8px; bottom: -8px; width: 34px; height: 34px; border-radius: 50%;
+    background: #c0243a; color: #fff; display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 15px; border: 2px solid #ff8ba0;
+  }
+  .hero .armor {
+    position: absolute; right: 22px; bottom: -8px; width: 30px; height: 30px; border-radius: 50%;
+    background: #6b7280; color: #fff; display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 13px; border: 2px solid #cbd5e1;
+  }
+  .hero .name { position: absolute; top: -9px; left: 50%; transform: translateX(-50%);
+    font-size: 10.5px; font-weight: 800; color: var(--muted); background: var(--surface);
+    padding: 1px 8px; border-radius: 999px; border: 1px solid var(--border); white-space: nowrap; }
+  .hero.tgt { border-color: var(--bear); cursor: pointer; box-shadow: 0 0 0 4px rgba(255,107,138,.25); }
+  .hero.tgt:hover { transform: translateY(-2px); }
+
+  .side-info { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; color: var(--muted); font-weight: 700; }
+  .side-info .deckcnt { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 3px 8px; }
+  .power {
+    width: 62px; height: 62px; border-radius: 50%; font-size: 22px;
+    background: radial-gradient(circle at 35% 30%, #3a2f6b, #1a1730);
+    border: 2px solid var(--acc); color: #fff; display: flex; align-items: center; justify-content: center;
+    box-shadow: var(--shadow); transition: .14s; position: relative;
+  }
+  .power .pc { position: absolute; top: -6px; left: -6px; width: 22px; height: 22px; border-radius: 50%;
+    background: var(--mana); color: #04222f; font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center; border: 2px solid #bfe9ff; }
+  .power:disabled { opacity: .4; filter: grayscale(.6); cursor: default; }
+  .power.usable:not(:disabled) { box-shadow: 0 0 0 4px rgba(124,92,255,.3); }
+  .power.tgt { border-color: var(--gold); box-shadow: 0 0 0 4px rgba(255,204,85,.3); }
+
+  /* mana crystals */
+  .mana-strip { display: flex; gap: 3px; align-items: center; }
+  .cry { width: 13px; height: 13px; border-radius: 3px; transform: rotate(45deg);
+    background: #2a2f44; border: 1px solid #3a4058; }
+  .cry.on { background: var(--mana); border-color: #bfe9ff; box-shadow: 0 0 6px rgba(56,182,255,.7); }
+  .mana-num { font-weight: 800; font-size: 13px; color: var(--mana); min-width: 42px; }
+
+  /* ---------- card ---------- */
+  .minion {
+    position: relative; width: clamp(72px, 10.5vw, 96px); aspect-ratio: 3/4;
+    border-radius: 12px; background: linear-gradient(180deg, #2b2140, #1a1526);
+    border: 2px solid #4a3f66; box-shadow: var(--shadow);
+    display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+    padding-top: 8px; font-size: 30px; flex: none; transition: transform .12s, box-shadow .12s, filter .12s;
+    animation: summon .28s ease;
+  }
+  @keyframes summon { from { transform: translateY(14px) scale(.7); opacity: 0; } }
+  .minion .art { line-height: 1; filter: drop-shadow(0 2px 3px rgba(0,0,0,.5)); }
+  .minion .nm { font-size: 8.5px; font-weight: 700; color: #d9d2f0; margin-top: auto; padding: 0 3px 2px;
+    text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .minion .atk, .minion .hp {
+    position: absolute; bottom: -7px; width: 24px; height: 24px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px; color: #fff;
+  }
+  .minion .atk { left: -7px; background: #caa23c; border: 2px solid #ffe08a; }
+  .minion .hp  { right: -7px; background: #c0243a; border: 2px solid #ff8ba0; }
+  .minion .hp.dmg { background: #7a1020; }
+  .minion .hp.buff { background: #1c7a4a; border-color: #57e0a0; }
+  .minion .atk.buff { background: #1c7a4a; border-color: #57e0a0; }
+  .minion.taunt { border-color: #8a97ab; box-shadow: 0 0 0 3px rgba(160,175,200,.25), var(--shadow); }
+  .minion.taunt::before {
+    content: "🛡"; position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+    font-size: 15px; filter: drop-shadow(0 1px 2px #000);
+  }
+  .minion.shield { border-color: var(--gold); box-shadow: 0 0 12px rgba(255,204,85,.55), var(--shadow); }
+  .minion.sick { filter: grayscale(.55) brightness(.82); }
+  .minion.ready { border-color: var(--bull); box-shadow: 0 0 0 3px rgba(46,230,168,.35), var(--shadow); cursor: pointer; }
+  .minion.ready:hover { transform: translateY(-4px); }
+  .minion.sel { border-color: #fff; box-shadow: 0 0 0 3px #fff, var(--shadow-lg); transform: translateY(-6px); }
+  .minion.tgt { border-color: var(--bear); box-shadow: 0 0 0 3px rgba(255,107,138,.5), var(--shadow); cursor: pointer; }
+  .minion.tgt:hover { transform: translateY(-4px); }
+  .minion.attacking { transform: translateY(-16px) scale(1.06); z-index: 5; }
+  .minion.dying { animation: die .3s forwards; }
+  @keyframes die { to { transform: scale(.4) rotate(14deg); opacity: 0; } }
+
+  /* ---------- hand ---------- */
+  .hand-wrap { flex: none; padding: 4px 8px 16px; display: flex; flex-direction: column; align-items: center;
+    gap: 4px; min-height: 208px; background: linear-gradient(0deg, #10121c, transparent); }
+  .hand { display: flex; justify-content: center; align-items: flex-end; }
+  .hcard {
+    width: 116px; height: 158px; margin: 0 -14px; border-radius: 14px;
+    background: linear-gradient(180deg, #241d38, #17121f); border: 2px solid #4a3f66;
+    box-shadow: var(--shadow); position: relative; padding: 26px 9px 9px;
+    display: flex; flex-direction: column; align-items: center; text-align: center;
+    transition: transform .14s, margin .14s, box-shadow .14s; flex: none;
+  }
+  .hand .hcard:hover { transform: translateY(-24px) scale(1.05); margin: 0 4px; z-index: 8; box-shadow: var(--shadow-lg); }
+  .hcard .cost { position: absolute; top: -9px; left: -9px; width: 28px; height: 28px; border-radius: 50%;
+    background: var(--mana); color: #04222f; font-weight: 800; font-size: 15px;
+    display: flex; align-items: center; justify-content: center; border: 2px solid #bfe9ff; }
+  .hcard .cost.cheap { background: var(--bull); border-color: #9df3d3; }
+  .hcard .cost.pricey { background: var(--bear); border-color: #ffc2ce; }
+  .hcard .cname { font-size: 10.5px; font-weight: 800; line-height: 1.12; min-height: 24px;
+    white-space: normal; overflow-wrap: anywhere; }
+  .hcard .cart { font-size: 32px; margin: 2px 0; }
+  .hcard .ctext { font-size: 9px; color: #cfc8e6; line-height: 1.25; flex: 1; overflow: hidden; }
+  .hcard .ctype { font-size: 8px; letter-spacing: .5px; text-transform: uppercase; color: var(--muted); font-weight: 800; }
+  .hcard .catk, .hcard .chp {
+    position: absolute; bottom: -8px; width: 26px; height: 26px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px; color: #fff;
+  }
+  .hcard .catk { left: -8px; background: #caa23c; border: 2px solid #ffe08a; }
+  .hcard .chp  { right: -8px; background: #c0243a; border: 2px solid #ff8ba0; }
+  .hcard.playable { cursor: pointer; border-color: var(--bull); box-shadow: 0 0 0 2px rgba(46,230,168,.4), var(--shadow); }
+  .hcard.unplayable { filter: grayscale(.5) brightness(.7); }
+  .hcard.sel { border-color: #fff; box-shadow: 0 0 0 3px #fff, var(--shadow-lg); transform: translateY(-26px) scale(1.06); margin: 0 6px; }
+
+  .enemy-hand { display: flex; justify-content: center; gap: 3px; padding: 3px 0; flex: none; }
+  .enemy-hand .cb { width: 30px; height: 42px; border-radius: 6px;
+    background: linear-gradient(160deg, #3a2f6b, #221b3f); border: 1px solid #5a4f8a; }
+
+  /* ---------- overlays ---------- */
+  .veil {
+    position: fixed; inset: 0; background: rgba(6,7,14,.82); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+    display: flex; align-items: center; justify-content: center; z-index: 50; padding: 20px;
+  }
+  .veil[hidden] { display: none; }
+  .modal {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 20px;
+    padding: 26px 28px; max-width: 640px; width: 100%; box-shadow: var(--shadow-lg); text-align: center;
+  }
+  .modal h1 { margin: 0 0 6px; font-size: 24px; background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .modal h2 { margin: 0 0 14px; font-size: 18px; }
+  .modal p { color: var(--muted); font-size: 13.5px; margin: 6px 0 16px; }
+  .deck-pick { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+  .deck-opt {
+    flex: 1 1 220px; max-width: 260px; background: var(--surface-alt); border: 2px solid var(--border);
+    border-radius: 14px; padding: 16px; text-align: left; transition: .14s;
+  }
+  .deck-opt:hover { border-color: var(--acc); transform: translateY(-3px); }
+  .deck-opt .dn { font-weight: 800; font-size: 15px; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+  .deck-opt .dd { font-size: 12px; color: var(--muted); line-height: 1.5; }
+  .mull-cards { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin: 10px 0 16px; }
+  .mull-cards .hcard { cursor: pointer; margin: 0; }
+  .mull-cards .hcard.toss { filter: grayscale(1) brightness(.55); border-color: var(--bear); }
+  .mull-cards .hcard.toss::after { content: "↻ สับคืน"; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 800; color: var(--bear); background: rgba(0,0,0,.35); border-radius: 12px; }
+
+  /* ---------- fx / misc ---------- */
+  #fxlayer { position: fixed; inset: 0; pointer-events: none; z-index: 40; overflow: hidden; }
+  .float {
+    position: absolute; font-weight: 900; font-size: 22px; text-shadow: 0 2px 6px #000;
+    animation: floatUp 1s ease forwards;
+  }
+  @keyframes floatUp { to { transform: translateY(-46px); opacity: 0; } }
+  .float.dmg { color: #ff5b78; } .float.heal { color: #45e6a6; } .float.buff { color: #8bd0ff; }
+
+  .turnbanner {
+    position: fixed; left: 50%; top: 42%; transform: translate(-50%, -50%) scale(.8);
+    font-size: 30px; font-weight: 900; padding: 12px 34px; border-radius: 999px;
+    background: var(--grad); color: #fff; box-shadow: var(--shadow-lg); z-index: 45; opacity: 0;
+    pointer-events: none; white-space: nowrap;
+  }
+  .turnbanner.show { animation: banner 1.2s ease forwards; }
+  @keyframes banner { 15% { opacity: 1; transform: translate(-50%,-50%) scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%,-50%) scale(1.05); } }
+
+  #endturn {
+    position: absolute; right: 16px; bottom: 14px;
+    width: 92px; height: 92px; border-radius: 50%; font-weight: 800; font-size: 13px; line-height: 1.2;
+    background: radial-gradient(circle at 35% 30%, #3a2f6b, #1a1730); border: 3px solid var(--acc); color: #fff;
+    box-shadow: var(--shadow); transition: .14s;
+  }
+  #endturn.hot { border-color: var(--bull); box-shadow: 0 0 0 5px rgba(46,230,168,.3); animation: pulse 1.6s infinite; }
+  #endturn:disabled { opacity: .45; filter: grayscale(.6); }
+  @keyframes pulse { 50% { box-shadow: 0 0 0 12px rgba(46,230,168,0); } }
+
+  .log {
+    position: absolute; left: 12px; bottom: 14px;
+    width: 196px; max-height: 40%; overflow: hidden; font-size: 11px; color: var(--muted);
+    background: rgba(10,12,20,.5); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px;
+    display: flex; flex-direction: column-reverse; gap: 3px; line-height: 1.35;
+  }
+  .log b { color: var(--text); }
+  @media (max-width: 780px) {
+    .log { display: none; }
+    #endturn { width: 72px; height: 72px; font-size: 11px; right: 8px; }
+    .hcard { width: 96px; height: 140px; }
+  }
+  .hint { text-align: center; font-size: 12.5px; color: var(--muted); font-weight: 700;
+    flex: 0 0 auto; display: flex; align-items: center; justify-content: center; min-height: 26px;
+    padding: 4px 12px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="topbar">
+    <span class="brand">⚔ Aether Clash</span>
+    <span class="sp"></span>
+    <button class="pill" id="howBtn">วิธีเล่น</button>
+    <button class="pill" id="restartBtn">เกมใหม่</button>
+    <a class="pill" href="index.html">🏠 หน้าหลัก</a>
+  </div>
+
+  <div class="board" id="boardEl">
+    <div class="lane hero-row" id="enemyHeroRow"></div>
+    <div class="enemy-hand" id="enemyHand"></div>
+    <div class="lane minions-row" id="enemyBoard"></div>
+    <div class="midline"></div>
+    <div class="lane minions-row" id="youBoard"></div>
+    <div class="lane hero-row" id="youHeroRow"></div>
+    <button id="endturn">จบเทิร์น</button>
+    <div class="log" id="logEl"></div>
+  </div>
+
+  <div class="hand-wrap">
+    <div class="hint" id="hintEl"></div>
+    <div class="hand" id="youHand"></div>
+  </div>
+</div>
+
+<div id="fxlayer"></div>
+<div class="turnbanner" id="banner"></div>
+
+<!-- deck select -->
+<div class="veil" id="startVeil">
+  <div class="modal">
+    <h1>Aether Clash</h1>
+    <p>เกมการ์ดต่อสู้ผลัดเทิร์น · เลือกสำรับของคุณ แล้วสู้กับ AI</p>
+    <div class="deck-pick" id="deckPick"></div>
+  </div>
+</div>
+
+<!-- mulligan -->
+<div class="veil" id="mullVeil" hidden>
+  <div class="modal">
+    <h2>สับการ์ดเปิดเกม (Mulligan)</h2>
+    <p>แตะการ์ดที่ไม่ต้องการเพื่อสับคืนสำรับ แล้วจับใหม่</p>
+    <div class="mull-cards" id="mullCards"></div>
+    <button class="pill solid" id="mullConfirm">พร้อมสู้</button>
+  </div>
+</div>
+
+<!-- how to play -->
+<div class="veil" id="howVeil" hidden>
+  <div class="modal" style="text-align:left;">
+    <h2 style="text-align:center;">วิธีเล่น</h2>
+    <p style="color:var(--text);">
+      • ฮีโร่มีเลือด 30 · แต่ละเทิร์นได้คริสตัลมานาเพิ่ม 1 (สูงสุด 10) และเติมเต็ม<br>
+      • แตะการ์ดบนมือเพื่อลง — มินเนียนลงสนาม, สเปลใช้แล้วทิ้ง (บางใบต้องเลือกเป้า)<br>
+      • มินเนียนที่เพิ่งลงต้องรอเทิร์นถัดไปถึงจะตีได้ (ยกเว้น <b>Charge</b>)<br>
+      • แตะมินเนียนของคุณ (ขอบเขียว) แล้วแตะศัตรูเพื่อโจมตี — ตีกันเสียเลือดทั้งคู่<br>
+      • <b>Taunt</b> ต้องเคลียร์ก่อนถึงตีตัวอื่น/หน้าฮีโร่ได้ · <b>Divine Shield</b> กันดาเมจครั้งแรก<br>
+      • <b>Battlecry</b> ทำงานตอนลง · <b>Deathrattle</b> ทำงานตอนตาย<br>
+      • พลังฮีโร่ (วงกลมข้างฮีโร่) ใช้ได้เทิร์นละครั้ง เสีย 2 มานา<br>
+      • สำรับหมด = โดน Fatigue เสียเลือดเพิ่มขึ้นเรื่อย ๆ · ฮีโร่ศัตรูเลือด 0 = ชนะ
+    </p>
+    <div style="text-align:center;"><button class="pill solid" id="howClose">เข้าใจแล้ว</button></div>
+  </div>
+</div>
+
+<!-- game over -->
+<div class="veil" id="overVeil" hidden>
+  <div class="modal">
+    <h1 id="overTitle">ชนะ!</h1>
+    <p id="overSub"></p>
+    <button class="pill solid" id="overAgain">เล่นอีกครั้ง</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+  const rnd = (n) => Math.floor(Math.random() * n);
+  function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = rnd(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+
+  /* ============================ CARD POOL ============================ */
+  // minion: {type:'minion', cost, atk, hp, emoji, keywords:[], text, battlecry?, deathrattle?, needTarget?}
+  // spell:  {type:'spell', cost, emoji, text, target, cast(g,tgt)}
+  const CARDS = {
+    /* ---- minions ---- */
+    wisp:        { name: "Wisp", type: "minion", cost: 0, atk: 1, hp: 1, emoji: "✨", text: "" },
+    squire:      { name: "Squire", type: "minion", cost: 1, atk: 1, hp: 2, emoji: "🗡️", text: "" },
+    footman:     { name: "Footman", type: "minion", cost: 1, atk: 2, hp: 1, emoji: "🪖", text: "" },
+    argent:      { name: "Argent Squire", type: "minion", cost: 1, atk: 1, hp: 1, emoji: "⚜️", keywords: ["Divine Shield"], text: "Divine Shield" },
+    snapper:     { name: "River Snapper", type: "minion", cost: 2, atk: 2, hp: 3, emoji: "🐢", text: "" },
+    shieldbearer:{ name: "Shieldbearer", type: "minion", cost: 2, atk: 0, hp: 4, emoji: "🧱", keywords: ["Taunt"], text: "Taunt" },
+    engineer:    { name: "Novice Engineer", type: "minion", cost: 2, atk: 1, hp: 1, emoji: "🔧", text: "Battlecry: จั่วการ์ด 1 ใบ",
+                   battlecry: (g, self) => draw(self.side, 1) },
+    spider:      { name: "Nerubian", type: "minion", cost: 2, atk: 2, hp: 2, emoji: "🕷️", text: "Deathrattle: เรียก Spiderling 1/1",
+                   deathrattle: (g, self) => summon(self.side, "spiderling", 1) },
+    raider:      { name: "Wolfrider", type: "minion", cost: 3, atk: 3, hp: 1, emoji: "🐺", keywords: ["Charge"], text: "Charge" },
+    grizzly:     { name: "Ironfur Grizzly", type: "minion", cost: 3, atk: 3, hp: 3, emoji: "🐻", keywords: ["Taunt"], text: "Taunt" },
+    crusader:    { name: "Scarlet Crusader", type: "minion", cost: 3, atk: 3, hp: 1, emoji: "🛡️", keywords: ["Divine Shield"], text: "Divine Shield" },
+    acolyte:     { name: "Temple Acolyte", type: "minion", cost: 3, atk: 3, hp: 2, emoji: "🙏", text: "Battlecry: ฟื้นเลือดฮีโร่คุณ 3",
+                   battlecry: (g, self) => healChar(g.players[self.side].hero, 3) },
+    knight:      { name: "Silver Hand Knight", type: "minion", cost: 4, atk: 4, hp: 4, emoji: "🐎", text: "Battlecry: เรียก Squire 2/2",
+                   battlecry: (g, self) => summon(self.side, "squireling", 1) },
+    senjin:      { name: "Sen'jin Shieldmasta", type: "minion", cost: 4, atk: 3, hp: 5, emoji: "🗿", keywords: ["Taunt"], text: "Taunt" },
+    drake:       { name: "Azure Drake", type: "minion", cost: 5, atk: 4, hp: 4, emoji: "🐉", text: "Battlecry: จั่วการ์ด 1 ใบ",
+                   battlecry: (g, self) => draw(self.side, 1) },
+    berserker:   { name: "Gurubashi Berserker", type: "minion", cost: 5, atk: 2, hp: 7, emoji: "😡", text: "" },
+    abom:        { name: "Abomination", type: "minion", cost: 5, atk: 4, hp: 4, emoji: "🧟", keywords: ["Taunt"], text: "Taunt · Deathrattle: ดาเมจ 2 ทุกตัว",
+                   deathrattle: (g) => { charList().forEach(c => dealDamage(c, 2)); } },
+    elemental:   { name: "Fire Elemental", type: "minion", cost: 6, atk: 6, hp: 5, emoji: "🔥", text: "Battlecry: ดาเมจ 3", needTarget: "any",
+                   battlecry: (g, self, tgt) => { if (tgt) dealDamage(tgt, 3); } },
+    ogre:        { name: "Boulderfist Ogre", type: "minion", cost: 6, atk: 6, hp: 7, emoji: "👹", text: "" },
+    golem:       { name: "War Golem", type: "minion", cost: 7, atk: 7, hp: 7, emoji: "🪨", text: "" },
+    /* tokens */
+    spiderling:  { name: "Spiderling", type: "minion", cost: 1, atk: 1, hp: 1, emoji: "🕸️", text: "", token: true },
+    squireling:  { name: "Squire", type: "minion", cost: 2, atk: 2, hp: 2, emoji: "🥚", text: "", token: true },
+    sheep:       { name: "Sheep", type: "minion", cost: 1, atk: 0, hp: 1, emoji: "🐑", text: "", token: true },
+    recruit:     { name: "Recruit", type: "minion", cost: 1, atk: 1, hp: 1, emoji: "🧍", text: "", token: true },
+
+    /* ---- spells ---- */
+    arcaneshot:  { name: "Arcane Shot", type: "spell", cost: 1, emoji: "🏹", text: "ดาเมจ 2", target: "any",
+                   cast: (g, t) => dealDamage(t, 2) },
+    blessing:    { name: "Blessing of Might", type: "spell", cost: 1, emoji: "💠", text: "มินเนียนตัวหนึ่ง +2/+2", target: "minion",
+                   cast: (g, t) => buff(t, 2, 2) },
+    frostbolt:   { name: "Frostbolt", type: "spell", cost: 2, emoji: "❄️", text: "ดาเมจ 3", target: "any",
+                   cast: (g, t) => dealDamage(t, 3) },
+    arcaneexpl:  { name: "Arcane Explosion", type: "spell", cost: 2, emoji: "💥", text: "ดาเมจ 1 ให้มินเนียนศัตรูทั้งหมด",
+                   cast: (g, t, caster) => enemyMinions(caster).forEach(m => dealDamage(m, 1)) },
+    healtouch:   { name: "Healing Touch", type: "spell", cost: 3, emoji: "💚", text: "ฟื้นเลือด 8", target: "friendly",
+                   cast: (g, t) => healChar(t, 8) },
+    fireball:    { name: "Fireball", type: "spell", cost: 4, emoji: "🔥", text: "ดาเมจ 6", target: "any",
+                   cast: (g, t) => dealDamage(t, 6) },
+    hex:         { name: "Hex", type: "spell", cost: 4, emoji: "🐑", text: "เปลี่ยนมินเนียนเป็นแกะ 0/1", target: "minion",
+                   cast: (g, t) => transform(t, "sheep") },
+    holynova:    { name: "Holy Nova", type: "spell", cost: 5, emoji: "🌟", text: "ดาเมจ 2 ศัตรูทั้งหมด · ฟื้น 2 ฝ่ายเรา",
+                   cast: (g, t, caster) => {
+                     const foe = other(caster);
+                     [g.players[foe].hero, ...g.players[foe].board].forEach(c => dealDamage(c, 2));
+                     [g.players[caster].hero, ...g.players[caster].board].forEach(c => healChar(c, 2));
+                   } },
+    flamestrike: { name: "Flamestrike", type: "spell", cost: 7, emoji: "🌋", text: "ดาเมจ 4 ให้มินเนียนศัตรูทั้งหมด",
+                   cast: (g, t, caster) => enemyMinions(caster).forEach(m => dealDamage(m, 4)) },
+    coin:        { name: "The Coin", type: "spell", cost: 0, emoji: "🪙", text: "ได้มานา 1 หน่วยในเทิร์นนี้", token: true,
+                   cast: (g, t, caster) => { g.players[caster].mana = Math.min(10, g.players[caster].mana + 1); } },
+  };
+
+  function mk(id) {
+    const d = CARDS[id];
+    const c = { iid: ++IID, id, name: d.name, type: d.type, cost: d.cost, emoji: d.emoji, text: d.text,
+      keywords: (d.keywords || []).slice() };
+    if (d.type === "minion") {
+      c.atk = d.atk; c.hp = d.hp; c.maxHp = d.hp;
+      c.baseAtk = d.atk;
+      c.taunt = c.keywords.includes("Taunt");
+      c.divineShield = c.keywords.includes("Divine Shield");
+      c.charge = c.keywords.includes("Charge");
+      c.sick = true; c.hasAttacked = false;
+      c.battlecry = d.battlecry; c.deathrattle = d.deathrattle; c.needTarget = d.needTarget || null;
+    } else {
+      c.target = d.target || null; c.cast = d.cast;
+    }
+    return c;
+  }
+  let IID = 0;
+
+  /* ============================ DECKS ============================ */
+  const DECKS = {
+    arcanist: {
+      name: "Arcanist", emoji: "🧙", hp: "fireblast",
+      desc: "สายเวทย์ · เบิร์นเยอะ เคลียร์บอร์ดแรง พลังฮีโร่ยิงดาเมจ 1",
+      list: { arcaneshot: 2, frostbolt: 2, fireball: 2, arcaneexpl: 2, flamestrike: 1, hex: 1,
+              wisp: 2, argent: 2, engineer: 2, snapper: 2, raider: 2, drake: 2, elemental: 2, ogre: 2, senjin: 2, golem: 1, spider: 1 },
+    },
+    vanguard: {
+      name: "Vanguard", emoji: "🛡️", hp: "reinforce",
+      desc: "สายบุก · มินเนียนแน่น Taunt เยอะ พลังฮีโร่เรียกทหาร 1/1",
+      list: { squire: 2, footman: 2, argent: 2, shieldbearer: 2, grizzly: 2, crusader: 2, acolyte: 2,
+              knight: 2, senjin: 2, berserker: 2, abom: 2, ogre: 2, raider: 2, golem: 1, blessing: 2, healtouch: 1 },
+    },
+  };
+  const HERO_POWERS = {
+    fireblast: { name: "Fireblast", emoji: "🔥", cost: 2, target: "any", use: (g, t) => dealDamage(t, 1) },
+    reinforce: { name: "Reinforce", emoji: "🧍", cost: 2, target: null, use: (g, t, side) => summon(side, "recruit", 1) },
+  };
+  function buildDeck(key) {
+    const out = [];
+    Object.entries(DECKS[key].list).forEach(([id, n]) => { for (let i = 0; i < n; i++) out.push(mk(id)); });
+    return shuffle(out);
+  }
+
+  /* ============================ STATE ============================ */
+  let G = null;
+  function newHero(side, deckKey) {
+    return { isHero: true, side, name: DECKS[deckKey].name, emoji: DECKS[deckKey].emoji, hp: 30, maxHp: 30, armor: 0 };
+  }
+  function other(side) { return side === "you" ? "ai" : "you"; }
+  function charList() {
+    if (!G) return [];
+    return [G.players.you.hero, G.players.ai.hero, ...G.players.you.board, ...G.players.ai.board];
+  }
+  function enemyMinions(side) { return G.players[other(side)].board.slice(); }
+  function log(html) { G.log.unshift(html); if (G.log.length > 40) G.log.pop(); }
+
+  /* ============================ EFFECT HELPERS ============================ */
+  function nm(c) { return c.isHero ? `<b>${c.name}</b> (ฮีโร่${c.side === "you" ? "คุณ" : "ศัตรู"})` : `${c.emoji} <b>${c.name}</b>`; }
+
+  function dealDamage(c, amt) {
+    if (!c || amt <= 0) return;
+    if (!c.isHero && !G.players[c.side].board.includes(c)) return; // already dead/removed
+    if (!c.isHero && c.divineShield) { c.divineShield = false; c.keywords = c.keywords.filter(k => k !== "Divine Shield");
+      log(`${nm(c)} เสีย Divine Shield`); FX.push({ c, txt: "🛡️✖", cls: "buff" }); return; }
+    if (c.isHero && c.armor > 0) { const a = Math.min(c.armor, amt); c.armor -= a; amt -= a; }
+    if (amt <= 0) return;
+    c.hp -= amt;
+    log(`${nm(c)} รับดาเมจ ${amt}`);
+    FX.push({ c, txt: "-" + amt, cls: "dmg" });
+  }
+  function healChar(c, amt) {
+    if (!c || amt <= 0) return;
+    const max = c.isHero ? c.maxHp : c.maxHp;
+    if (c.hp >= max) return;
+    const real = Math.min(amt, max - c.hp);
+    c.hp += real;
+    log(`${nm(c)} ฟื้นเลือด ${real}`);
+    FX.push({ c, txt: "+" + real, cls: "heal" });
+  }
+  function buff(m, a, h) {
+    if (!m || m.isHero) return;
+    m.atk += a; m.hp += h; m.maxHp += h; m.buffed = true;
+    log(`${nm(m)} ได้ +${a}/+${h}`);
+    FX.push({ c: m, txt: `+${a}/+${h}`, cls: "buff" });
+  }
+  function transform(m, tokenId) {
+    if (!m || m.isHero) return;
+    const board = G.players[m.side].board;
+    const idx = board.indexOf(m);
+    if (idx < 0) return;
+    const fresh = mk(tokenId);
+    fresh.side = m.side; fresh.sick = true; fresh.hasAttacked = true; fresh.canAttack = false;
+    board[idx] = fresh;
+    log(`${nm(m)} ถูกแปลงเป็น ${nm(fresh)}`);
+  }
+  function summon(side, id, count) {
+    for (let i = 0; i < (count || 1); i++) {
+      const board = G.players[side].board;
+      if (board.length >= 7) return;
+      const m = mk(id);
+      m.side = side;
+      m.sick = !m.charge; m.hasAttacked = false;
+      m.canAttack = m.charge && m.atk > 0;
+      board.push(m);
+      log(`${side === "you" ? "คุณ" : "ศัตรู"}เรียก ${nm(m)}`);
+    }
+  }
+  function draw(side, count) {
+    const p = G.players[side];
+    for (let i = 0; i < (count || 1); i++) {
+      if (!p.deck.length) {
+        p.fatigue++;
+        log(`<b>${side === "you" ? "คุณ" : "ศัตรู"}</b> โดน Fatigue!`);
+        dealDamage(p.hero, p.fatigue);
+        continue;
+      }
+      const card = p.deck.pop();
+      if (p.hand.length >= 10) { log(`มือเต็ม — ${nm(card)} ถูกเผา`); continue; }
+      p.hand.push(card);
+    }
+  }
+
+  /* ============================ DEATHS / GAME OVER ============================ */
+  function resolveDeaths() {
+    let again = true, guard = 0;
+    while (again && guard++ < 20) {
+      again = false;
+      for (const side of ["you", "ai"]) {
+        const board = G.players[side].board;
+        for (let i = board.length - 1; i >= 0; i--) {
+          if (board[i].hp <= 0) {
+            const m = board.splice(i, 1)[0];
+            log(`${nm(m)} ตาย`);
+            FX.push({ c: m, txt: "💀", cls: "dmg" });
+            if (m.deathrattle) { again = true; m.deathrattle(G, m); }
+          }
+        }
+      }
+    }
+  }
+  function checkOver() {
+    const yd = G.players.you.hero.hp <= 0, ad = G.players.ai.hero.hp <= 0;
+    if (!yd && !ad) return false;
+    G.over = true;
+    G.result = (yd && ad) ? "draw" : yd ? "lose" : "win";
+    return true;
+  }
+
+  /* ============================ TURN FLOW ============================ */
+  async function beginTurn(side) {
+    G.active = side;
+    const p = G.players[side];
+    p.maxMana = Math.min(10, p.maxMana + 1);
+    p.mana = p.maxMana;
+    p.powerUsed = false;
+    p.board.forEach(m => { m.sick = false; m.hasAttacked = false; m.canAttack = m.atk > 0; });
+    clearSel();
+    render();
+    banner(side === "you" ? "เทิร์นของคุณ" : "เทิร์นศัตรู");
+    await sleep(500);
+    draw(side, 1);
+    if (checkOver()) return finish();
+    await flushFx();
+    if (side === "ai") { await sleep(600); aiTurn(); }
+  }
+  async function endTurn() {
+    if (G.over || G.active !== "you" || G.busy) return;
+    clearSel();
+    await beginTurn("ai");
+  }
+
+  /* ============================ PLAY / ATTACK ============================ */
+  function canPlay(card) {
+    const p = G.players.you;
+    if (card.cost > p.mana) return false;
+    if (card.type === "minion" && p.board.length >= 7) return false;
+    if (card.type === "spell" && card.target && !targetsFor(card.target, "you").length) return false;
+    if (card.type === "minion" && card.needTarget && !targetsFor(card.needTarget, "you").length) return false;
+    return true;
+  }
+  async function playCard(side, handIdx, target) {
+    const p = G.players[side];
+    const card = p.hand[handIdx];
+    if (!card) return;
+    p.hand.splice(handIdx, 1);
+    p.mana -= card.cost;
+    G.busy = true;
+    if (card.type === "minion") {
+      card.side = side;
+      card.sick = !card.charge; card.hasAttacked = false; card.canAttack = card.charge && card.atk > 0;
+      p.board.push(card);
+      log(`${side === "you" ? "คุณ" : "ศัตรู"}ลง ${nm(card)}`);
+      render(); await sleep(160);
+      if (card.battlecry) { card.battlecry(G, card, target); }
+    } else {
+      log(`${side === "you" ? "คุณ" : "ศัตรู"}ร่าย ${nm(card)}`);
+      if (card.cast) card.cast(G, target, side);
+    }
+    resolveDeaths();
+    await flushFx();
+    if (checkOver()) { G.busy = false; return finish(); }
+    G.busy = false;
+    render();
+  }
+
+  function tauntWall(side) { return G.players[side].board.filter(m => m.taunt); }
+  function attackTargets(attackerSide) {
+    const foe = other(attackerSide);
+    const wall = tauntWall(foe);
+    if (wall.length) return wall;
+    return [...G.players[foe].board, G.players[foe].hero];
+  }
+  async function doAttack(attacker, defender) {
+    if (G.busy || !attacker || !defender) return;
+    if (!attacker.canAttack || attacker.sick || attacker.atk <= 0) return;
+    if (!attackTargets(attacker.side).includes(defender)) return;
+    G.busy = true; clearSel();
+    const ael = cardEl(attacker); if (ael) ael.classList.add("attacking");
+    await sleep(160);
+    const retaliate = defender.isHero ? 0 : defender.atk;
+    dealDamage(defender, attacker.atk);
+    if (retaliate) dealDamage(attacker, retaliate);
+    attacker.hasAttacked = true; attacker.canAttack = false;
+    resolveDeaths();
+    await flushFx();
+    if (checkOver()) { G.busy = false; return finish(); }
+    G.busy = false;
+    render();
+  }
+  async function heroPower(side, target) {
+    const p = G.players[side];
+    const hp = HERO_POWERS[p.powerId];
+    if (p.powerUsed || p.mana < hp.cost) return;
+    p.mana -= hp.cost; p.powerUsed = true;
+    G.busy = true; clearSel();
+    log(`${side === "you" ? "คุณ" : "ศัตรู"}ใช้พลังฮีโร่ <b>${hp.name}</b>`);
+    hp.use(G, target, side);
+    resolveDeaths();
+    await flushFx();
+    if (checkOver()) { G.busy = false; return finish(); }
+    G.busy = false; render();
+  }
+
+  /* ============================ TARGETING (player) ============================ */
+  function targetsFor(spec, forSide) {
+    const you = G.players.you, ai = G.players.ai;
+    const mine = [you.hero, ...you.board], foe = [ai.hero, ...ai.board];
+    switch (spec) {
+      case "any": return [...mine, ...foe];
+      case "enemy": return foe;
+      case "friendly": return mine;
+      case "minion": return [...you.board, ...ai.board];
+      case "enemy-minion": return ai.board.slice();
+      case "friendly-minion": return you.board.slice();
+      default: return [];
+    }
+  }
+  let SEL = null; // {kind:'hand',i} | {kind:'attacker',iid} | {kind:'power'} ; plus SEL.targets[]
+  function clearSel() { SEL = null; }
+  function pickHand(i) {
+    if (G.over || G.busy || G.active !== "you") return;
+    const card = G.players.you.hand[i];
+    if (!card || !canPlay(card)) return;
+    if (SEL && SEL.kind === "hand" && SEL.i === i) { clearSel(); render(); return; }
+    const spec = card.type === "spell" ? card.target : card.needTarget;
+    if (spec) { SEL = { kind: "hand", i, targets: targetsFor(spec, "you") }; }
+    else { clearSel(); playCard("you", i, null); return; }
+    render();
+  }
+  function pickAttacker(iid) {
+    if (G.over || G.busy || G.active !== "you") return;
+    const m = G.players.you.board.find(x => x.iid === iid);
+    if (!m || !m.canAttack || m.sick || m.atk <= 0) return;
+    if (SEL && SEL.kind === "attacker" && SEL.iid === iid) { clearSel(); render(); return; }
+    SEL = { kind: "attacker", iid, targets: attackTargets("you") };
+    render();
+  }
+  function pickPower() {
+    if (G.over || G.busy || G.active !== "you") return;
+    const p = G.players.you, hp = HERO_POWERS[p.powerId];
+    if (p.powerUsed || p.mana < hp.cost) return;
+    if (SEL && SEL.kind === "power") { clearSel(); render(); return; }
+    if (hp.target) { SEL = { kind: "power", targets: targetsFor(hp.target, "you") }; render(); }
+    else { clearSel(); heroPower("you", null); }
+  }
+  function pickTarget(ref) {
+    if (!SEL || !SEL.targets || !SEL.targets.includes(ref)) return;
+    const s = SEL; clearSel();
+    if (s.kind === "hand") playCard("you", s.i, ref);
+    else if (s.kind === "attacker") { const a = G.players.you.board.find(x => x.iid === s.iid); doAttack(a, ref); }
+    else if (s.kind === "power") heroPower("you", ref);
+  }
+
+  /* ============================ AI ============================ */
+  async function aiTurn() {
+    if (G.over) return;
+    const me = G.players.ai, foe = G.players.you;
+    G.busy = false;
+    // 1) play cards (greedy, biggest useful spend first)
+    let acted = true, safety = 0;
+    while (acted && safety++ < 20 && !G.over) {
+      acted = false;
+      const options = me.hand.map((c, i) => ({ c, i })).filter(o => aiCanPlay(o.c));
+      if (!options.length) break;
+      const choice = aiChoosePlay(options);
+      if (!choice) break;
+      const tgt = choice.target !== undefined ? choice.target : aiPickTarget(choice.c);
+      await sleep(560);
+      await playCard("ai", me.hand.indexOf(choice.c), tgt);
+      acted = true;
+      render();
+    }
+    // 2) hero power
+    const hp = HERO_POWERS[me.powerId];
+    if (!me.powerUsed && me.mana >= hp.cost) {
+      const t = aiPowerTarget();
+      if (t !== false) { await sleep(500); await heroPower("ai", t); render(); }
+    }
+    // 3) attacks
+    await sleep(400);
+    await aiAttacks();
+    if (G.over) return;
+    await sleep(350);
+    await beginTurn("you");
+  }
+  function aiCanPlay(c) {
+    if (c.cost > G.players.ai.mana) return false;
+    if (c.type === "minion" && G.players.ai.board.length >= 7) return false;
+    if (c.type === "spell" && c.target && !aiTargets(c.target).length) return false;
+    if (c.type === "minion" && c.needTarget && !aiTargets(c.needTarget).length) return false;
+    if (c.id === "coin") return G.players.ai.hand.some(x => x !== c && x.cost === G.players.ai.mana + 1);
+    return true;
+  }
+  function aiTargets(spec) {
+    const me = G.players.ai, foe = G.players.you;
+    const mine = [me.hero, ...me.board], en = [foe.hero, ...foe.board];
+    if (spec === "any") return [...mine, ...en];
+    if (spec === "enemy") return en;
+    if (spec === "friendly") return mine;
+    if (spec === "minion") return [...me.board, ...foe.board];
+    if (spec === "enemy-minion") return foe.board.slice();
+    if (spec === "friendly-minion") return me.board.slice();
+    return [];
+  }
+  function biggestEnemyMinion() {
+    return G.players.you.board.slice().sort((a, b) => (b.atk + b.hp) - (a.atk + a.hp))[0] || null;
+  }
+  function aiChoosePlay(options) {
+    const me = G.players.ai, foe = G.players.you;
+    // hard removal on a scary minion
+    const threat = biggestEnemyMinion();
+    if (threat && (threat.atk >= 4 || threat.taunt || threat.divineShield)) {
+      const hex = options.find(o => o.c.id === "hex");
+      if (hex && (threat.atk >= 5 || threat.hp >= 5)) return { c: hex.c, target: threat };
+      const fb = options.find(o => o.c.id === "fireball");
+      if (fb && threat.hp <= 6) return { c: fb.c, target: threat };
+    }
+    // board clears when behind on board
+    if (foe.board.length >= 3) {
+      const fs = options.find(o => o.c.id === "flamestrike"); if (fs) return { c: fs.c, target: null };
+      const hn = options.find(o => o.c.id === "holynova"); if (hn && me.board.length <= foe.board.length) return { c: hn.c, target: null };
+      const ax = options.find(o => o.c.id === "arcaneexpl"); if (ax && foe.board.filter(m => m.hp === 1).length >= 2) return { c: ax.c, target: null };
+    }
+    // coin to ramp
+    const coin = options.find(o => o.c.id === "coin");
+    if (coin) return { c: coin.c, target: null };
+    // heal if low
+    if (me.hero.hp <= 12) {
+      const ht = options.find(o => o.c.id === "healtouch"); if (ht) return { c: ht.c, target: me.hero };
+    }
+    // buff a decent minion
+    const bl = options.find(o => o.c.id === "blessing");
+    if (bl && me.board.some(m => !m.sick && m.atk >= 2)) {
+      const t = me.board.filter(m => m.atk >= 2).sort((a, b) => b.atk - a.atk)[0];
+      return { c: bl.c, target: t };
+    }
+    // otherwise: spend mana on the most expensive playable minion, else any minion, else burn spell to face
+    const minions = options.filter(o => o.c.type === "minion").sort((a, b) => b.c.cost - a.c.cost);
+    if (minions.length) return { c: minions[0].c, target: minions[0].c.needTarget ? aiPickTarget(minions[0].c) : undefined };
+    const burn = options.filter(o => ["arcaneshot", "frostbolt", "fireball"].includes(o.c.id)).sort((a, b) => b.c.cost - a.c.cost);
+    if (burn.length) {
+      const kill = burn.find(o => { const d = { arcaneshot: 2, frostbolt: 3, fireball: 6 }[o.c.id]; const m = biggestEnemyMinion(); return m && m.hp <= d && m.atk >= 3; });
+      if (kill) return { c: kill.c, target: biggestEnemyMinion() };
+      if (foe.hero.hp <= 8) return { c: burn[0].c, target: foe.hero };
+    }
+    return options[0] ? { c: options[0].c, target: options[0].c.needTarget ? aiPickTarget(options[0].c) : undefined } : null;
+  }
+  function aiPickTarget(card) {
+    const spec = card.type === "spell" ? card.target : card.needTarget;
+    if (!spec) return null;
+    const foe = G.players.you, me = G.players.ai;
+    if (card.id === "healtouch" || spec === "friendly") return me.hero.hp < me.hero.maxHp ? me.hero : (me.board[0] || me.hero);
+    if (spec === "minion") return biggestEnemyMinion() || me.board[0] || null;
+    // damage: kill a minion if possible else face
+    const dmg = { arcaneshot: 2, frostbolt: 3, fireball: 6, elemental: 3 }[card.id] || 2;
+    const killable = foe.board.filter(m => m.hp <= dmg && !m.divineShield).sort((a, b) => (b.atk + b.hp) - (a.atk + a.hp))[0];
+    if (killable && (killable.atk >= 3 || killable.taunt)) return killable;
+    if (foe.hero.hp <= dmg) return foe.hero;
+    return killable || foe.hero;
+  }
+  function aiPowerTarget() {
+    const me = G.players.ai, foe = G.players.you;
+    const hp = HERO_POWERS[me.powerId];
+    if (!hp.target) return null;
+    const k = foe.board.find(m => m.hp === 1 && !m.divineShield && m.atk >= 2);
+    if (k) return k;
+    if (foe.hero.hp <= 3) return foe.hero;
+    return false; // save it
+  }
+  async function aiAttacks() {
+    const me = G.players.ai, foe = G.players.you;
+    let guard = 0;
+    while (guard++ < 20 && !G.over) {
+      const ready = me.board.filter(m => m.canAttack && !m.sick && m.atk > 0);
+      if (!ready.length) break;
+      const wall = tauntWall("you");
+      // lethal?
+      if (!wall.length) {
+        const swing = ready.reduce((s, m) => s + m.atk, 0);
+        if (swing >= foe.hero.hp) {
+          for (const m of ready) { if (G.over) break; await sleep(420); await doAttack(m, foe.hero); }
+          break;
+        }
+      }
+      const attacker = ready[0];
+      let best = null, bestScore = -1e9;
+      const opts = wall.length ? wall : [...foe.board, foe.hero];
+      for (const t of opts) {
+        let score;
+        if (t.isHero) score = attacker.atk - 0.1;
+        else {
+          const kills = attacker.atk >= t.hp && !t.divineShield;
+          const dies = t.atk >= attacker.hp && !attacker.divineShield;
+          score = (kills ? (t.atk + t.hp) : t.hp * 0.3) - (dies ? attacker.atk + attacker.hp : 0) + (t.taunt ? 3 : 0);
+        }
+        if (score > bestScore) { bestScore = score; best = t; }
+      }
+      if (!best) break;
+      // if nothing good to trade and no taunt, just go face
+      if (!wall.length && !best.isHero && bestScore < 0) best = foe.hero;
+      await sleep(430);
+      await doAttack(attacker, best);
+    }
+  }
+
+  /* ============================ FX ============================ */
+  let FX = [];
+  async function flushFx() {
+    const shots = FX.slice(); FX = [];
+    // capture each target's screen position from the CURRENT dom, before the re-render removes dead minions
+    const placed = shots.map(s => { const el = cardEl(s.c); return { s, r: el ? el.getBoundingClientRect() : null }; });
+    render();
+    let any = false;
+    for (const { s, r } of placed) {
+      const rect = r || (cardEl(s.c) ? cardEl(s.c).getBoundingClientRect() : null);
+      if (!rect) continue;
+      any = true;
+      const f = document.createElement("div");
+      f.className = "float " + (s.cls || "dmg");
+      f.textContent = s.txt;
+      f.style.left = (rect.left + rect.width / 2 - 12) + "px";
+      f.style.top = (rect.top + rect.height / 2 - 12) + "px";
+      $("fxlayer").appendChild(f);
+      setTimeout(() => f.remove(), 1000);
+      const live = cardEl(s.c);
+      if (live) live.animate([{ transform: "translateX(-3px)" }, { transform: "translateX(3px)" }, { transform: "translateX(0)" }], { duration: 160 });
+    }
+    if (any) await sleep(360);
+  }
+  function cardEl(c) {
+    if (!c) return null;
+    if (c.isHero) return document.querySelector(`.hero[data-hero="${c.side}"]`);
+    return document.querySelector(`.minion[data-iid="${c.iid}"]`);
+  }
+  function banner(txt) {
+    const b = $("banner"); b.textContent = txt; b.classList.remove("show"); void b.offsetWidth; b.classList.add("show");
+  }
+
+  /* ============================ RENDER ============================ */
+  function heroHtml(side) {
+    const p = G.players[side];
+    const h = p.hero;
+    const hp = HERO_POWERS[p.powerId];
+    const isTgt = SEL && SEL.targets && SEL.targets.includes(h);
+    const powerUsable = side === "you" && !p.powerUsed && p.mana >= hp.cost && G.active === "you" && !G.busy;
+    const powerTgt = SEL && SEL.kind === "power" && side === "you";
+    return `
+      <div class="side-info">
+        <div class="deckcnt">🂠 ${p.deck.length}</div>
+        ${side === "you" ? manaHtml(p) : `<div class="deckcnt">✋ ${p.hand.length}</div>`}
+      </div>
+      <div class="hero ${isTgt ? "tgt" : ""}" data-hero="${side}" data-ref="hero:${side}">
+        <span class="name">${h.name}</span>
+        <span>${h.emoji}</span>
+        ${h.armor > 0 ? `<span class="armor">${h.armor}</span>` : ""}
+        <span class="hp">${h.hp}</span>
+      </div>
+      <button class="power ${powerUsable ? "usable" : ""} ${powerTgt ? "tgt" : ""}" data-power="${side}" ${side === "you" && powerUsable ? "" : "disabled"}>
+        <span class="pc">${hp.cost}</span>${hp.emoji}
+      </button>`;
+  }
+  function manaHtml(p) {
+    let cr = "";
+    for (let i = 0; i < 10; i++) cr += `<span class="cry ${i < p.mana ? "on" : ""}"></span>`;
+    return `<div class="mana-strip">${cr}</div><div class="mana-num">${p.mana}/${p.maxMana}</div>`;
+  }
+  function minionHtml(m, side) {
+    const cls = ["minion"];
+    if (m.taunt) cls.push("taunt");
+    if (m.divineShield) cls.push("shield");
+    if (side === "you") {
+      if (m.canAttack && !m.sick && m.atk > 0 && G.active === "you" && !G.busy) cls.push("ready");
+      if (m.sick || !m.canAttack || m.atk <= 0) cls.push("sick");
+      if (SEL && SEL.kind === "attacker" && SEL.iid === m.iid) cls.push("sel");
+    } else {
+      if (SEL && SEL.targets && SEL.targets.includes(m)) cls.push("tgt");
+    }
+    const atkCls = m.atk > m.baseAtk ? "buff" : "";
+    const hpCls = m.hp < m.maxHp ? "dmg" : (m.hp > (CARDS[m.id].hp || m.hp) ? "buff" : "");
+    return `<div class="${cls.join(" ")}" data-iid="${m.iid}" data-ref="minion:${m.iid}">
+      <span class="art">${m.emoji}</span>
+      <span class="nm">${m.name}</span>
+      <span class="atk ${atkCls}">${m.atk}</span>
+      <span class="hp ${hpCls}">${m.hp}</span>
+    </div>`;
+  }
+  function handHtml() {
+    const p = G.players.you;
+    return p.hand.map((c, i) => {
+      const ok = canPlay(c) && G.active === "you" && !G.busy;
+      const sel = SEL && SEL.kind === "hand" && SEL.i === i;
+      const costCls = c.cost <= 1 ? "cheap" : c.cost >= 7 ? "pricey" : "";
+      return `<div class="hcard ${ok ? "playable" : "unplayable"} ${sel ? "sel" : ""}" data-hand="${i}">
+        <span class="cost ${costCls}">${c.cost}</span>
+        <div class="cname">${c.name}</div>
+        <div class="cart">${c.emoji}</div>
+        <div class="ctext">${c.text || ""}</div>
+        <div class="ctype">${c.type === "minion" ? "มินเนียน" : "สเปล"}</div>
+        ${c.type === "minion" ? `<span class="catk">${c.atk}</span><span class="chp">${c.hp}</span>` : ""}
+      </div>`;
+    }).join("");
+  }
+  function render() {
+    if (!G) return;
+    $("enemyHeroRow").innerHTML = heroHtml("ai");
+    $("youHeroRow").innerHTML = heroHtml("you");
+    $("enemyBoard").innerHTML = G.players.ai.board.map(m => minionHtml(m, "ai")).join("");
+    $("youBoard").innerHTML = G.players.you.board.map(m => minionHtml(m, "you")).join("");
+    $("youHand").innerHTML = handHtml();
+    $("enemyHand").innerHTML = Array.from({ length: G.players.ai.hand.length }, () => `<div class="cb"></div>`).join("");
+    $("logEl").innerHTML = G.log.map(l => `<div>${l}</div>`).join("");
+    const et = $("endturn");
+    et.disabled = G.active !== "you" || G.busy || G.over;
+    et.classList.toggle("hot", G.active === "you" && !G.busy && !G.over);
+    et.textContent = G.active === "you" ? "จบเทิร์น" : "รอศัตรู…";
+    // hint
+    let hint = "";
+    if (G.over) hint = "";
+    else if (G.active !== "you") hint = "ศัตรูกำลังคิด…";
+    else if (SEL && SEL.kind === "hand") hint = "เลือกเป้าหมายของการ์ด (แตะการ์ดเดิมเพื่อยกเลิก)";
+    else if (SEL && SEL.kind === "attacker") hint = "เลือกศัตรูที่จะโจมตี";
+    else if (SEL && SEL.kind === "power") hint = "เลือกเป้าหมายของพลังฮีโร่";
+    else hint = "แตะการ์ดบนมือเพื่อลง · แตะมินเนียนขอบเขียวเพื่อโจมตี";
+    $("hintEl").textContent = hint;
+  }
+
+  /* ============================ INPUT ============================ */
+  $("boardEl").addEventListener("click", (e) => {
+    const refEl = e.target.closest("[data-ref]");
+    const powerBtn = e.target.closest("[data-power]");
+    if (powerBtn && powerBtn.dataset.power === "you") { pickPower(); return; }
+    if (!refEl) { if (SEL) { clearSel(); render(); } return; }
+    const [kind, key] = refEl.dataset.ref.split(":");
+    let ref = null;
+    if (kind === "hero") ref = G.players[key].hero;
+    else if (kind === "minion") {
+      const iid = +key;
+      ref = G.players.you.board.find(m => m.iid === iid) || G.players.ai.board.find(m => m.iid === iid);
+    }
+    if (!ref) return;
+    // targeting mode: any valid target click resolves
+    if (SEL && SEL.targets && SEL.targets.includes(ref)) { pickTarget(ref); return; }
+    // else: selecting one of your own minions to attack, or your hero (nothing)
+    if (kind === "minion" && G.players.you.board.includes(ref)) { pickAttacker(ref.iid); return; }
+    // clicked something not useful -> clear
+    if (SEL) { clearSel(); render(); }
+  });
+  $("youHand").addEventListener("click", (e) => {
+    const h = e.target.closest("[data-hand]");
+    if (h) pickHand(+h.dataset.hand);
+  });
+  $("endturn").addEventListener("click", endTurn);
+  $("howBtn").addEventListener("click", () => $("howVeil").hidden = false);
+  $("howClose").addEventListener("click", () => $("howVeil").hidden = true);
+  $("restartBtn").addEventListener("click", () => location.reload());
+  $("overAgain").addEventListener("click", () => location.reload());
+
+  /* ============================ SETUP ============================ */
+  function renderDeckPick() {
+    $("deckPick").innerHTML = Object.entries(DECKS).map(([k, d]) => `
+      <button class="deck-opt" data-deck="${k}">
+        <div class="dn">${d.emoji} ${d.name}</div>
+        <div class="dd">${d.desc}</div>
+      </button>`).join("");
+    $("deckPick").querySelectorAll("[data-deck]").forEach(b =>
+      b.addEventListener("click", () => startGame(b.dataset.deck)));
+  }
+  function startGame(youKey) {
+    const aiKey = youKey === "arcanist" ? "vanguard" : "arcanist";
+    IID = 0;
+    G = {
+      turn: 1, active: "you", over: false, result: null, busy: true, log: [],
+      players: {
+        you: { hero: newHero("you", youKey), deck: buildDeck(youKey), hand: [], board: [],
+               mana: 0, maxMana: 0, fatigue: 0, powerId: DECKS[youKey].hp, powerUsed: false, deckKey: youKey },
+        ai:  { hero: newHero("ai", aiKey), deck: buildDeck(aiKey), hand: [], board: [],
+               mana: 0, maxMana: 0, fatigue: 0, powerId: DECKS[aiKey].hp, powerUsed: false, deckKey: aiKey },
+      },
+    };
+    const youFirst = Math.random() < 0.5;
+    G.firstSide = youFirst ? "you" : "ai";
+    // opening hands
+    for (let i = 0; i < 3; i++) { G.players.you.hand.push(G.players.you.deck.pop()); G.players.ai.hand.push(G.players.ai.deck.pop()); }
+    if (youFirst) { G.players.ai.hand.push(G.players.ai.deck.pop()); G.players.ai.hand.push(mk("coin")); }
+    else { G.players.you.hand.push(G.players.you.deck.pop()); G.players.you.hand.push(mk("coin")); }
+    $("startVeil").hidden = true;
+    openMulligan();
+  }
+  function openMulligan() {
+    const toss = new Set();
+    const wrap = $("mullCards");
+    function paint() {
+      wrap.innerHTML = G.players.you.hand.map((c, i) => `
+        <div class="hcard ${toss.has(i) ? "toss" : ""}" data-m="${i}">
+          <span class="cost">${c.cost}</span>
+          <div class="cname">${c.name}</div>
+          <div class="cart">${c.emoji}</div>
+          <div class="ctext">${c.text || ""}</div>
+          <div class="ctype">${c.type === "minion" ? "มินเนียน" : "สเปล"}</div>
+          ${c.type === "minion" ? `<span class="catk">${c.atk}</span><span class="chp">${c.hp}</span>` : ""}
+        </div>`).join("");
+      wrap.querySelectorAll("[data-m]").forEach(el => el.addEventListener("click", () => {
+        const i = +el.dataset.m;
+        if (G.players.you.hand[i].id === "coin") return;
+        toss.has(i) ? toss.delete(i) : toss.add(i);
+        paint();
+      }));
+    }
+    paint();
+    $("mullVeil").hidden = false;
+    $("mullConfirm").onclick = async () => {
+      const p = G.players.you;
+      const idxs = [...toss].sort((a, b) => b - a);
+      const back = [];
+      idxs.forEach(i => back.push(p.hand.splice(i, 1)[0]));
+      back.forEach(c => { if (c.id !== "coin") p.deck.push(c); });
+      shuffle(p.deck);
+      for (let k = 0; k < back.filter(c => c.id !== "coin").length; k++) p.hand.push(p.deck.pop());
+      // simple AI mulligan: toss anything costing 5+, draw the same number back
+      const ap = G.players.ai;
+      const apBack = [];
+      for (let i = ap.hand.length - 1; i >= 0; i--) {
+        if (ap.hand[i].id !== "coin" && ap.hand[i].cost >= 5) apBack.push(ap.hand.splice(i, 1)[0]);
+      }
+      apBack.forEach(c => ap.deck.push(c));
+      shuffle(ap.deck);
+      for (let k = 0; k < apBack.length; k++) ap.hand.push(ap.deck.pop());
+      $("mullVeil").hidden = true;
+      log(`<b>เริ่มเกม</b> — ${G.firstSide === "you" ? "คุณ" : "ศัตรู"}เล่นก่อน`);
+      G.busy = false;
+      render();
+      await sleep(250);
+      await beginTurn(G.firstSide);
+    };
+  }
+  function finish() {
+    render();
+    $("overTitle").textContent = G.result === "win" ? "ชนะ! 🏆" : G.result === "lose" ? "แพ้…" : "เสมอ";
+    $("overSub").textContent = G.result === "win"
+      ? "จัดการฮีโร่ศัตรูได้สำเร็จ"
+      : G.result === "lose" ? "ฮีโร่ของคุณล้มลง" : "ทั้งคู่ล้มพร้อมกัน";
+    $("overVeil").hidden = false;
+  }
+
+  renderDeckPick();
+})();
+</script>
+</body>
+</html>
