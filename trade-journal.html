@@ -2829,7 +2829,7 @@
   document.getElementById("pbAddBtn").addEventListener("click", () => openPbModal(null));
   document.getElementById("pbModalClose").addEventListener("click", closePbModal);
   document.getElementById("pbCancelBtn").addEventListener("click", closePbModal);
-  document.getElementById("pbModal").addEventListener("click", (e) => { if (e.target === document.getElementById("pbModal")) closePbModal(); });
+  // เช่นเดียวกับฟอร์มเพิ่มเทรด: ไม่ปิดเมื่อคลิกด้านนอก กันข้อมูลหาย
 
   document.getElementById("pbSaveBtn").addEventListener("click", () => {
     const name = document.getElementById("pbName").value.trim();
@@ -3004,7 +3004,7 @@
   document.getElementById("addTradeBtn").addEventListener("click", () => openTradeModal(null));
   document.getElementById("tradeModalClose").addEventListener("click", closeTradeModal);
   document.getElementById("tradeCancelBtn").addEventListener("click", closeTradeModal);
-  tradeModal.addEventListener("click", (e) => { if (e.target === tradeModal) closeTradeModal(); });
+  // ไม่ปิดฟอร์มเมื่อคลิกพื้นที่ว่างด้านนอก — กันข้อมูลที่กรอกไว้หาย (ปิดด้วยปุ่ม ✕ / ยกเลิก เท่านั้น)
 
   document.getElementById("tfTvPreviewBtn").addEventListener("click", () => {
     toggleTvEmbed(document.getElementById("tfTvChart"), tvSymbolFor({
