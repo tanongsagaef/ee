@@ -808,6 +808,8 @@
         <div class="field"><label class="small">SL % (อัตโนมัติ)</label><input type="text" id="tfSlPct" readonly placeholder="—"></div>
         <div class="field"><label class="small">TP % (อัตโนมัติ)</label><input type="text" id="tfTpPct" readonly placeholder="—"></div>
       </div>
+      <div id="tfFutCalcHint" class="small" style="text-transform:none;letter-spacing:0;font-weight:400;color:var(--muted);margin:2px 0 4px;min-height:15px;"></div>
+      <button type="button" class="ghost" id="tfFutApplyCalc" style="margin-bottom:10px;" hidden>↩ ใส่ค่าที่คำนวณ (Size / Margin / เสี่ยง$ / PNL%)</button>
       <div class="field"><label class="small">Setup (ป้ายสั้น ๆ)</label><input type="text" id="tfSetup" placeholder="เช่น short wave B (sub A)"></div>
       <div class="field"><label class="small">เงื่อนไขหยุด (Stop condition)</label><input type="text" id="tfStopCond" placeholder="เช่น break B, break low"></div>
       <div class="field"><label class="small">เหตุผลเข้า (Entry reasoning)</label><textarea id="tfEntryReason" rows="2" placeholder="ทำไมถึงเข้าไม้นี้ / เงื่อนไขที่รอ"></textarea></div>
@@ -2596,20 +2598,58 @@
     if (days < 7) return days + " วัน";
     return days + " วัน (~" + Math.round(days / 7) + " สัปดาห์)";
   }
+  let futCalc = null;
   function updateFuturesDetailCalc() {
     if (tfMarketType.value !== "futures") return;
     const g = id => document.getElementById(id);
     g("tfDuration").value = futDurationText(g("tfDate").value, g("tfDateClose").value);
-    const entry = tfNum("tfEntry"), sl = tfNum("tfSl"), tp = tfNum("tfTp");
+    const entry = tfNum("tfEntry"), sl = tfNum("tfSl"), tp = tfNum("tfTp"), exit = tfNum("tfExit");
     let slPct = null, tpPct = null;
     if (entry != null && entry !== 0 && sl != null) { slPct = Math.abs(entry - sl) / Math.abs(entry) * 100; g("tfSlPct").value = slPct.toFixed(2) + "%"; }
     else g("tfSlPct").value = "";
     if (entry != null && entry !== 0 && tp != null) { tpPct = Math.abs(tp - entry) / Math.abs(entry) * 100; g("tfTpPct").value = tpPct.toFixed(2) + "%"; }
     else g("tfTpPct").value = "";
     g("tfRrr").placeholder = (slPct && tpPct) ? ("อัตโนมัติ ≈ " + (tpPct / slPct).toFixed(2)) : "อัตโนมัติจาก TP/SL";
+
+    // risk-based sizing: Size / Margin / เสี่ยง$ / PNL%
+    const lev = tfNum("tfLeverage");
+    const riskPct = tfNum("tfRiskPct");
+    let riskAmt = tfNum("tfRiskUsd"), riskFromPct = false;
+    if (riskAmt == null && riskPct != null && pfCapital() > 0) { riskAmt = riskPct / 100 * pfCapital(); riskFromPct = true; }
+    const hintEl = g("tfFutCalcHint"), btn = g("tfFutApplyCalc");
+    futCalc = null;
+    if (entry != null && entry !== 0 && sl != null && Math.abs(entry - sl) > 0 && riskAmt > 0) {
+      const dir = entry > sl ? 1 : -1;
+      const notional = riskAmt / (Math.abs(entry - sl) / Math.abs(entry));
+      const size = notional / entry;
+      const margin = lev > 0 ? notional / lev : null;
+      const pnlUsd = exit != null ? size * (exit - entry) * dir : null;
+      const pnlPct = (margin && pnlUsd != null) ? (pnlUsd / margin * 100) : null;
+      futCalc = { size, margin, riskAmt, pnlPct };
+      const fx = (v, d) => v == null ? "—" : Number(v).toLocaleString("en-US", { maximumFractionDigits: d });
+      hintEl.textContent = "💡 คำนวณจากความเสี่ยง:  Size ≈ " + fx(size, size < 1 ? 6 : 3) +
+        "  ·  Margin ≈ $" + fx(margin, 2) +
+        "  ·  เสี่ยง ≈ $" + fx(riskAmt, 2) + (riskFromPct ? " (" + riskPct + "% ของพอร์ต " + PF_LABEL[activePf === "all" ? "futures" : activePf] + ")" : "") +
+        (pnlPct != null ? "  ·  PNL% ≈ " + fx(pnlPct, 1) + "%" : "");
+      btn.hidden = false;
+    } else {
+      hintEl.textContent = (entry != null && sl != null && !(riskAmt > 0))
+        ? "ใส่ความเสี่ยงต่อไม้ (% ในเช็กลิสต์ หรือ ช่อง 'ความเสี่ยงเป็นเงิน $') เพื่อให้คำนวณ Size ให้"
+        : "";
+      btn.hidden = true;
+    }
   }
-  ["tfDate", "tfDateClose", "tfEntry", "tfSl", "tfTp"].forEach(id =>
+  ["tfDate", "tfDateClose", "tfEntry", "tfSl", "tfTp", "tfExit", "tfLeverage", "tfRiskUsd", "tfRiskPct"].forEach(id =>
     document.getElementById(id).addEventListener("input", updateFuturesDetailCalc));
+  document.getElementById("tfFutApplyCalc").addEventListener("click", () => {
+    if (!futCalc) return;
+    const set = (id, v, d) => { if (v != null && isFinite(v)) document.getElementById(id).value = Number(v).toFixed(d); };
+    set("tfSize", futCalc.size, futCalc.size < 1 ? 6 : 4);
+    set("tfMargin", futCalc.margin, 2);
+    set("tfRiskUsd", futCalc.riskAmt, 2);
+    set("tfPnlPct", futCalc.pnlPct, 2);
+    successToast("ใส่ค่าที่คำนวณแล้ว");
+  });
 
   function updateGradeToggle() {
     document.querySelectorAll("#tfGradeToggle .grade-btn").forEach(btn => {
