@@ -399,6 +399,35 @@
     .calendar-day { min-height: 44px; }
     .metrics-grid { grid-template-columns: 1fr; }
   }
+
+  /* ---------- review system additions ---------- */
+  .mini-seg { display: inline-flex; gap: 4px; background: var(--surface-alt); border: 1px solid var(--border); padding: 4px; border-radius: 999px; flex-wrap: wrap; }
+  .mini-seg button { border: none; background: none; color: var(--muted); font-weight: 700; font-size: 12px; padding: 6px 12px; border-radius: 999px; cursor: pointer; font-family: inherit; }
+  .mini-seg button.active { background: var(--accent-soft); color: var(--accent); }
+  .chip-pick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  .chip-pick label { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; padding: 5px 9px; border-radius: 999px; border: 1.5px solid var(--border); background: var(--surface-alt); color: var(--muted); cursor: pointer; }
+  .chip-pick label.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); font-weight: 700; }
+  .chip-pick input { display: none; }
+  .exec-range { width: 100%; accent-color: var(--accent); }
+  .review-card { border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; margin-bottom: 12px; background: var(--surface-alt); }
+  .review-card h4 { margin: 0 0 8px; font-size: 14px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .review-card .r-meta { font-size: 11.5px; color: var(--muted); font-weight: 600; }
+  .action-item { display: flex; gap: 8px; align-items: flex-start; padding: 8px 0; border-top: 1px dashed var(--border); }
+  .action-item:first-child { border-top: none; }
+  .action-item .ai-check { margin-top: 3px; }
+  .action-item.done { opacity: .6; }
+  .action-item.done .ai-text { text-decoration: line-through; }
+  .review-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin-top: 8px; }
+  .rg-pair { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--bg); }
+  .rg-pair .rg-imgs { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; }
+  .rg-pair img { width: 100%; height: 92px; object-fit: cover; cursor: pointer; display: block; }
+  .rg-pair .rg-cap { padding: 6px 9px; font-size: 11.5px; display: flex; justify-content: space-between; gap: 6px; }
+  .dist-bar-row { display: flex; align-items: center; gap: 8px; font-size: 11.5px; margin: 3px 0; }
+  .dist-bar-row .dbl { width: 58px; text-align: right; color: var(--muted); font-family: ui-monospace, monospace; flex: 0 0 auto; }
+  .dist-bar-row .dbt { width: 34px; color: var(--muted); flex: 0 0 auto; }
+  .dist-bar { height: 15px; border-radius: 4px; min-width: 2px; }
+  .warn-note { font-size: 11.5px; color: #d97706; background: rgba(217,119,6,0.10); border: 1px solid rgba(217,119,6,0.35); border-radius: 8px; padding: 6px 10px; margin: 6px 0; }
+  .sample-thin td { opacity: .55; }
 </style>
 </head>
 <body>
@@ -437,6 +466,7 @@
   <button class="tab-btn active" data-tab="calendar">ปฏิทิน</button>
   <button class="tab-btn" data-tab="overview">ภาพรวม</button>
   <button class="tab-btn" data-tab="log">บันทึกเทรด</button>
+  <button class="tab-btn" data-tab="review">ทบทวน</button>
   <button class="tab-btn" data-tab="playbook">Playbook</button>
   <button class="tab-btn" data-tab="chart">กราฟ + AI</button>
 </div>
@@ -487,6 +517,96 @@
   <div class="panel">
     <h3>วิเคราะห์จุดออก — แผน vs ผลจริง</h3>
     <div id="exitAnalysisWrap"></div>
+  </div>
+  <div class="panel">
+    <h3>การกระจายผล R (R-Multiple Distribution)</h3>
+    <div id="rDistWrap"></div>
+  </div>
+  <div class="panel">
+    <h3>เทียบช่วงเวลา — กำลังเก่งขึ้นหรือแย่ลง</h3>
+    <div id="periodCompareWrap"></div>
+  </div>
+  <div class="panel">
+    <h3>แนวโน้มวินัยรายสัปดาห์</h3>
+    <div id="disciplineTrendWrap"></div>
+  </div>
+  <div class="panel">
+    <h3>🤖 ให้ AI ทบทวนหลายไม้พร้อมกัน</h3>
+    <div class="row" style="gap:8px; align-items:center; flex-wrap:wrap;">
+      <span class="small" style="margin:0;text-transform:none;font-weight:400;">วิเคราะห์ pattern จากไม้ที่ปิดแล้วในพอร์ตที่เลือก</span>
+      <select id="ovAiScope" style="width:auto;">
+        <option value="20">20 ไม้ล่าสุด</option>
+        <option value="50">50 ไม้ล่าสุด</option>
+        <option value="thisMonth">เดือนนี้</option>
+        <option value="all">ทั้งหมด</option>
+      </select>
+      <button class="ghost" id="ovAiReviewBtn">🤖 วิเคราะห์</button>
+    </div>
+    <div id="ovAiReviewStatus" class="small" style="text-transform:none;font-weight:400;margin-top:8px;"></div>
+    <div id="ovAiReviewOut" class="trade-card-notes" style="white-space:pre-wrap;margin-top:8px;display:none;"></div>
+  </div>
+</div>
+
+<!-- REVIEW TAB -->
+<div id="tab-review" class="hidden">
+  <div class="panel">
+    <div class="row" style="justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+      <h3 style="margin:0;">บทวิเคราะห์ประจำงวด</h3>
+      <div class="row" style="gap:8px; align-items:center;">
+        <div class="mini-seg" id="reviewPeriodSeg">
+          <button data-p="week" class="active">รายสัปดาห์</button>
+          <button data-p="month">รายเดือน</button>
+        </div>
+        <button class="primary" id="newReviewBtn">＋ สร้างบทวิเคราะห์งวดนี้</button>
+      </div>
+    </div>
+    <div id="reviewStreakLine" class="small" style="text-transform:none;font-weight:600;margin-top:8px;color:var(--muted);"></div>
+  </div>
+  <div id="reviewListWrap"></div>
+</div>
+
+<!-- Review editor modal -->
+<div id="reviewModal" class="modal-backdrop">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="reviewModalTitle">บทวิเคราะห์</h2>
+      <button class="icon-btn" id="reviewModalClose">✕</button>
+    </div>
+    <div id="reviewSnapshot" class="metrics-grid" style="margin-bottom:14px;"></div>
+
+    <div class="field" id="reviewCarryWrap" style="display:none;">
+      <label class="small">ทบทวน action ที่ตั้งไว้งวดก่อน — ทำได้ไหม / ได้ผลไหม</label>
+      <div id="reviewCarryList"></div>
+    </div>
+
+    <div class="field"><label class="small">ทำอะไรได้ดีงวดนี้</label><textarea id="rvWentWell" rows="2" placeholder="จุดที่ทำถูก อยากทำต่อ"></textarea></div>
+    <div class="field"><label class="small">ข้อผิดพลาด / สิ่งที่ต้องแก้</label><textarea id="rvMistakes" rows="2" placeholder="พลาดตรงไหน ทำไม"></textarea></div>
+    <div class="field"><label class="small">สภาพตลาดช่วงนี้</label><textarea id="rvMarket" rows="2" placeholder="เทรนด์ / ความผันผวน / ข่าว ที่ส่งผล"></textarea></div>
+    <div class="field"><label class="small">บทเรียนสำคัญ</label><textarea id="rvLessons" rows="2" placeholder="ประโยคเดียวที่อยากจำไปงวดหน้า"></textarea></div>
+
+    <div class="field">
+      <label class="small">Action items สำหรับงวดหน้า (บรรทัดละ 1 ข้อ) — จะถูกยกไปให้เช็คในงวดถัดไป</label>
+      <textarea id="rvActions" rows="3" placeholder="เช่น หยุดเทรดหลังแพ้ 2 ไม้ติด&#10;เข้าเฉพาะ setup A ในช่วง London"></textarea>
+    </div>
+
+    <div class="field">
+      <label class="small">สรุปโดย AI</label>
+      <button type="button" class="ghost" id="rvAiBtn" style="margin-bottom:6px;">🤖 ให้ AI สรุป pattern ของงวดนี้</button>
+      <div id="rvAiStatus" class="small" style="text-transform:none;font-weight:400;margin-bottom:6px;"></div>
+      <div id="rvAiOut" class="trade-card-notes" style="white-space:pre-wrap;display:none;"></div>
+    </div>
+
+    <div class="field" id="rvGalleryWrap" style="display:none;">
+      <label class="small">ภาพเทรดในงวดนี้ (ก่อน / หลัง)</label>
+      <div id="rvGallery" class="review-gallery"></div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="ghost danger hidden" id="reviewDeleteBtn">ลบบทวิเคราะห์นี้</button>
+      <div class="spacer"></div>
+      <button class="ghost" id="reviewCancelBtn">ปิด</button>
+      <button class="primary" id="reviewSaveBtn">บันทึก</button>
+    </div>
   </div>
 </div>
 
@@ -754,6 +874,10 @@
         <label class="small">ความเสี่ยงต่อไม้ (% ของพอร์ต)</label>
         <input type="number" id="tfRiskPct" step="0.1" min="0" placeholder="เช่น 1">
       </div>
+      <div class="field" style="margin-bottom:10px;">
+        <label class="small">สภาพจิตใจก่อนเข้าไม้</label>
+        <div class="chip-pick" id="tfMoodPick"></div>
+      </div>
       <div class="check-row" id="tfChecklistItems"></div>
       <div id="tfChecklistEditor" class="hidden" style="margin-top:10px;">
         <label class="small">รายการเช็กลิสต์ (บรรทัดละ 1 ข้อ)</label>
@@ -931,6 +1055,23 @@
       <div id="tfTvChart" class="tv-embed hidden"></div>
     </div>
 
+    <div class="pretrade" style="margin-top:2px;">
+      <div class="pretrade-head"><label class="small" style="margin:0;">📝 ประเมินการทำตามแผน (แยกจากกำไร-ขาดทุน)</label></div>
+      <div class="field" style="margin-bottom:10px;">
+        <label class="small">คะแนนการ execute เทียบกับแผน — <span id="tfExecScoreView" class="mono">ยังไม่ให้คะแนน</span></label>
+        <input type="range" id="tfExecScore" class="exec-range" min="0" max="100" step="5" value="0">
+        <div class="small" style="text-transform:none;font-weight:400;color:var(--muted);margin-top:2px;">0 = แหกแผนทั้งไม้ · 100 = ทำตามแผนเป๊ะ (ไม้ที่แพ้แต่เทรดถูกก็ให้คะแนนสูงได้)</div>
+      </div>
+      <div class="field">
+        <label class="small">ความผิดพลาดที่เกิดขึ้น (เลือกได้หลายข้อ)</label>
+        <div class="chip-pick" id="tfMistakePick"></div>
+      </div>
+      <div class="field" style="margin-top:8px;">
+        <label class="small">สภาพจิตใจหลังปิดไม้</label>
+        <div class="chip-pick" id="tfMoodAfterPick"></div>
+      </div>
+    </div>
+
     <div class="field">
       <label class="small">ความเห็นหลังเทรด (Trade Review)</label>
       <textarea id="tfNotes" rows="3" placeholder="สิ่งที่เรียนรู้ สิ่งที่ควรทำต่างไปครั้งหน้า ฯลฯ"></textarea>
@@ -984,6 +1125,78 @@
   const MONTH_SHORT_TH = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
   const DOW_TH = ["อา","จ","อ","พ","พฤ","ศ","ส","สรุป"];
   const MARKET_LABEL = { forex: "Forex", futures: "Futures", other: "อื่นๆ" };
+
+  /* ---------- review-system vocab ---------- */
+  const MOOD_OPTS = [
+    ["calm", "😌 สงบ/มีวินัย"],
+    ["confident", "💪 มั่นใจ (มีเหตุผล)"],
+    ["fomo", "😰 FOMO/กลัวตกรถ"],
+    ["revenge", "😡 แก้แค้น/โมโห"],
+    ["fearful", "😨 กลัว/ลังเล"],
+    ["bored", "🥱 เบื่อ/อยากมีอะไรทำ"],
+    ["tired", "😪 ล้า/ไม่พร้อม"],
+  ];
+  const MOOD_LABEL = Object.fromEntries(MOOD_OPTS);
+  const MISTAKE_TAXONOMY = [
+    "เข้าเร็ว (ยังไม่ยืนยัน)", "ไล่ราคา (FOMO)", "เทรดแก้แค้น", "ไม่มี SL / ถอย SL", "SL แคบเกินไป",
+    "เสี่ยงเกินแผน (ไซซ์ใหญ่)", "ออกก่อนเป้า (มือไว)", "ถือขาดทุนเกิน 1R", "ข้ามเช็กลิสต์", "เทรดช่วงข่าว",
+    "เทรดนอก session", "สวนเทรนด์ไม่มีเหตุผล", "เทรดถี่เกินไป (overtrade)", "ไม่มีแผนออก", "ย้ายเป้า TP หนี",
+  ];
+  const REVIEWS_KEY = "tj_reviews_v1";
+  function loadReviews() {
+    try {
+      const a = JSON.parse(localStorage.getItem(REVIEWS_KEY) || "[]");
+      return Array.isArray(a) ? a : [];
+    } catch (e) { return []; }
+  }
+  function saveReviews() {
+    try { localStorage.setItem(REVIEWS_KEY, JSON.stringify(reviews)); } catch (e) {}
+    pushCloudSync();
+  }
+  let reviews = loadReviews();
+
+  // ISO-week key, e.g. "2026-W37"
+  function isoWeekKey(d) {
+    const dt = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    const day = dt.getUTCDay() || 7;
+    dt.setUTCDate(dt.getUTCDate() + 4 - day);
+    const yearStart = new Date(Date.UTC(dt.getUTCFullYear(), 0, 1));
+    const wk = Math.ceil(((dt - yearStart) / 86400000 + 1) / 7);
+    return dt.getUTCFullYear() + "-W" + pad2(wk);
+  }
+  function periodKeyOf(dateStr, period) {
+    const d = new Date(dateStr + "T00:00:00");
+    if (isNaN(d)) return null;
+    return period === "month" ? dateStr.slice(0, 7) : isoWeekKey(d);
+  }
+  function periodLabel(key, period) {
+    if (period === "month") {
+      const [y, m] = key.split("-");
+      return MONTH_SHORT_TH[+m - 1] + " " + y;
+    }
+    return key.replace("-W", " สัปดาห์ที่ ");
+  }
+  // sorted list of period keys that actually have trades, newest last
+  function periodKeysWithTrades(period) {
+    const set = new Set();
+    pfTrades().forEach(t => { const k = periodKeyOf(t.date, period); if (k) set.add(k); });
+    return [...set].sort();
+  }
+  function prevPeriodKey(key, period) {
+    if (period === "month") {
+      const [y, m] = key.split("-").map(Number);
+      const d = new Date(y, m - 2, 1);
+      return d.getFullYear() + "-" + pad2(d.getMonth() + 1);
+    }
+    const [y, w] = key.split("-W").map(Number);
+    // Monday of ISO week 1 is the Monday on/before Jan 4
+    const jan4 = new Date(Date.UTC(y, 0, 4));
+    const mondayW1 = new Date(jan4);
+    mondayW1.setUTCDate(jan4.getUTCDate() - ((jan4.getUTCDay() || 7) - 1));
+    const monday = new Date(mondayW1);
+    monday.setUTCDate(mondayW1.getUTCDate() + (w - 1) * 7 - 7);  // previous week's Monday
+    return isoWeekKey(new Date(monday.getUTCFullYear(), monday.getUTCMonth(), monday.getUTCDate()));
+  }
 
   function loadTrades() {
     try {
@@ -1175,10 +1388,12 @@
     document.getElementById("tab-calendar").classList.toggle("hidden", tab !== "calendar");
     document.getElementById("tab-overview").classList.toggle("hidden", tab !== "overview");
     document.getElementById("tab-log").classList.toggle("hidden", tab !== "log");
+    document.getElementById("tab-review").classList.toggle("hidden", tab !== "review");
     document.getElementById("tab-playbook").classList.toggle("hidden", tab !== "playbook");
     document.getElementById("tab-chart").classList.toggle("hidden", tab !== "chart");
     if (tab === "overview") renderOverview();
     if (tab === "log") renderLog();
+    if (tab === "review") renderReviewTab();
     if (tab === "playbook") renderPlaybooks();
     if (tab === "chart") initChartTab();
   }
@@ -1196,6 +1411,7 @@
     renderCalendar();
     if (currentTab === "overview") renderOverview();
     else if (currentTab === "log") renderLog();
+    else if (currentTab === "review") renderReviewTab();
     else if (currentTab === "playbook") renderPlaybooks();
   }
   document.querySelectorAll("#pfSwitch button").forEach(btn => {
@@ -1496,6 +1712,9 @@
     if (t.riskPct != null) flags.push("เสี่ยง " + t.riskPct + "%");
     if (t.breakeven) flags.push("Breakeven");
     if (t.enteredWindow) flags.push("เข้าตามช่วงเวลา ✓");
+    if (typeof t.execScore === "number") flags.push("execute " + t.execScore + "/100");
+    if (t.mood) flags.push(MOOD_LABEL[t.mood] || t.mood);
+    if (typeof t.mfe === "number") flags.push("MFE +" + t.mfe.toFixed(1) + "R");
 
     const narr = [];
     if (t.setup) narr.push(["Setup", t.setup]);
@@ -1511,7 +1730,7 @@
     if (t.chartExit && !isUrl(t.chartExit)) narr.push(["กราฟตอนออก", t.chartExit]);
 
     const posTags = t.tags || [];
-    const negTags = t.negTags || [];
+    const negTags = [...(t.negTags || []), ...(t.mistakes || [])];
     // t.image is the legacy single-image field from before before/after images existed
     const imgBefore = t.imageBefore || null;
     const imgAfter = t.imageAfter || (!t.imageBefore ? t.image : null) || null;
@@ -1630,7 +1849,20 @@
       if (!worstDay || sum < worstDay.sum) worstDay = { key, sum };
     });
 
-    return { total, pendingCount, wins: wins.length, losses: losses.length, totalPnl, winRate, avgWin, avgLoss, profitFactor, bestDay, worstDay };
+    // expectancy in R (avg realised R-multiple across trades with entry/SL/exit)
+    const rs = closed.map(edgeR).filter(x => x != null);
+    const expR = rs.length ? rs.reduce((s, x) => s + x, 0) / rs.length : null;
+    // discipline: share of rule-flagged trades that followed the plan, and avg self-rated execution
+    const ruled = closed.filter(t => t.followedRules === true || t.followedRules === false);
+    const followRate = ruled.length ? ruled.filter(t => t.followedRules).length / ruled.length * 100 : null;
+    const execScored = closed.filter(t => typeof t.execScore === "number");
+    const avgExec = execScored.length ? execScored.reduce((s, t) => s + t.execScore, 0) / execScored.length : null;
+    const cap = pfCapital();
+    const maxDD = computeMaxDrawdown();
+    const maxDDPct = cap > 0 ? (maxDD / cap * 100) : null;
+
+    return { total, pendingCount, wins: wins.length, losses: losses.length, totalPnl, winRate, avgWin, avgLoss,
+      profitFactor, bestDay, worstDay, expR, rCount: rs.length, followRate, avgExec, maxDD, maxDDPct };
   }
 
   function computeTagStats() {
@@ -1683,6 +1915,7 @@
           r: rs.length ? rs.reduce((s, x) => s + x, 0) / rs.length : null,
         };
       }).sort((a, b) => b.pnl - a.pnl);
+      const SIG_N = 10;  // below this a group is too small to trust
       const elig = rows.filter(r => r.n >= (minN || 3));
       let insight = "";
       if (elig.length >= 2) {
@@ -1692,16 +1925,41 @@
         else if (worst.pnl < 0)
           insight = `<div class="edge-insight">💡 กลุ่มที่ฉุดพอร์ต: <b>${escapeHtml(String(worst.k))}</b> (${fmtMoney(worst.pnl)}, ${worst.n} ไม้)</div>`;
       }
-      return `<div class="edge-block"><h4>${title}</h4>${insight}
+      const thin = rows.filter(r => r.n < SIG_N).length;
+      const caption = rows.every(r => r.n < SIG_N)
+        ? `<div class="warn-note">⚠ ทุกกลุ่มยังมีไม้ &lt; ${SIG_N} — ตัวเลขยังแกว่ง อย่าเพิ่งสรุปเป็นกฎ</div>`
+        : (thin ? `<div class="muted-note" style="margin-bottom:6px">⚠ แถวจาง = ไม้ยังน้อย (&lt; ${SIG_N}) ยังเชื่อไม่ได้เต็มที่</div>` : "");
+      return `<div class="edge-block"><h4>${title}</h4>${insight}${caption}
         <div class="table-scroll"><table>
         <thead><tr><th>กลุ่ม</th><th>ไม้</th><th>Win%</th><th>R เฉลี่ย</th><th>P/L เฉลี่ย</th><th>P/L รวม</th></tr></thead>
-        <tbody>${rows.map(r => `<tr>
-          <td>${escapeHtml(String(r.k))}</td><td>${r.n}</td><td>${r.wr.toFixed(0)}%</td>
+        <tbody>${rows.map(r => `<tr class="${r.n < SIG_N ? "sample-thin" : ""}">
+          <td>${escapeHtml(String(r.k))}</td><td>${r.n}${r.n < SIG_N ? " ⚠" : ""}</td><td>${r.wr.toFixed(0)}%</td>
           <td class="mono ${r.r == null ? "" : r.r >= 0 ? "pos" : "neg"}">${r.r == null ? "—" : (r.r >= 0 ? "+" : "") + r.r.toFixed(2) + "R"}</td>
           <td class="mono ${r.avg >= 0 ? "pos" : "neg"}">${fmtMoney(r.avg)}</td>
           <td class="mono ${r.pnl >= 0 ? "pos" : "neg"}">${fmtMoney(r.pnl)}</td>
         </tr>`).join("")}</tbody></table></div></div>`;
     };
+
+    // recurring-mistake frequency (from the fixed taxonomy on each trade)
+    const mistakeHtml = (() => {
+      const m = new Map();
+      closed.forEach(t => (t.mistakes || []).forEach(k => {
+        if (!m.has(k)) m.set(k, []);
+        m.get(k).push(t);
+      }));
+      if (!m.size) return "";
+      const rows = [...m.entries()].map(([k, arr]) => ({
+        k, n: arr.length,
+        pnl: arr.reduce((s, t) => s + pnlNum(t.pnl), 0),
+      })).sort((a, b) => a.pnl - b.pnl);
+      return `<div class="edge-block"><h4>ความผิดพลาดที่เกิดซ้ำ</h4>
+        <div class="edge-insight">💡 เจอบ่อยสุด: <b>${escapeHtml(rows.slice().sort((a,b)=>b.n-a.n)[0].k)}</b> (${rows.slice().sort((a,b)=>b.n-a.n)[0].n} ครั้ง) · แพงสุด: <b>${escapeHtml(rows[0].k)}</b> (${fmtMoney(rows[0].pnl)})</div>
+        <div class="table-scroll"><table>
+        <thead><tr><th>ความผิดพลาด</th><th>ครั้ง</th><th>P/L รวมของไม้ที่มีข้อนี้</th></tr></thead>
+        <tbody>${rows.map(r => `<tr><td>${escapeHtml(r.k)}</td><td>${r.n}</td>
+          <td class="mono ${r.pnl >= 0 ? "pos" : "neg"}">${fmtMoney(r.pnl)}</td></tr>`).join("")}</tbody>
+        </table></div></div>`;
+    })();
 
     // rule-break cost
     const ruled = closed.filter(t => t.followedRules === true || t.followedRules === false);
@@ -1726,6 +1984,9 @@
       groupTable("เกรด", t => t.grade, 3) +
       groupTable("ตลาด", t => MARKET_LABEL[t.marketType] || t.marketType, 3) +
       groupTable("ทิศทาง", t => t.side === "long" ? "BUY" : "SELL", 3) +
+      groupTable("อารมณ์ก่อนเข้าไม้", t => MOOD_LABEL[t.mood] || null, 2) +
+      groupTable("ช่วงคะแนน execute", t => typeof t.execScore === "number" ? (t.execScore >= 80 ? "80–100 (ตามแผน)" : t.execScore >= 50 ? "50–75 (มีจุดพลาด)" : "0–45 (แหกแผน)") : null, 3) +
+      mistakeHtml +
       ruleHtml;
   }
 
@@ -1778,11 +2039,91 @@
       ${worst.map(x => `<tr><td>${x.t.date}</td><td>${escapeHtml(x.t.symbol || "")}</td><td class="mono pos">${rr(realR(x.t))}</td><td class="mono">${rr(planR(x.t))}</td><td class="mono neg">−${x.gap.toFixed(2)}R</td></tr>`).join("")}
       </tbody></table></div></div>` : "";
 
+    // MFE / MAE (from daily highs/lows between entry and exit, computed on demand)
+    const withEx = cl.filter(t => typeof t.mfe === "number" && typeof t.mae === "number");
+    let mfeHtml = "";
+    if (withEx.length) {
+      const avgMfe = avg(withEx.map(t => t.mfe));
+      const avgMae = avg(withEx.map(t => t.mae));
+      const eff = avg(withEx.filter(t => t.mfe > 0.05).map(t => Math.max(0, realR(t)) / t.mfe));
+      mfeHtml = `<div class="metrics-grid" style="margin-top:10px">
+        <div class="metric"><div class="metric-label">MFE เฉลี่ย (กำไรสูงสุดที่วิ่งไปถึง)</div><div class="metric-value pos">${rr(avgMfe)}</div></div>
+        <div class="metric"><div class="metric-label">MAE เฉลี่ย (ติดลบลึกสุดระหว่างถือ)</div><div class="metric-value neg">−${(avgMae||0).toFixed(2)}R</div></div>
+        <div class="metric"><div class="metric-label">ประสิทธิภาพการเก็บกำไร (ได้จริง ÷ MFE)</div><div class="metric-value ${eff!=null&&eff>=0.5?"pos":""}">${eff==null?"—":(eff*100).toFixed(0)+"%"}</div></div>
+      </div>
+      <div class="muted-note" style="margin-top:4px">คำนวณจาก ${withEx.length}/${cl.length} ไม้ (แท่งราย 1 วัน · เฉพาะไม้ในช่วง ~1 ปีล่าสุด)</div>`;
+      if (avgMae != null && avgMae > 1.05) insights.push(`MAE เฉลี่ย −${avgMae.toFixed(2)}R — ราคามักย่อหลุด SL ที่วางไว้ก่อนจะไป (หรือ SL แคบไป/เข้าเร็วไป)`);
+      if (eff != null && eff < 0.45) insights.push(`เก็บกำไรได้แค่ ${(eff*100).toFixed(0)}% ของที่ราคาวิ่งให้ — โครงสร้างการออกยังรั่ว`);
+    }
+    const mfeBtn = `<div style="margin-top:10px"><button class="ghost" id="mfeMaeCalcBtn">📐 คำนวณ MFE/MAE จากราคาย้อนหลัง</button>
+      <span id="mfeMaeStatus" class="small" style="text-transform:none;font-weight:400;margin-left:8px;"></span></div>`;
+
     wrap.innerHTML =
       `<div class="muted-note" style="margin-bottom:8px">${cl.length} ไม้มีราคาครบ · ${withTp.length} ไม้ระบุ TP</div>` +
       `<div class="metrics-grid">${tiles.map(t => `<div class="metric"><div class="metric-label">${t[0]}</div><div class="metric-value ${t[2]}">${t[1]}</div></div>`).join("")}</div>` +
+      mfeHtml + mfeBtn +
       (insights.length ? `<div class="edge-insight" style="margin-top:10px">💡 ${insights.join("<br>💡 ")}</div>` : "") +
       worstHtml;
+
+    const mb = document.getElementById("mfeMaeCalcBtn");
+    if (mb) mb.addEventListener("click", () => computeMfeMae(cl));
+  }
+
+  /* ---------- MFE/MAE from daily candles (on demand) ---------- */
+  async function computeMfeMae(closedTrades) {
+    const status = document.getElementById("mfeMaeStatus");
+    const btn = document.getElementById("mfeMaeCalcBtn");
+    const tdKey = (localStorage.getItem("sd_api_key") || "").trim();
+    const dataSrc = localStorage.getItem(CV_LS.dsrc) || "auto";
+    const oneYearAgo = Date.now() / 1000 - 370 * 86400;
+    const todo = closedTrades.filter(t => {
+      if (typeof t.mfe === "number" && typeof t.mae === "number") return false;
+      const openT = Date.parse((t.date || "") + "T00:00:00Z") / 1000;
+      return openT && openT > oneYearAgo && t.symbol;
+    });
+    if (!todo.length) { status.textContent = "ไม่มีไม้ที่ต้องคำนวณเพิ่ม (ไม้เก่ากว่า ~1 ปีข้ามให้)"; return; }
+    btn.disabled = true;
+    let done = 0, ok = 0;
+    for (const t of todo) {
+      done++;
+      status.textContent = `กำลังคำนวณ ${done}/${todo.length}…`;
+      try {
+        const dSym = cvNormalizeDataSymbol((t.symbol || "").replace(/^[a-z]+:/i, ""));
+        let candles = [];
+        try {
+          if (dataSrc === "binance") candles = await cvFetchCandlesBinance(dSym, "1day");
+          else if (dataSrc === "twelvedata") candles = await cvFetchCandles(dSym, "1day", tdKey);
+          else if (tdKey) { try { candles = await cvFetchCandles(dSym, "1day", tdKey); } catch (e) { candles = await cvFetchCandlesBinance(dSym, "1day"); } }
+          else candles = await cvFetchCandlesBinance(dSym, "1day");
+        } catch (e) { candles = []; }
+        if (!candles.length) continue;
+        const openT = Date.parse(t.date + "T00:00:00Z") / 1000;
+        const closeT = Date.parse(((t.dateClose || t.date) + "T23:59:59Z")) / 1000;
+        const seg = candles.filter(c => c.time >= openT - 86400 && c.time <= closeT + 86400);
+        if (!seg.length) continue;
+        const risk = Math.abs(t.entry - t.sl);
+        if (!(risk > 0)) continue;
+        const d = t.side === "short" ? -1 : 1;
+        let bestFav = -Infinity, worstAdv = Infinity;
+        seg.forEach(c => {
+          const favPrice = d === 1 ? c.high : c.low;
+          const advPrice = d === 1 ? c.low : c.high;
+          bestFav = Math.max(bestFav, (favPrice - t.entry) * d);
+          worstAdv = Math.min(worstAdv, (advPrice - t.entry) * d);
+        });
+        const rec = trades.find(x => x.id === t.id);
+        if (rec) {
+          rec.mfe = Math.max(0, bestFav / risk);
+          rec.mae = Math.max(0, -worstAdv / risk);
+          rec.mfeMaeAt = Date.now();
+          ok++;
+        }
+      } catch (e) { /* skip this trade */ }
+      await new Promise(r => setTimeout(r, tdKey && dataSrc !== "binance" ? 8000 : 350));
+    }
+    if (ok) { saveTrades(); renderExitAnalysis(); }
+    status.textContent = `เสร็จ — คำนวณได้ ${ok}/${todo.length} ไม้` + (ok < todo.length ? " (ที่เหลือหาราคาไม่ได้/สัญลักษณ์ไม่ตรง)" : "");
+    if (btn) btn.disabled = false;
   }
 
   function renderTagStats() {
@@ -1921,6 +2262,10 @@
       metric("กำไรเฉลี่ย/ครั้ง", s.wins ? fmtMoney(s.avgWin) : "—", "pos"),
       metric("ขาดทุนเฉลี่ย/ครั้ง", s.losses ? fmtMoney(s.avgLoss) : "—", "neg"),
       metric("Profit Factor", s.profitFactor === Infinity ? "∞" : closedCount ? s.profitFactor.toFixed(2) : "—"),
+      metric("Expectancy (R เฉลี่ย/ไม้)", s.expR == null ? "—" : (s.expR >= 0 ? "+" : "") + s.expR.toFixed(2) + "R", s.expR == null ? "" : s.expR >= 0 ? "pos" : "neg"),
+      metric("Drawdown สูงสุด", s.maxDD > 0 ? "−" + fmtPlain(s.maxDD) + (s.maxDDPct != null ? ` (${s.maxDDPct.toFixed(1)}%)` : "") : "—", s.maxDD > 0 ? "neg" : ""),
+      metric("ทำตามแผน", s.followRate == null ? "—" : s.followRate.toFixed(0) + "%", s.followRate == null ? "" : s.followRate >= 80 ? "pos" : "neg"),
+      metric("คะแนน execute เฉลี่ย", s.avgExec == null ? "—" : s.avgExec.toFixed(0) + "/100", s.avgExec == null ? "" : s.avgExec >= 70 ? "pos" : "neg"),
       metric("วันที่ดีที่สุด", s.bestDay ? `${s.bestDay.key} (${fmtMoney(s.bestDay.sum)})` : "—", s.bestDay && s.bestDay.sum >= 0 ? "pos" : ""),
       metric("วันที่แย่ที่สุด", s.worstDay ? `${s.worstDay.key} (${fmtMoney(s.worstDay.sum)})` : "—", s.worstDay && s.worstDay.sum < 0 ? "neg" : ""),
     ].join("");
@@ -1956,7 +2301,438 @@
     renderTagStats();
     renderEdgeReport();
     renderExitAnalysis();
+    renderRDistribution();
+    renderPeriodCompare();
+    renderDisciplineTrend();
   }
+
+  /* ---------- R-multiple distribution histogram ---------- */
+  function renderRDistribution() {
+    const wrap = document.getElementById("rDistWrap");
+    const rs = pfTrades().filter(t => !isPending(t)).map(edgeR).filter(x => x != null);
+    if (rs.length < 4) { wrap.innerHTML = '<div class="empty">ต้องมีเทรดที่ปิดแล้ว + มีราคาเข้า/SL/ออก อย่างน้อย 4 ไม้</div>'; return; }
+    const buckets = [
+      { lbl: "≤ −3R", t: -3, lo: -Infinity, hi: -3 },
+      { lbl: "−3 ถึง −2R", lo: -3, hi: -2 },
+      { lbl: "−2 ถึง −1R", lo: -2, hi: -1 },
+      { lbl: "−1 ถึง 0R", lo: -1, hi: 0 },
+      { lbl: "0 ถึง 1R", lo: 0, hi: 1 },
+      { lbl: "1 ถึง 2R", lo: 1, hi: 2 },
+      { lbl: "2 ถึง 3R", lo: 2, hi: 3 },
+      { lbl: "≥ 3R", lo: 3, hi: Infinity },
+    ];
+    const counts = buckets.map(b => rs.filter(r => r > b.lo && r <= b.hi).length);
+    const maxC = Math.max(...counts, 1);
+    const mean = rs.reduce((s, x) => s + x, 0) / rs.length;
+    const sd = Math.sqrt(rs.reduce((s, x) => s + (x - mean) ** 2, 0) / rs.length);
+    const wins = rs.filter(r => r > 0).length;
+    const rows = buckets.map((b, i) => {
+      const neg = b.hi <= 0;
+      const w = (counts[i] / maxC * 100).toFixed(1);
+      return `<div class="dist-bar-row">
+        <span class="dbl">${b.lbl}</span>
+        <div class="dist-bar" style="width:${w}%;background:${neg ? "var(--bear)" : "var(--bull)"}"></div>
+        <span class="dbt">${counts[i]}</span></div>`;
+    }).join("");
+    wrap.innerHTML = rows +
+      `<div class="muted-note" style="margin-top:8px">${rs.length} ไม้ · เฉลี่ย ${(mean>=0?"+":"")}${mean.toFixed(2)}R · SD ${sd.toFixed(2)}R · ไม้บวก ${(wins/rs.length*100).toFixed(0)}%` +
+      (mean > 0 ? ` · <span class="pos">คาดหวังเป็นบวก</span>` : ` · <span class="neg">คาดหวังยังติดลบ</span>`) + `</div>` +
+      (rs.filter(r => r < -1.05).length ? `<div class="warn-note">มี ${rs.filter(r => r < -1.05).length} ไม้ที่ขาดทุนเกิน 1R — จุดรั่วอยู่ที่การตัดขาดทุน</div>` : "");
+  }
+
+  /* ---------- period-over-period comparison ---------- */
+  function periodStats(tradesArr) {
+    const closed = tradesArr.filter(t => !isPending(t));
+    const n = closed.length;
+    const pnl = closed.reduce((s, t) => s + pnlNum(t.pnl), 0);
+    const wins = closed.filter(t => tradeOutcome(t) === "win").length;
+    const rs = closed.map(edgeR).filter(x => x != null);
+    const ruled = closed.filter(t => t.followedRules === true || t.followedRules === false);
+    const execS = closed.filter(t => typeof t.execScore === "number");
+    return {
+      n, pnl,
+      winRate: n ? wins / n * 100 : null,
+      expR: rs.length ? rs.reduce((s, x) => s + x, 0) / rs.length : null,
+      followRate: ruled.length ? ruled.filter(t => t.followedRules).length / ruled.length * 100 : null,
+      avgExec: execS.length ? execS.reduce((s, t) => s + t.execScore, 0) / execS.length : null,
+    };
+  }
+  function renderPeriodCompare() {
+    const wrap = document.getElementById("periodCompareWrap");
+    const rows = [];
+    ["week", "month"].forEach(period => {
+      const keys = periodKeysWithTrades(period);
+      if (keys.length < 2) return;
+      const curK = keys[keys.length - 1], prevK = keys[keys.length - 2];
+      const cur = periodStats(pfTrades().filter(t => periodKeyOf(t.date, period) === curK));
+      const prev = periodStats(pfTrades().filter(t => periodKeyOf(t.date, period) === prevK));
+      const cell = (v, fmt, goodUp) => {
+        if (v == null) return `<td class="mono">—</td>`;
+        return `<td class="mono">${fmt(v)}</td>`;
+      };
+      const delta = (a, b, fmt, unit) => {
+        if (a == null || b == null) return `<td class="mono">—</td>`;
+        const d = a - b;
+        const cls = Math.abs(d) < 1e-9 ? "" : d > 0 ? "pos" : "neg";
+        return `<td class="mono ${cls}">${d >= 0 ? "+" : ""}${fmt(d)}${unit || ""}</td>`;
+      };
+      const m$ = v => fmtMoney(v);
+      const mR = v => (v >= 0 ? "+" : "") + v.toFixed(2) + "R";
+      const mP = v => v.toFixed(0) + "%";
+      rows.push(`<div class="edge-block"><h4>${period === "week" ? "สัปดาห์นี้ vs สัปดาห์ก่อน" : "เดือนนี้ vs เดือนก่อน"}</h4>
+        <div class="table-scroll"><table>
+        <thead><tr><th>ตัวชี้วัด</th><th>${periodLabel(prevK, period)}</th><th>${periodLabel(curK, period)}</th><th>เปลี่ยน</th></tr></thead>
+        <tbody>
+          <tr><td>จำนวนไม้</td><td class="mono">${prev.n}</td><td class="mono">${cur.n}</td><td class="mono">${cur.n - prev.n >= 0 ? "+" : ""}${cur.n - prev.n}</td></tr>
+          <tr><td>P/L</td><td class="mono ${prev.pnl>=0?"pos":"neg"}">${m$(prev.pnl)}</td><td class="mono ${cur.pnl>=0?"pos":"neg"}">${m$(cur.pnl)}</td>${delta(cur.pnl, prev.pnl, m$)}</tr>
+          <tr><td>Win rate</td>${cell(prev.winRate, mP)}${cell(cur.winRate, mP)}${delta(cur.winRate, prev.winRate, v=>v.toFixed(0), "%")}</tr>
+          <tr><td>Expectancy</td>${cell(prev.expR, mR)}${cell(cur.expR, mR)}${delta(cur.expR, prev.expR, v=>v.toFixed(2), "R")}</tr>
+          <tr><td>ทำตามแผน</td>${cell(prev.followRate, mP)}${cell(cur.followRate, mP)}${delta(cur.followRate, prev.followRate, v=>v.toFixed(0), "%")}</tr>
+          <tr><td>คะแนน execute</td>${cell(prev.avgExec, v=>v.toFixed(0))}${cell(cur.avgExec, v=>v.toFixed(0))}${delta(cur.avgExec, prev.avgExec, v=>v.toFixed(0))}</tr>
+        </tbody></table></div></div>`);
+    });
+    wrap.innerHTML = rows.length ? rows.join("") : '<div class="empty">ต้องมีเทรดในอย่างน้อย 2 สัปดาห์ (หรือ 2 เดือน) จึงจะเทียบได้</div>';
+  }
+
+  /* ---------- weekly discipline trend sparkline ---------- */
+  function renderDisciplineTrend() {
+    const wrap = document.getElementById("disciplineTrendWrap");
+    const keys = periodKeysWithTrades("week").slice(-12);
+    if (keys.length < 2) { wrap.innerHTML = '<div class="empty">ต้องมีเทรดอย่างน้อย 2 สัปดาห์</div>'; return; }
+    const series = keys.map(k => {
+      const st = periodStats(pfTrades().filter(t => periodKeyOf(t.date, "week") === k));
+      return { k, follow: st.followRate, exec: st.avgExec };
+    });
+    const w = 620, h = 150, padL = 34, padR = 12, padT = 12, padB = 26;
+    const xStep = series.length > 1 ? (w - padL - padR) / (series.length - 1) : 0;
+    const xAt = i => padL + i * xStep;
+    const yAt = v => padT + (h - padT - padB) * (1 - v / 100);
+    const line = (sel, color) => {
+      const pts = series.map((d, i) => d[sel] == null ? null : `${xAt(i).toFixed(1)},${yAt(d[sel]).toFixed(1)}`).filter(Boolean).join(" ");
+      return pts ? `<polyline points="${pts}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linejoin="round"/>` +
+        series.map((d, i) => d[sel] == null ? "" : `<circle cx="${xAt(i).toFixed(1)}" cy="${yAt(d[sel]).toFixed(1)}" r="3" fill="${color}"/>`).join("") : "";
+    };
+    wrap.innerHTML = `<svg viewBox="0 0 ${w} ${h}" width="100%" height="150" preserveAspectRatio="none" style="overflow:visible">
+      ${[0, 50, 80, 100].map(v => `<line x1="${padL}" y1="${yAt(v)}" x2="${w - padR}" y2="${yAt(v)}" stroke="var(--border)" stroke-dasharray="3 3"/><text x="${padL - 6}" y="${yAt(v)}" font-size="9" text-anchor="end" dy="3" fill="var(--muted)">${v}</text>`).join("")}
+      ${line("follow", "var(--accent)")}
+      ${line("exec", "var(--bull)")}
+      <text x="${padL}" y="${h - 8}" font-size="10" fill="var(--muted)">${periodLabel(series[0].k, "week")}</text>
+      <text x="${w - padR}" y="${h - 8}" font-size="10" text-anchor="end" fill="var(--muted)">${periodLabel(series[series.length - 1].k, "week")}</text>
+    </svg>
+    <div class="muted-note" style="margin-top:4px"><span style="color:var(--accent)">●</span> % ทำตามแผน &nbsp; <span style="color:var(--bull)">●</span> คะแนน execute เฉลี่ย — ต่อสัปดาห์ (12 สัปดาห์ล่าสุด)</div>`;
+  }
+
+  /* ================= shared Gemini call + batch trade review ================= */
+  async function geminiGenerate(promptText) {
+    const key = (localStorage.getItem(CV_LS.akey) || "").trim();
+    if (!key) throw new Error("ยังไม่ได้ตั้งค่า Gemini API key (ตั้งในแท็บ 'กราฟ + AI' ก่อน)");
+    const call = async (model) => {
+      const res = await fetch(
+        "https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent",
+        {
+          method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": key },
+          body: JSON.stringify({
+            contents: [{ role: "user", parts: [{ text: promptText }] }],
+            generationConfig: { maxOutputTokens: 1400, temperature: 0.4 },
+          }),
+        }
+      );
+      return { ok: res.ok, j: await res.json() };
+    };
+    let model = localStorage.getItem(CV_LS.model) || cv.model;
+    let r = await call(model);
+    if (!r.ok) {
+      const em = String((r.j && r.j.error && r.j.error.message) || "");
+      if (/quota|RESOURCE_EXHAUSTED/i.test(em) && !/flash/i.test(model)) {
+        try { await cvLoadModels(key, true); r = await call(cv.model); } catch (e) {}
+      }
+    }
+    if (!r.ok) throw new Error((r.j && r.j.error && r.j.error.message) || "เรียก AI ไม่สำเร็จ");
+    const cand = r.j.candidates && r.j.candidates[0];
+    const text = ((cand && cand.content && cand.content.parts) || [])
+      .filter(p => typeof p.text === "string").map(p => p.text).join("\n").trim();
+    if (!text) throw new Error("AI ไม่ได้ตอบข้อความกลับมา");
+    return text;
+  }
+
+  function tradesTableForAi(list) {
+    const rows = list.map(t => {
+      const r = edgeR(t);
+      return [
+        t.date,
+        (t.symbol || "?") + " " + (t.side === "long" ? "BUY" : "SELL"),
+        isPending(t) ? "รอผล" : fmtMoney(pnlNum(t.pnl)) + "$",
+        r == null ? "" : (r >= 0 ? "+" : "") + r.toFixed(2) + "R",
+        typeof t.execScore === "number" ? "exec " + t.execScore : "",
+        t.followedRules === false ? "แหกแผน" : (t.followedRules ? "ตามแผน" : ""),
+        t.mood ? MOOD_LABEL[t.mood] || t.mood : "",
+        (t.mistakes || []).join("/"),
+        t.model || t.setup || "",
+        t.session || "",
+      ].filter(Boolean).join(" | ");
+    });
+    return rows.join("\n");
+  }
+
+  async function aiReviewTradeList(list, label, statusEl, outEl, onDone) {
+    if (list.length < 3) { statusEl.textContent = "ต้องมีไม้ที่ปิดแล้วอย่างน้อย 3 ไม้"; return; }
+    statusEl.textContent = "กำลังวิเคราะห์ " + list.length + " ไม้…";
+    const prompt = [
+      "คุณเป็นโค้ชเทรดมืออาชีพ วิเคราะห์ชุดเทรดต่อไปนี้ (" + label + ") แบบภาพรวม ภาษาไทย:",
+      "",
+      "วันที่ | สัญลักษณ์+ทิศ | P/L | R | คะแนน execute | วินัย | อารมณ์ | ข้อผิดพลาด | โมเดล | session",
+      tradesTableForAi(list),
+      "",
+      "ตอบเป็นหัวข้อสั้น ๆ:",
+      "1) รูปแบบที่ได้เงิน — เงื่อนไข/โมเดล/ช่วงเวลา/อารมณ์ ที่ผลดีชัดเจน",
+      "2) รูปแบบที่เสียเงิน — จุดรั่วที่เกิดซ้ำ",
+      "3) วินัย vs ผล — การแหกแผน/อารมณ์ กระทบผลจริงแค่ไหน",
+      "4) 3 กฎที่ควรทำงวดหน้า — สั้น ชัด ทำตามได้จริง",
+    ].join("\n");
+    try {
+      const text = await geminiGenerate(prompt);
+      outEl.style.display = "block";
+      outEl.textContent = text;
+      statusEl.textContent = "เสร็จแล้ว";
+      if (onDone) onDone(text);
+    } catch (err) {
+      statusEl.textContent = "วิเคราะห์ไม่สำเร็จ: " + (err.message || err);
+    }
+  }
+
+  (function wireOverviewAi() {
+    const btn = document.getElementById("ovAiReviewBtn");
+    if (!btn) return;
+    btn.addEventListener("click", () => {
+      const scope = document.getElementById("ovAiScope").value;
+      let list = pfTrades().filter(t => !isPending(t))
+        .sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt || 0) - (a.createdAt || 0));
+      let label = "";
+      if (scope === "thisMonth") { const mk = todayKey().slice(0, 7); list = list.filter(t => t.date.slice(0, 7) === mk); label = "เดือนนี้"; }
+      else if (scope === "all") { label = "ทั้งหมด " + list.length + " ไม้"; }
+      else { const n = +scope; list = list.slice(0, n); label = n + " ไม้ล่าสุด"; }
+      aiReviewTradeList(list, label,
+        document.getElementById("ovAiReviewStatus"),
+        document.getElementById("ovAiReviewOut"));
+    });
+  })();
+
+  /* ================= REVIEW TAB ================= */
+  let reviewPeriod = "week";
+  let editingReviewId = null;
+  let editingReviewObj = null;   // the review being edited (may not be in `reviews` yet)
+
+  function reviewStatsSnapshot(list) {
+    const st = periodStats(list);
+    const dd = (() => {
+      let cum = 0, peak = 0, mx = 0;
+      list.filter(t => !isPending(t)).sort((a, b) => a.date.localeCompare(b.date))
+        .forEach(t => { cum += pnlNum(t.pnl); peak = Math.max(peak, cum); mx = Math.max(mx, peak - cum); });
+      return mx;
+    })();
+    return { trades: list.length, closed: st.n, winRate: st.winRate, pnl: st.pnl, expR: st.expR,
+      followRate: st.followRate, avgExec: st.avgExec, dd };
+  }
+
+  function renderReviewTab() {
+    document.querySelectorAll("#reviewPeriodSeg button").forEach(b =>
+      b.classList.toggle("active", b.dataset.p === reviewPeriod));
+    const wrap = document.getElementById("reviewListWrap");
+    const mine = reviews.filter(r => r.period === reviewPeriod).sort((a, b) => b.key.localeCompare(a.key));
+
+    // streak: consecutive most-recent periods (with trades) that have a review
+    const keysWith = periodKeysWithTrades(reviewPeriod).slice().reverse();
+    let streak = 0;
+    for (const k of keysWith) { if (mine.some(r => r.key === k)) streak++; else break; }
+    const curKey = periodKeyOf(todayKey(), reviewPeriod);
+    const hasCur = mine.some(r => r.key === curKey);
+    document.getElementById("reviewStreakLine").innerHTML =
+      `🔥 ทบทวนต่อเนื่อง ${streak} ${reviewPeriod === "week" ? "สัปดาห์" : "เดือน"} · งวดนี้ (${periodLabel(curKey, reviewPeriod)}) ` +
+      (hasCur ? '<span class="pos">ทำแล้ว ✓</span>' : '<span class="neg">ยังไม่ได้ทำ</span>');
+    document.getElementById("newReviewBtn").textContent = hasCur ? "แก้บทวิเคราะห์งวดนี้" : "＋ สร้างบทวิเคราะห์งวดนี้";
+
+    if (!mine.length) { wrap.innerHTML = '<div class="panel"><div class="empty">ยังไม่มีบทวิเคราะห์ — กด "สร้างบทวิเคราะห์งวดนี้"</div></div>'; return; }
+    wrap.innerHTML = '<div class="panel">' + mine.map(r => {
+      const s = r.stats || {};
+      const openActions = (r.actions || []).filter(a => a.done !== true).length;
+      return `<div class="review-card" data-id="${r.id}">
+        <h4>${periodLabel(r.key, r.period)}
+          <span class="r-meta">${s.closed || 0} ไม้ · ${s.pnl != null ? fmtMoney(s.pnl) : "—"} · Exp ${s.expR != null ? (s.expR >= 0 ? "+" : "") + s.expR.toFixed(2) + "R" : "—"} · ทำตามแผน ${s.followRate != null ? s.followRate.toFixed(0) + "%" : "—"}</span>
+        </h4>
+        ${r.lessons ? `<div style="font-size:13px;margin-bottom:6px"><b>บทเรียน:</b> ${escapeHtml(r.lessons)}</div>` : ""}
+        ${(r.actions || []).length ? `<div class="r-meta">Action: ${(r.actions || []).length} ข้อ · ค้าง ${openActions}</div>` : ""}
+        <button class="linkbtn" style="margin-top:8px" data-open="${r.id}">เปิด / แก้ไข</button>
+      </div>`;
+    }).join("") + '</div>';
+    wrap.querySelectorAll("[data-open]").forEach(b =>
+      b.addEventListener("click", () => openReviewModal(b.dataset.open)));
+  }
+
+  function tradesForPeriod(key, period) {
+    return pfTrades().filter(t => periodKeyOf(t.date, period) === key);
+  }
+
+  function openReviewModal(id) {
+    const key = periodKeyOf(todayKey(), reviewPeriod);
+    let r = id ? reviews.find(x => x.id === id) : reviews.find(x => x.period === reviewPeriod && x.key === key);
+    const isNew = !r;
+    if (isNew) {
+      r = { id: uid(), period: reviewPeriod, key, createdAt: Date.now(),
+        wentWell: "", mistakes: "", marketNotes: "", lessons: "", actions: [], aiSummary: "", carry: [] };
+    }
+    editingReviewId = r.id;
+    editingReviewObj = r;
+    const list = tradesForPeriod(r.key, r.period);
+    const snap = reviewStatsSnapshot(list);
+    if (isNew || !r.stats) r.stats = snap;
+
+    document.getElementById("reviewModalTitle").textContent = "บทวิเคราะห์ · " + periodLabel(r.key, r.period);
+    document.getElementById("reviewDeleteBtn").classList.toggle("hidden", isNew);
+    const S = r.stats;
+    document.getElementById("reviewSnapshot").innerHTML = [
+      ["ไม้ที่ปิด", S.closed || 0, ""],
+      ["P/L", S.pnl != null ? fmtMoney(S.pnl) : "—", S.pnl >= 0 ? "pos" : "neg"],
+      ["Win rate", S.winRate != null ? S.winRate.toFixed(0) + "%" : "—", ""],
+      ["Expectancy", S.expR != null ? (S.expR >= 0 ? "+" : "") + S.expR.toFixed(2) + "R" : "—", S.expR >= 0 ? "pos" : "neg"],
+      ["ทำตามแผน", S.followRate != null ? S.followRate.toFixed(0) + "%" : "—", S.followRate >= 80 ? "pos" : "neg"],
+      ["Drawdown งวดนี้", S.dd ? "−" + fmtPlain(S.dd) : "—", S.dd ? "neg" : ""],
+    ].map(m => `<div class="metric"><div class="metric-label">${m[0]}</div><div class="metric-value ${m[2]}">${m[1]}</div></div>`).join("");
+
+    // carry-forward: action items from the previous period's review
+    const prevKey = prevPeriodKey(r.key, r.period);
+    const prevRev = reviews.find(x => x.period === r.period && x.key === prevKey);
+    const carryWrap = document.getElementById("reviewCarryWrap");
+    const carryList = document.getElementById("reviewCarryList");
+    if (prevRev && (prevRev.actions || []).length) {
+      if (!r.carry || !r.carry.length) {
+        r.carry = prevRev.actions.map(a => ({ id: uid(), text: a.text, done: null, result: "" }));
+      }
+      carryWrap.style.display = "";
+      carryList.innerHTML = r.carry.map((a, i) => `<div class="action-item" data-ci="${i}">
+        <div style="flex:1">
+          <div class="ai-text" style="font-size:13px">${escapeHtml(a.text)}</div>
+          <div class="mini-seg" style="margin-top:5px">
+            <button type="button" data-v="yes" class="${a.done === true ? "active" : ""}">ทำได้</button>
+            <button type="button" data-v="partly" class="${a.done === "partly" ? "active" : ""}">บ้าง</button>
+            <button type="button" data-v="no" class="${a.done === false ? "active" : ""}">ไม่ได้ทำ</button>
+          </div>
+          <input type="text" class="ci-result" placeholder="ได้ผลยังไง / ทำไมไม่ได้ทำ" value="${escapeHtml(a.result || "")}" style="margin-top:6px">
+        </div></div>`).join("");
+      carryList.querySelectorAll(".action-item").forEach(row => {
+        const idx = +row.dataset.ci;
+        row.querySelectorAll(".mini-seg button").forEach(b => b.addEventListener("click", () => {
+          row.querySelectorAll(".mini-seg button").forEach(x => x.classList.remove("active"));
+          b.classList.add("active");
+          r.carry[idx].done = b.dataset.v === "yes" ? true : b.dataset.v === "no" ? false : "partly";
+        }));
+        row.querySelector(".ci-result").addEventListener("input", e => { r.carry[idx].result = e.target.value; });
+      });
+    } else {
+      carryWrap.style.display = "none";
+      carryList.innerHTML = "";
+    }
+
+    document.getElementById("rvWentWell").value = r.wentWell || "";
+    document.getElementById("rvMistakes").value = r.mistakes || "";
+    document.getElementById("rvMarket").value = r.marketNotes || "";
+    document.getElementById("rvLessons").value = r.lessons || "";
+    document.getElementById("rvActions").value = (r.actions || []).map(a => a.text).join("\n");
+
+    const aiOut = document.getElementById("rvAiOut");
+    aiOut.style.display = r.aiSummary ? "block" : "none";
+    aiOut.textContent = r.aiSummary || "";
+    document.getElementById("rvAiStatus").textContent = "";
+
+    // image gallery for the period
+    const pairs = list.filter(t => t.imageBefore || t.imageAfter || t.image);
+    const gWrap = document.getElementById("rvGalleryWrap");
+    if (pairs.length) {
+      gWrap.style.display = "";
+      document.getElementById("rvGallery").innerHTML = pairs.map(t => {
+        const b = t.imageBefore, a = t.imageAfter || (!t.imageBefore ? t.image : null);
+        const rM = edgeR(t);
+        return `<div class="rg-pair"><div class="rg-imgs">
+          ${b ? `<img src="${b}" data-lb="${b}">` : `<div style="height:92px;background:var(--surface-alt)"></div>`}
+          ${a ? `<img src="${a}" data-lb="${a}">` : `<div style="height:92px;background:var(--surface-alt)"></div>`}
+        </div><div class="rg-cap"><span>${escapeHtml(t.symbol || "—")}</span><span class="mono ${pnlNum(t.pnl) >= 0 ? "pos" : "neg"}">${rM != null ? (rM >= 0 ? "+" : "") + rM.toFixed(1) + "R" : (isPending(t) ? "รอผล" : fmtMoney(pnlNum(t.pnl)))}</span></div></div>`;
+      }).join("");
+      document.getElementById("rvGallery").querySelectorAll("[data-lb]").forEach(img =>
+        img.addEventListener("click", () => openLightbox(img.dataset.lb)));
+    } else {
+      gWrap.style.display = "none";
+    }
+
+    document.getElementById("reviewModal").classList.add("open");
+  }
+
+  function closeReviewModal() {
+    document.getElementById("reviewModal").classList.remove("open");
+    editingReviewId = null;
+    editingReviewObj = null;
+  }
+
+  function collectReviewFromForm() {
+    const r = editingReviewObj || reviews.find(x => x.id === editingReviewId) ||
+      { id: editingReviewId, period: reviewPeriod, key: periodKeyOf(todayKey(), reviewPeriod), createdAt: Date.now(), actions: [], carry: [] };
+    editingReviewObj = r;
+    r.wentWell = document.getElementById("rvWentWell").value.trim();
+    r.mistakes = document.getElementById("rvMistakes").value.trim();
+    r.marketNotes = document.getElementById("rvMarket").value.trim();
+    r.lessons = document.getElementById("rvLessons").value.trim();
+    const newTexts = document.getElementById("rvActions").value.split("\n").map(s => s.trim()).filter(Boolean);
+    const prevActions = r.actions || [];
+    r.actions = newTexts.map(text => {
+      const ex = prevActions.find(a => a.text === text);
+      return ex || { id: uid(), text, done: null, result: "" };
+    });
+    r.updatedAt = Date.now();
+    if (!r.stats) r.stats = reviewStatsSnapshot(tradesForPeriod(r.key, r.period));
+    return r;
+  }
+
+  function saveReview() {
+    const r = collectReviewFromForm();
+    const i = reviews.findIndex(x => x.id === r.id);
+    if (i >= 0) reviews[i] = r; else reviews.push(r);
+    saveReviews();
+    closeReviewModal();
+    renderReviewTab();
+    successToast("บันทึกบทวิเคราะห์เรียบร้อย");
+  }
+
+  document.getElementById("reviewPeriodSeg").addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    reviewPeriod = b.dataset.p;
+    renderReviewTab();
+  });
+  document.getElementById("newReviewBtn").addEventListener("click", () => openReviewModal(null));
+  document.getElementById("reviewModalClose").addEventListener("click", closeReviewModal);
+  document.getElementById("reviewCancelBtn").addEventListener("click", closeReviewModal);
+  document.getElementById("reviewSaveBtn").addEventListener("click", saveReview);
+  document.getElementById("reviewDeleteBtn").addEventListener("click", () => {
+    if (!editingReviewId) return;
+    Swal.fire({ icon: "warning", title: "ลบบทวิเคราะห์นี้?", showCancelButton: true, confirmButtonText: "ลบ", cancelButtonText: "ยกเลิก", confirmButtonColor: "#dc2626", reverseButtons: true })
+      .then(res => {
+        if (!res.isConfirmed) return;
+        reviews = reviews.filter(x => x.id !== editingReviewId);
+        saveReviews();
+        closeReviewModal();
+        renderReviewTab();
+      });
+  });
+  document.getElementById("rvAiBtn").addEventListener("click", () => {
+    // make sure the review is persisted so the AI summary has somewhere to land
+    const r = collectReviewFromForm();
+    if (!reviews.some(x => x.id === r.id)) { reviews.push(r); saveReviews(); }
+    const list = tradesForPeriod(r.key, r.period).filter(t => !isPending(t));
+    aiReviewTradeList(list, periodLabel(r.key, r.period),
+      document.getElementById("rvAiStatus"),
+      document.getElementById("rvAiOut"),
+      (text) => {
+        const rr = reviews.find(x => x.id === editingReviewId);
+        if (rr) { rr.aiSummary = text; saveReviews(); renderReviewTab(); }
+      });
+  });
 
   function buildEquityCurveSvg() {
     const cap = pfCapital();
@@ -2474,6 +3250,43 @@
   let currentOutcome = null;   // "win" | "loss" | "be" | null (manual override of the P/L-derived result)
   let aiScoreVal = null;   // 0-100 score from the last AI review of this trade
   let aiGradeVal = null;   // A-E grade the AI suggested
+  let currentMood = null;        // pre-trade mental state
+  let currentMoodAfter = null;   // post-trade mental state
+  let currentMistakes = [];      // fixed-taxonomy mistakes on this trade
+  let execScoreTouched = false;  // has the exec-score slider been set this session
+
+  function renderMoodPick(id, sel, onPick) {
+    const box = document.getElementById(id);
+    if (!box) return;
+    box.dataset.val = sel || "";
+    box.innerHTML = MOOD_OPTS.map(([v, lbl]) =>
+      `<label class="${sel === v ? "on" : ""}"><input type="radio" name="${id}" value="${v}" ${sel === v ? "checked" : ""}>${lbl}</label>`
+    ).join("");
+    box.querySelectorAll("input").forEach(inp => inp.addEventListener("click", () => {
+      const clearing = box.dataset.val === inp.value;   // re-click on the selected chip clears it
+      box.dataset.val = clearing ? "" : inp.value;
+      if (clearing) inp.checked = false;
+      box.querySelectorAll("label").forEach(l =>
+        l.classList.toggle("on", !clearing && l.querySelector("input").value === inp.value));
+      onPick(clearing ? null : inp.value);
+    }));
+  }
+  function renderMistakePick(sel) {
+    const box = document.getElementById("tfMistakePick");
+    if (!box) return;
+    const set = new Set(sel || []);
+    box.innerHTML = MISTAKE_TAXONOMY.map(m =>
+      `<label class="${set.has(m) ? "on" : ""}"><input type="checkbox" value="${escapeHtml(m)}" ${set.has(m) ? "checked" : ""}>${escapeHtml(m)}</label>`
+    ).join("");
+    box.querySelectorAll("input").forEach(inp => inp.addEventListener("change", () =>
+      inp.closest("label").classList.toggle("on", inp.checked)));
+  }
+  function updateExecScoreView() {
+    const el = document.getElementById("tfExecScoreView");
+    const v = +document.getElementById("tfExecScore").value;
+    if (el) el.textContent = execScoreTouched ? v + "/100" : "ยังไม่ให้คะแนน";
+  }
+
   function renderAiScoreView() {
     const el = document.getElementById("tfAiScoreView");
     if (!el) return;
@@ -2988,6 +3801,16 @@
     aiGradeVal = t && t.aiGrade ? t.aiGrade : null;
     renderAiScoreView();
 
+    currentMood = t && t.mood ? t.mood : null;
+    currentMoodAfter = t && t.moodAfter ? t.moodAfter : null;
+    currentMistakes = t && Array.isArray(t.mistakes) ? t.mistakes.slice() : [];
+    renderMoodPick("tfMoodPick", currentMood, v => { currentMood = v; });
+    renderMoodPick("tfMoodAfterPick", currentMoodAfter, v => { currentMoodAfter = v; });
+    renderMistakePick(currentMistakes);
+    execScoreTouched = !!(t && typeof t.execScore === "number");
+    document.getElementById("tfExecScore").value = t && typeof t.execScore === "number" ? t.execScore : 0;
+    updateExecScoreView();
+
     toggleMarketFields();
     updateTradeCalc();
     updateFuturesDetailCalc();
@@ -3120,6 +3943,7 @@
     }
   }
   document.getElementById("tfAiReviewBtn").addEventListener("click", tfAiReviewTrade);
+  document.getElementById("tfExecScore").addEventListener("input", () => { execScoreTouched = true; updateExecScoreView(); });
 
   document.getElementById("tradeSaveBtn").addEventListener("click", () => {
     const cl = checklistState();
@@ -3197,6 +4021,10 @@
       breakeven: document.getElementById("tfBreakeven").checked,
       enteredWindow: document.getElementById("tfEntryWindow").checked,
       riskPct: document.getElementById("tfRiskPct").value !== "" ? Number(document.getElementById("tfRiskPct").value) : null,
+      mood: currentMood || null,
+      moodAfter: currentMoodAfter || null,
+      mistakes: currentMistakes.slice(),
+      execScore: execScoreTouched ? Number(document.getElementById("tfExecScore").value) : null,
       checklistDone: checklistState().doneLabels,
       checklistTotal: checklist.length,
       tags,
@@ -3208,6 +4036,12 @@
       notes: document.getElementById("tfNotes").value.trim(),
       createdAt: editingId ? (trades.find(x => x.id === editingId) || {}).createdAt || Date.now() : Date.now(),
     };
+
+    // carry forward computed fields the form doesn't edit
+    if (editingId) {
+      const prev = trades.find(x => x.id === editingId) || {};
+      ["mfe", "mae", "mfeMaeAt"].forEach(k => { if (prev[k] != null) record[k] = prev[k]; });
+    }
 
     if (editingId) {
       trades = trades.map(t => t.id === editingId ? record : t);
@@ -3312,7 +4146,7 @@
       app: "ee-suite-backup",
       exportedAt: new Date().toISOString(),
       elliottWave: { chapters: exportChapters },
-      tradeJournal: { trades, capital, capitals, checklist, playbooks },
+      tradeJournal: { trades, capital, capitals, checklist, playbooks, reviews },
       stockDecide: {
         watchlist: JSON.parse(localStorage.getItem("sd_watchlist") || "[]"),
         log: JSON.parse(localStorage.getItem("sd_log") || "[]"),
@@ -3354,6 +4188,11 @@
       const existingPbIds = new Set(playbooks.map(p => p.id));
       playbooks = playbooks.concat(tj.playbooks.filter(p => !(p.id && existingPbIds.has(p.id))).map(p => ({ ...p, id: p.id || uid() })));
       savePlaybooks();
+    }
+    if (tj && Array.isArray(tj.reviews) && tj.reviews.length) {
+      const existingRvIds = new Set(reviews.map(r => r.id));
+      reviews = reviews.concat(tj.reviews.filter(r => !(r.id && existingRvIds.has(r.id))).map(r => ({ ...r, id: r.id || uid() })));
+      saveReviews();
     }
 
     // Elliott Wave (remote — merge straight into its IndexedDB)
@@ -3453,7 +4292,7 @@
     const db = FirebaseSync.getDb();
     const uid = FirebaseSync.getUser().uid;
     db.collection("users").doc(uid).collection("sync").doc("tradeJournal")
-      .set({ trades, capital, capitals, checklist, playbooks, updatedAt: Date.now() })
+      .set({ trades, capital, capitals, checklist, playbooks, reviews, updatedAt: Date.now() })
       .catch(err => console.error("sync push failed", err));
   }
 
@@ -3484,13 +4323,20 @@
           playbooks = Object.values(pmap);
           try { localStorage.setItem(PLAYBOOKS_KEY, JSON.stringify(playbooks)); } catch (e) {}
         }
+        if (Array.isArray(remote.reviews)) {
+          const rmap = {};
+          remote.reviews.forEach(r => { if (r && r.id) rmap[r.id] = r; });
+          reviews.forEach(r => { if (r && r.id) rmap[r.id] = r; }); // local wins on id clash
+          reviews = Object.values(rmap);
+          try { localStorage.setItem(REVIEWS_KEY, JSON.stringify(reviews)); } catch (e) {}
+        }
         syncApplyingRemote = true;
         saveTrades();
         saveCapital();
         syncApplyingRemote = false;
-        await ref.set({ trades, capital, capitals, checklist, playbooks, updatedAt: Date.now() });
+        await ref.set({ trades, capital, capitals, checklist, playbooks, reviews, updatedAt: Date.now() });
       } else {
-        await ref.set({ trades, capital, capitals, checklist, playbooks, updatedAt: Date.now() });
+        await ref.set({ trades, capital, capitals, checklist, playbooks, reviews, updatedAt: Date.now() });
       }
     } catch (err) {
       console.error("initial sync failed", err);
@@ -3517,6 +4363,10 @@
         playbooks = data.playbooks;
         try { localStorage.setItem(PLAYBOOKS_KEY, JSON.stringify(playbooks)); } catch (e) {}
       }
+      if (Array.isArray(data.reviews)) {
+        reviews = data.reviews;
+        try { localStorage.setItem(REVIEWS_KEY, JSON.stringify(reviews)); } catch (e) {}
+      }
       saveTrades();
       saveCapital();
       syncApplyingRemote = false;
@@ -3524,6 +4374,7 @@
       renderCalendar();
       renderLog();
       if (typeof renderPlaybooks === "function" && !document.getElementById("tab-playbook").classList.contains("hidden")) renderPlaybooks();
+      if (typeof renderReviewTab === "function" && !document.getElementById("tab-review").classList.contains("hidden")) renderReviewTab();
       if (typeof currentTab !== "undefined" && currentTab === "overview") renderOverview();
     }, err => console.error("sync listener error", err));
   }
