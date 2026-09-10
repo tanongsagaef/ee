@@ -108,6 +108,13 @@
   .grade-btn.active[data-grade="D"] { background: rgba(217,119,6,0.12); border-color: #d97706; color: #d97706; }
   .grade-btn.active[data-grade="E"] { background: var(--bear-soft); border-color: var(--bear); color: var(--bear); }
 
+  /* win / loss / break-even */
+  .outcome-toggle { display: flex; gap: 6px; }
+  .outcome-btn { flex: 1; padding: 10px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--surface-alt); color: var(--muted); font-weight: 800; cursor: pointer; font-size: 13px; letter-spacing: .5px; }
+  .outcome-btn.active[data-outcome="win"] { background: var(--bull-soft); border-color: var(--bull); color: var(--bull); }
+  .outcome-btn.active[data-outcome="loss"] { background: var(--bear-soft); border-color: var(--bear); color: var(--bear); }
+  .outcome-btn.active[data-outcome="be"] { background: rgba(217,119,6,0.12); border-color: #d97706; color: #d97706; }
+
   /* tradingview link */
   .tv-link-btn { display: inline-flex; align-items: center; gap: 6px; background: var(--accent-soft); border: 1px solid rgba(79,70,229,0.3); color: var(--accent); padding: 8px 14px; border-radius: 8px; font-size: 12.5px; font-weight: 700; text-decoration: none; margin: 6px 0; cursor: pointer; font-family: inherit; }
   .tv-link-btn:hover { background: var(--accent); color: #fff; }
@@ -321,6 +328,15 @@
   .grade-stamp.grade-C { color: var(--accent); }
   .grade-stamp.grade-D { color: #d97706; }
   .grade-stamp.grade-E { color: var(--bear); }
+  .outcome-stamp {
+    flex-shrink: 0; height: 26px; padding: 0 10px; border-radius: 6px;
+    border: 2.5px solid currentColor; display: inline-flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 900; letter-spacing: .6px; transform: rotate(-6deg); position: relative;
+  }
+  .outcome-stamp::after { content: ""; position: absolute; inset: 2px; border: 1px solid currentColor; border-radius: 4px; opacity: .5; }
+  .outcome-stamp.outcome-win { color: var(--bull); }
+  .outcome-stamp.outcome-loss { color: var(--bear); }
+  .outcome-stamp.outcome-be { color: #d97706; }
 
   /* image lightbox */
   .lightbox-backdrop { display: none; position: fixed; inset: 0; background: rgba(8,9,16,.9); z-index: 60; align-items: center; justify-content: center; padding: 24px; }
@@ -791,13 +807,12 @@
       </div>
       <div class="row">
         <div class="field">
-          <label class="small">ผลเทรด (Win / Loss / เสมอ)</label>
-          <select id="tfOutcome">
-            <option value="">— อิงจากกำไร/ขาดทุน —</option>
-            <option value="win">ชนะ (Win)</option>
-            <option value="loss">แพ้ (Loss)</option>
-            <option value="be">เสมอ (Breakeven)</option>
-          </select>
+          <label class="small">Outcome — ปล่อยว่าง = อิงกำไร/ขาดทุน</label>
+          <div class="outcome-toggle" id="tfOutcomeToggle">
+            <button type="button" class="outcome-btn" data-outcome="win">WIN</button>
+            <button type="button" class="outcome-btn" data-outcome="loss">LOSS</button>
+            <button type="button" class="outcome-btn" data-outcome="be">B/E</button>
+          </div>
         </div>
         <div class="field">
           <label class="small">คะแนนจาก AI</label>
@@ -1393,9 +1408,6 @@
 
     const flags = [];
     if (isPending(t)) flags.push("⏳ รอผลเทรด");
-    if (t.outcome === "win") flags.push("ชนะ");
-    else if (t.outcome === "loss") flags.push("แพ้");
-    else if (t.outcome === "be") flags.push("เสมอ");
     if (t.aiScore != null) flags.push("🤖 " + t.aiScore + "/100" + (t.aiGrade ? " · " + t.aiGrade : ""));
     if (Array.isArray(t.checklistDone) && t.checklistTotal) {
       flags.push("แผน " + t.checklistDone.length + "/" + t.checklistTotal + (t.checklistDone.length === t.checklistTotal ? " ✓" : ""));
@@ -1425,9 +1437,11 @@
     const imgBefore = t.imageBefore || null;
     const imgAfter = t.imageAfter || (!t.imageBefore ? t.image : null) || null;
 
+    const OUT_LABEL = { win: "WIN", loss: "LOSS", be: "B/E" };
     return `<div class="trade-card" data-id="${t.id}">
       <div class="trade-card-head">
         ${t.grade ? `<span class="grade-stamp grade-${t.grade}" title="เกรด ${t.grade}">${t.grade}</span>` : ""}
+        ${t.outcome ? `<span class="outcome-stamp outcome-${t.outcome}" title="ผลเทรด">${OUT_LABEL[t.outcome] || ""}</span>` : ""}
         <span class="badge market">${MARKET_LABEL[t.marketType] || t.marketType}</span>
         <span class="badge ${t.side === "long" ? "up" : "down"}">${t.side === "long" ? "BUY" : "SELL"}</span>
         ${pnlHtml(t, "trade-card-pnl")}
@@ -2378,6 +2392,7 @@
   let currentImageBefore = null;
   let currentImageAfter = null;
   let currentGrade = null;
+  let currentOutcome = null;   // "win" | "loss" | "be" | null (manual override of the P/L-derived result)
   let aiScoreVal = null;   // 0-100 score from the last AI review of this trade
   let aiGradeVal = null;   // A-E grade the AI suggested
   function renderAiScoreView() {
@@ -2528,6 +2543,18 @@
     btn.addEventListener("click", () => {
       currentGrade = (btn.dataset.grade === currentGrade) ? null : btn.dataset.grade;
       updateGradeToggle();
+    });
+  });
+
+  function updateOutcomeToggle() {
+    document.querySelectorAll("#tfOutcomeToggle .outcome-btn").forEach(btn => {
+      btn.classList.toggle("active", btn.dataset.outcome === currentOutcome);
+    });
+  }
+  document.querySelectorAll("#tfOutcomeToggle .outcome-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      currentOutcome = (btn.dataset.outcome === currentOutcome) ? null : btn.dataset.outcome;
+      updateOutcomeToggle();
     });
   });
 
@@ -2838,7 +2865,8 @@
     document.getElementById("tfExitExec").value = t && t.exitExec ? t.exitExec : "";
     document.getElementById("tfChartSetup").value = t && t.chartSetup ? t.chartSetup : "";
     document.getElementById("tfChartExit").value = t && t.chartExit ? t.chartExit : "";
-    document.getElementById("tfOutcome").value = t && t.outcome ? t.outcome : "";
+    currentOutcome = t && ["win", "loss", "be"].includes(t.outcome) ? t.outcome : null;
+    updateOutcomeToggle();
     aiScoreVal = t && t.aiScore != null ? t.aiScore : null;
     aiGradeVal = t && t.aiGrade ? t.aiGrade : null;
     renderAiScoreView();
@@ -3044,7 +3072,7 @@
       account: document.getElementById("tfAccount").value.trim(),
       model: document.getElementById("tfModel").value.trim(),
       grade: currentGrade,
-      outcome: marketType === "futures" ? (document.getElementById("tfOutcome").value || null) : null,
+      outcome: marketType === "futures" ? currentOutcome : null,
       aiScore: aiScoreVal,
       aiGrade: aiGradeVal,
       playbookId: currentPlaybookId || null,
