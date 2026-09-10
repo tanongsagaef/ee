@@ -3,504 +3,404 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<title>STOCK/DECIDE</title>
+<meta name="color-scheme" content="light dark" />
+<title>พอร์ตลงทุน · Stock / Crypto</title>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <style>
   :root {
-    --bg: #0a0d11;
-    --panel: #11151b;
-    --panel-2: #161b22;
-    --line: #232a33;
-    --text: #e6e9ed;
-    --muted: #7c8794;
-    --accent: #e8a33d;
-    --bull: #34c77b;
-    --bear: #e5484d;
-    --neutral: #d9a441;
+    color-scheme: light;
+    --bg: #eef0f8; --surface: #ffffff; --surface-alt: #f4f5fb; --border: #e4e5f2;
+    --text: #12132a; --muted: #6b6f86;
+    --accent: #7c5cff; --accent-hover: #6b48ff; --accent-soft: #efeaff;
+    --bull: #10b981; --bull-soft: rgba(16,185,129,0.12);
+    --bear: #f43f5e; --bear-soft: rgba(244,63,94,0.12);
+    --neutral: #f59e0b;
+    --grad: linear-gradient(120deg, #7c5cff 0%, #b74bff 48%, #ff5ca8 100%);
+    --grad-soft: linear-gradient(120deg, rgba(124,92,255,.14), rgba(255,92,168,.14));
+    --shadow: 0 2px 6px rgba(20,20,60,.05), 0 14px 40px -14px rgba(60,40,160,.18);
+    --shadow-lg: 0 8px 24px -6px rgba(70,40,170,.28);
+    --radius: 16px; --radius-lg: 22px;
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #0a0b12; --surface: #14151f; --surface-alt: #1b1d2b; --border: #282a3d;
+    --text: #eef0ff; --muted: #9296b5;
+    --accent: #9b83ff; --accent-hover: #b3a1ff; --accent-soft: #241f45;
+    --bull: #2ee6a8; --bull-soft: rgba(46,230,168,0.14);
+    --bear: #ff6b8a; --bear-soft: rgba(255,107,138,0.14);
+    --neutral: #ffb44d;
+    --grad: linear-gradient(120deg, #8f6bff 0%, #c65bff 48%, #ff6bb0 100%);
+    --grad-soft: linear-gradient(120deg, rgba(143,107,255,.20), rgba(255,107,176,.16));
+    --shadow: 0 2px 8px rgba(0,0,0,.35), 0 18px 44px -16px rgba(0,0,0,.6);
+    --shadow-lg: 0 10px 30px -8px rgba(120,80,255,.4);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #0a0b12; --surface: #14151f; --surface-alt: #1b1d2b; --border: #282a3d;
+      --text: #eef0ff; --muted: #9296b5;
+      --accent: #9b83ff; --accent-hover: #b3a1ff; --accent-soft: #241f45;
+      --bull: #2ee6a8; --bull-soft: rgba(46,230,168,0.14);
+      --bear: #ff6b8a; --bear-soft: rgba(255,107,138,0.14);
+      --neutral: #ffb44d;
+      --grad: linear-gradient(120deg, #8f6bff 0%, #c65bff 48%, #ff6bb0 100%);
+      --grad-soft: linear-gradient(120deg, rgba(143,107,255,.20), rgba(255,107,176,.16));
+      --shadow: 0 2px 8px rgba(0,0,0,.35), 0 18px 44px -16px rgba(0,0,0,.6);
+      --shadow-lg: 0 10px 30px -8px rgba(120,80,255,.4);
+    }
   }
   * { box-sizing: border-box; }
   body {
-    margin: 0;
-    font-family: -apple-system, "Segoe UI", Inter, sans-serif;
-    background: var(--bg);
+    margin: 0; padding: 22px 20px 64px;
+    font-family: "Sarabun", "Noto Sans Thai", "Segoe UI", system-ui, sans-serif;
     color: var(--text);
-    padding: 18px;
-    padding-bottom: 60px;
+    background:
+      radial-gradient(680px 400px at 8% -6%, rgba(124,92,255,.20), transparent 60%),
+      radial-gradient(620px 420px at 100% 0%, rgba(255,92,168,.16), transparent 55%),
+      radial-gradient(700px 500px at 60% 120%, rgba(56,224,255,.12), transparent 60%),
+      var(--bg);
+    background-attachment: fixed;
   }
   .mono { font-family: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", monospace; }
-  .header { display: flex; align-items: baseline; justify-content: space-between; border-bottom: 1px solid var(--line); padding-bottom: 12px; margin-bottom: 14px; flex-wrap: wrap; gap: 8px; }
-  .brand { font-size: 20px; font-weight: 700; letter-spacing: 0.5px; }
-  .brand .dot { color: var(--accent); }
-  .back-link { background: transparent; border: 1px solid var(--line); color: var(--text); padding: 8px 14px; border-radius: 4px; font-size: 13px; text-decoration: none; display: inline-flex; align-items: center; }
-  .back-link:hover { border-color: var(--accent); color: var(--accent); }
-  .ticker-strip { overflow: hidden; white-space: nowrap; width: 100%; border: 1px solid var(--line); background: var(--panel); border-radius: 4px; padding: 6px 0; margin-bottom: 14px; display: none; }
-  .ticker-strip.show { display: block; }
-  .ticker-strip-inner { display: inline-block; padding-left: 100%; animation: scroll-left 22s linear infinite; }
-  @media (prefers-reduced-motion: reduce) { .ticker-strip-inner { animation: none; padding-left: 12px; } }
-  @keyframes scroll-left { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
-  .ticker-item { display: inline-block; padding: 0 18px; font-size: 12px; color: var(--muted); }
-  .ticker-item b { color: var(--text); }
-  .tabs { display: flex; gap: 4px; margin-bottom: 16px; flex-wrap: wrap; }
-  .tab-btn { background: transparent; border: 1px solid var(--line); color: var(--muted); padding: 7px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-family: ui-monospace, monospace; letter-spacing: 0.3px; }
-  .tab-btn.active { color: var(--accent); border-color: var(--accent); background: rgba(232,163,61,0.08); }
-  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 16px; margin-bottom: 14px; }
-  .panel h3 { margin: 0 0 12px 0; font-size: 13px; letter-spacing: 0.5px; color: var(--muted); text-transform: uppercase; font-weight: 600; }
-  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-  input[type="text"], input[type="number"], input[type="password"] { background: var(--panel-2); border: 1px solid var(--line); color: var(--text); padding: 8px 10px; border-radius: 4px; font-size: 13px; font-family: ui-monospace, monospace; }
-  input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
-  button.primary { background: var(--accent); color: #14110a; border: none; padding: 8px 16px; border-radius: 4px; font-weight: 700; cursor: pointer; font-size: 13px; }
-  button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
-  button.ghost { background: transparent; border: 1px solid var(--line); color: var(--text); padding: 8px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; }
-  button.ghost:hover { border-color: var(--accent); }
-  .link-btn { background: none; border: none; color: var(--bear); cursor: pointer; font-size: 12px; }
-  .error-box { color: var(--bear); font-size: 13px; padding: 10px; border: 1px solid var(--bear); border-radius: 4px; background: rgba(229,72,77,0.08); margin-bottom: 12px; display: none; }
-  .error-box.show { display: block; }
-  .result-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
-  .sym-name { font-size: 24px; font-weight: 800; }
-  .sym-price { font-family: ui-monospace, monospace; font-size: 15px; color: var(--muted); margin-top: 4px; }
-  .stamp { font-family: ui-monospace, monospace; font-weight: 800; font-size: 22px; letter-spacing: 3px; border: 3px double currentColor; padding: 6px 18px; transform: rotate(-6deg); border-radius: 4px; white-space: nowrap; }
-  .metrics-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
-  .metric { background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px; padding: 10px; }
-  .metric-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 4px; }
-  .metric-value { font-family: ui-monospace, monospace; font-size: 15px; font-weight: 700; }
-  .metric-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
-  .disclaimer { font-size: 11px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 10px; margin-top: 14px; }
-  textarea { width: 100%; background: var(--panel-2); border: 1px solid var(--line); color: var(--text); border-radius: 4px; padding: 8px 10px; font-size: 13px; font-family: -apple-system, sans-serif; resize: vertical; }
-  label.small { font-size: 11px; color: var(--muted); display: block; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.3px; }
-  .field { margin-bottom: 10px; }
-  .table-scroll { overflow-x: auto; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 480px; }
-  th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--line); }
-  th { color: var(--muted); font-size: 11px; text-transform: uppercase; font-weight: 600; }
-  .badge { padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: 700; font-family: ui-monospace, monospace; }
-  .badge.up { color: var(--bull); border: 1px solid var(--bull); }
-  .badge.down { color: var(--bear); border: 1px solid var(--bear); }
-  .badge.flat { color: var(--neutral); border: 1px solid var(--neutral); }
-  .empty { color: var(--muted); font-size: 13px; padding: 20px; text-align: center; }
-  .hidden { display: none !important; }
-  .loading-spin { display: inline-block; }
-  button.download { background: var(--panel-2); border: 1px solid var(--accent); color: var(--accent); padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 700; }
-  button.download:hover { background: rgba(232,163,61,0.12); }
-  .metric.pos { border-color: var(--bull); }
-  .metric.pos .metric-value { color: var(--bull); }
-  .metric.neg { border-color: var(--bear); }
-  .metric.neg .metric-value { color: var(--bear); }
-  .metric.neu { border-color: var(--neutral); }
-  .metric.neu .metric-value { color: var(--neutral); }
-  details.glossary { background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 10px 14px; margin-top: 14px; }
-  details.glossary summary { cursor: pointer; font-size: 13px; font-weight: 700; color: var(--accent); list-style: none; }
-  details.glossary summary::-webkit-details-marker { display: none; }
-  details.glossary summary:before { content: "▸ "; }
-  details.glossary[open] summary:before { content: "▾ "; }
-  .gloss-item { padding: 10px 0; border-top: 1px solid var(--line); }
-  .gloss-item:first-of-type { border-top: none; }
-  .gloss-title { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
-  .gloss-desc { font-size: 12.5px; color: var(--text); line-height: 1.5; margin-bottom: 6px; }
-  .gloss-row { font-size: 12px; line-height: 1.5; margin-bottom: 2px; }
-  .gloss-row.good { color: var(--bull); }
-  .gloss-row.bad { color: var(--bear); }
-  .gloss-row.warn { color: var(--neutral); }
-  .analyst-summary { border-left: 3px solid var(--accent); background: var(--panel-2); }
-  .analyst-summary h3 { color: var(--accent); }
-  .analyst-summary .as-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
-  .analyst-summary .as-verdict { font-family: ui-monospace, monospace; font-weight: 800; font-size: 13px; padding: 3px 10px; border-radius: 3px; border: 1px solid currentColor; }
-  .analyst-summary p { font-size: 13.5px; line-height: 1.7; margin: 0 0 10px 0; }
-  .analyst-summary p:last-of-type { margin-bottom: 0; }
-  .analyst-summary .as-caveat { font-size: 11px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 8px; margin-top: 10px; }
-  .bulk-progress-bar { width: 100%; height: 8px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
-  .bulk-progress-fill { height: 100%; background: var(--accent); width: 0%; transition: width 0.3s ease; }
-  th.sortable { cursor: pointer; user-select: none; }
-  th.sortable:hover { color: var(--accent); }
-  .news-list { list-style: none; margin: 0; padding: 0; }
-  .news-item { padding: 8px 0; border-top: 1px solid var(--line); }
-  .news-item:first-child { border-top: none; }
-  .news-item a { color: var(--text); text-decoration: none; font-size: 13px; line-height: 1.4; }
-  .news-item a:hover { color: var(--accent); text-decoration: underline; }
-  .news-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
-  .qual-note { font-size: 11px; color: var(--muted); margin-top: 8px; }
-  .score-badge { display: flex; flex-direction: column; align-items: center; justify-content: center; border: 2px solid currentColor; border-radius: 8px; padding: 6px 16px; min-width: 84px; }
-  .score-num { font-size: 26px; font-weight: 800; line-height: 1; }
-  .score-text { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 3px; }
-  .breakdown-row { display: flex; justify-content: space-between; gap: 10px; font-size: 12.5px; padding: 5px 0; border-top: 1px solid var(--line); }
-  .breakdown-row:first-child { border-top: none; }
-  .breakdown-pts { font-family: ui-monospace, monospace; font-weight: 700; white-space: nowrap; }
-  .breakdown-pts.p { color: var(--bull); }
-  .breakdown-pts.n { color: var(--bear); }
-  .breakdown-pts.z { color: var(--muted); }
-  .entry-card { border-radius: 6px; padding: 14px; margin-bottom: 14px; border: 1px solid; }
-  .entry-card.now { border-color: var(--bull); background: rgba(52,199,123,0.08); }
-  .entry-card.wait { border-color: var(--neutral); background: rgba(217,164,65,0.08); }
-  .entry-card.avoid { border-color: var(--bear); background: rgba(229,72,77,0.08); }
-  .entry-card.neutral { border-color: var(--line); background: var(--panel-2); }
-  .entry-title { font-weight: 700; font-size: 14px; margin-bottom: 6px; }
-  .entry-zone { font-family: ui-monospace, monospace; font-size: 15px; font-weight: 700; margin: 6px 0; }
-  .entry-note { font-size: 12.5px; color: var(--muted); line-height: 1.5; }
-  .wl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
-  .wl-card { background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 12px; position: relative; }
-  .wl-card.flipped { border-color: var(--bull); box-shadow: 0 0 0 1px var(--bull); }
-  .wl-flip-tag { position: absolute; top: -8px; right: 8px; background: var(--bull); color: #08120c; font-size: 9px; font-weight: 800; padding: 2px 6px; border-radius: 3px; letter-spacing: 0.3px; }
-  .wl-sym { font-weight: 800; font-size: 15px; margin-bottom: 2px; }
-  .wl-price { font-family: ui-monospace, monospace; font-size: 12px; color: var(--muted); margin-bottom: 8px; }
-  .wl-score-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-  .wl-score-num { font-family: ui-monospace, monospace; font-size: 22px; font-weight: 800; }
-  .wl-actions { display: flex; gap: 6px; margin-top: 8px; }
-  .wl-actions button { flex: 1; font-size: 11px; padding: 5px 6px; }
-  @media (max-width: 640px) {
-    body { padding: 12px 12px 46px; }
-    .header { padding-bottom: 10px; margin-bottom: 12px; }
-    .brand { font-size: 17px; }
-    .panel { padding: 13px 12px; margin-bottom: 12px; }
-    .tabs { overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; }
-    .tab-btn { white-space: nowrap; }
-    .sym-name { font-size: 20px; }
-    .stamp { font-size: 18px; letter-spacing: 2px; padding: 5px 12px; }
-    .metrics-grid { grid-template-columns: 1fr 1fr; }
-    .result-top { gap: 10px; }
-    input[type="text"], input[type="number"], input[type="password"] { flex: 1 1 auto; min-width: 0; }
+  .pos { color: var(--bull); } .neg { color: var(--bear); } .neu { color: var(--neutral); }
+  a { color: inherit; }
+
+  .header {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+    background: color-mix(in srgb, var(--surface) 78%, transparent);
+    -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+    border: 1px solid var(--border); border-radius: var(--radius-lg);
+    padding: 13px 18px; box-shadow: var(--shadow); margin-bottom: 16px;
+    position: sticky; top: 12px; z-index: 20;
   }
-  @media (max-width: 380px) { .metrics-grid { grid-template-columns: 1fr; } }
+  .brand {
+    font-size: 20px; font-weight: 900; letter-spacing: .2px; display: flex; align-items: center; gap: 9px;
+    background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .brand .dot { display: inline-block; width: 11px; height: 11px; border-radius: 50%; background: var(--grad); font-size: 0; flex: none;
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent); }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .navlink { background: var(--surface); border: 1px solid var(--border); color: var(--text);
+    padding: 8px 13px; border-radius: 999px; font-size: 12.5px; text-decoration: none; font-weight: 800;
+    display: inline-flex; align-items: center; gap: 6px; transition: all .14s ease; }
+  .navlink:hover { background: var(--grad); color: #fff; border-color: transparent; transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+  .navlink.plain { }
+  .icon-btn { background: var(--surface); border: 1px solid var(--border); color: var(--text);
+    width: 34px; height: 34px; border-radius: 11px; cursor: pointer; font-size: 15px;
+    display: inline-flex; align-items: center; justify-content: center; transition: all .14s ease; }
+  .icon-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .pf-switch { display: inline-flex; gap: 4px; margin-bottom: 12px; background: var(--surface-alt); border: 1px solid var(--border); padding: 4px; border-radius: 999px; flex-wrap: wrap; }
+  .pf-switch button { border: none; background: transparent; color: var(--muted); font-weight: 800; font-size: 12.5px; padding: 7px 16px; border-radius: 999px; cursor: pointer; font-family: inherit; }
+  .pf-switch button.active { background: var(--grad); color: #fff; box-shadow: var(--shadow-lg); }
+
+  .tabs { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; background: var(--surface-alt); padding: 5px; border-radius: 12px; width: fit-content; }
+  .tab-btn { background: transparent; border: none; color: var(--muted); padding: 8px 15px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 800; font-family: inherit; }
+  .tab-btn.active { color: #fff; background: var(--grad); box-shadow: var(--shadow-lg); }
+  .hidden { display: none !important; }
+
+  .grid { display: grid; gap: 16px; }
+  .panel { position: relative; background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); padding: 16px 18px; box-shadow: var(--shadow); margin-bottom: 16px; }
+  .panel h2 { margin: 0 0 12px; font-size: 12px; letter-spacing: .5px; color: var(--muted); text-transform: uppercase; font-weight: 900; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .panel h2 .sub { text-transform: none; letter-spacing: 0; font-weight: 600; color: var(--muted); margin-left: auto; }
+
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+  .tile { background: var(--surface-alt); border: 1px solid var(--border); border-radius: 14px; padding: 13px 15px; }
+  .tile .k { font-size: 10px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); font-weight: 900; margin-bottom: 6px; }
+  .tile .v { font-size: 22px; font-weight: 900; line-height: 1.05; letter-spacing: -.3px; }
+  .tile .v.small { font-size: 15px; }
+  .tile .note { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th { font-size: 10px; text-transform: uppercase; letter-spacing: .4px; color: var(--muted); font-weight: 900; }
+  td.num, th.num { text-align: right; }
+  tbody tr.clk { cursor: pointer; transition: background .12s ease; }
+  tbody tr.clk:hover { background: var(--grad-soft); }
+  .table-scroll { overflow-x: auto; }
+
+  .badge { font-size: 10.5px; font-weight: 900; padding: 3px 9px; border-radius: 999px; letter-spacing: .3px; display: inline-block; }
+  .badge.up { background: var(--bull-soft); color: var(--bull); }
+  .badge.down { background: var(--bear-soft); color: var(--bear); }
+  .badge.neutral { background: var(--accent-soft); color: var(--accent); }
+  .badge.warn { background: rgba(245,158,11,.14); color: var(--neutral); }
+  .chip { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 8px; background: var(--surface-alt); border: 1px solid var(--border); color: var(--muted); }
+
+  input, select, textarea { background: var(--surface-alt); border: 1px solid var(--border); color: var(--text);
+    padding: 9px 11px; border-radius: 9px; font-size: 13px; font-family: inherit; width: 100%; }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  textarea { resize: vertical; }
+  label.lbl { font-size: 11px; color: var(--muted); font-weight: 800; text-transform: uppercase; letter-spacing: .3px; display: block; margin-bottom: 5px; }
+  .field { margin-bottom: 12px; }
+  .frow { display: flex; gap: 10px; flex-wrap: wrap; }
+  .frow .field { flex: 1; min-width: 130px; }
+  button.primary { background: var(--accent); color: #fff; border: none; padding: 9px 18px; border-radius: 9px; font-weight: 800; cursor: pointer; font-size: 13px; font-family: inherit; }
+  button.primary:hover { background: var(--accent-hover); }
+  button.ghost { background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 8px 14px; border-radius: 9px; cursor: pointer; font-size: 13px; font-weight: 700; font-family: inherit; }
+  button.ghost:hover { border-color: var(--accent); color: var(--accent); }
+  button.ghost.danger:hover { border-color: var(--bear); color: var(--bear); }
+  .mini { font-size: 12px; padding: 5px 10px; border-radius: 8px; }
+
+  .alloc-wrap { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
+  .alloc-legend { display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; }
+  .alloc-legend > div { display: flex; align-items: center; gap: 8px; }
+  .alloc-dot { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+
+  .empty { color: var(--muted); font-size: 13px; padding: 24px; text-align: center; }
+  .muted-note { color: var(--muted); font-size: 12px; }
+
+  .modal-backdrop { display: none; position: fixed; inset: 0; background: rgba(15,15,35,.5); z-index: 40; align-items: flex-start; justify-content: center; padding: 14px; overflow-y: auto; }
+  .modal-backdrop.open { display: flex; }
+  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 18px; width: 100%; max-width: 460px; padding: 18px 20px; box-shadow: var(--shadow-lg); margin: auto; }
+  .modal h3 { margin: 0 0 14px; font-size: 16px; font-weight: 900; }
+  .modal-foot { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; flex-wrap: wrap; }
+
+  .breakdown li { font-size: 12.5px; padding: 5px 0; border-bottom: 1px dashed var(--border); display: flex; justify-content: space-between; gap: 12px; }
+  .score-hero { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .score-num { font-size: 44px; font-weight: 900; line-height: 1; }
+  .guide-box { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; margin-top: 12px; background: var(--surface-alt); font-size: 13px; line-height: 1.6; }
+
+  @media (max-width: 640px) {
+    body { padding: 12px 11px 46px; }
+    .header { padding: 11px 13px; }
+    .brand { font-size: 16px; }
+    .panel { padding: 13px 13px; }
+    .tabs { width: 100%; overflow-x: auto; flex-wrap: nowrap; }
+    .tab-btn { white-space: nowrap; }
+    .score-num { font-size: 34px; }
+    .tiles { grid-template-columns: 1fr 1fr; }
+  }
 </style>
 </head>
 <body>
 
 <div class="header">
-  <div class="brand"><span class="dot">●</span> STOCK<span class="dot">/</span>DECIDE</div>
+  <div class="brand"><span class="dot">◆</span> พอร์ตลงทุน <span class="mono" style="font-size:11px;color:var(--muted);font-weight:600;">Stock / Crypto</span></div>
   <div class="row">
-    <a href="index.html" class="back-link">🏠 หน้าหลัก</a>
-    <a href="elliott-wave.html" class="back-link">Elliott Wave</a>
-    <a href="trade-journal.html" class="back-link">TRADE JOURNAL</a>
-    <input type="password" id="apiKeyInput" placeholder="Twelve Data API key" style="width:220px" />
-    <input type="password" id="finnhubKeyInput" placeholder="Finnhub API key (ข่าว/ข้อมูลเพิ่มเติม — ไม่บังคับ)" style="width:260px" />
-    <button class="ghost" id="saveKeyBtn">บันทึก key</button>
-    <div class="row" id="syncWidget" style="gap:6px;">
-      <button class="ghost" id="syncSignInBtn" title="ลงชื่อเข้าใช้ด้วย Google เพื่อซิงค์ข้อมูลข้ามอุปกรณ์แบบเรียลไทม์">☁ ซิงค์ข้ามอุปกรณ์</button>
-      <img id="syncAvatar" class="hidden" style="width:26px;height:26px;border-radius:50%;vertical-align:middle;">
-      <span id="syncStatus" class="hidden" style="font-size:11.5px;color:var(--muted);white-space:nowrap;"></span>
-      <button class="ghost hidden" id="syncSignOutBtn" title="ออกจากระบบ (หยุดซิงค์บนเครื่องนี้)">ออกจากระบบ</button>
-    </div>
-    <button class="ghost" id="exportBtn" title="ส่งออกข้อมูลทั้งหมด (Elliott Wave + Trade Journal + Stock/Decide) เป็นไฟล์เดียว">⬇ ส่งออกข้อมูลทั้งหมด</button>
-    <button class="ghost" id="importBtn" title="นำเข้าไฟล์สำรองรวม — จะเพิ่มต่อท้ายข้อมูลเดิมของทั้ง 3 ระบบ ไม่ทับของเดิม">⬆ นำเข้าข้อมูลทั้งหมด</button>
-    <input type="file" id="importInput" accept="application/json" hidden>
-    <button class="download" id="downloadBtn" title="ดาวน์โหลดไฟล์นี้เก็บไว้ในเครื่องออฟไลน์">⬇ ดาวน์โหลดไฟล์นี้</button>
+    <a class="navlink plain" href="index.html">◂ ห้องนักบิน</a>
+    <a class="navlink" href="trade-journal.html">📓 Trade Journal</a>
+    <a class="navlink" href="trading-tools.html">🧮 เครื่องมือเทรด</a>
+    <button class="navlink plain" id="syncSignInBtn">☁ ซิงค์</button>
+    <img id="syncAvatar" class="hidden" style="width:26px;height:26px;border-radius:50%;">
+    <span id="syncStatus" class="hidden muted-note" style="white-space:nowrap;"></span>
+    <button class="navlink plain hidden" id="syncSignOutBtn">ออก</button>
+    <button class="icon-btn" id="themeToggle" title="สลับโหมดสว่าง/มืด">◐</button>
   </div>
 </div>
 
-<div id="quotaBar" style="font-size:11px;color:var(--muted);margin-bottom:14px;padding:6px 10px;border:1px solid var(--line);border-radius:4px;background:var(--panel);"></div>
-
-<div class="ticker-strip" id="tickerStrip">
-  <div class="ticker-strip-inner mono" id="tickerStripInner"></div>
+<div class="pf-switch" id="pfSwitch">
+  <button data-pf="all" class="active">ทั้งหมด</button>
+  <button data-pf="stock">หุ้น</button>
+  <button data-pf="crypto">คริปโต</button>
 </div>
 
 <div class="tabs">
-  <button class="tab-btn active" data-tab="analyze">[1] วิเคราะห์</button>
-  <button class="tab-btn" data-tab="watchlist">[2] WATCHLIST</button>
-  <button class="tab-btn" data-tab="size">[3] POSITION SIZE</button>
-  <button class="tab-btn" data-tab="log">[4] LOG</button>
-  <button class="tab-btn" data-tab="bulk">[5] BULK SCAN</button>
-  <button class="tab-btn" data-tab="teamvs">[6] เทียบทีม</button>
+  <button class="tab-btn active" data-tab="holdings">พอร์ต</button>
+  <button class="tab-btn" data-tab="analyze">วิเคราะห์</button>
+  <button class="tab-btn" data-tab="watchlist">Watchlist</button>
+  <button class="tab-btn" data-tab="thesis">Thesis / รีวิว</button>
+  <button class="tab-btn hidden" data-tab="oldlog" id="oldlogTabBtn">บันทึกเก่า</button>
 </div>
 
-<!-- ANALYZE TAB -->
-<div id="tab-analyze">
+<!-- ===================== HOLDINGS ===================== -->
+<div id="tab-holdings">
   <div class="panel">
-    <div class="row">
-      <input type="text" id="symbolInput" placeholder="สัญลักษณ์หุ้น เช่น AAPL" value="AAPL" style="width:160px" />
-      <button class="primary" id="analyzeBtn">วิเคราะห์</button>
-      <button class="ghost hidden" id="addWatchlistBtn">+ เพิ่มลง watchlist</button>
-    </div>
-    <div id="noKeyNotice" style="margin-top:10px;font-size:12px;color:var(--muted);">
-      ยังไม่มี API key — สมัครฟรีที่ twelvedata.com/pricing แล้ววางไว้ด้านบน
-    </div>
-    <div style="margin-top:4px;font-size:12px;color:var(--muted);">
-      อยากได้เท่าล่าสุด + ตัวเลขเชิงคุณภาพเพิ่มเติม (ROE, Debt/Equity, Margin) สมัครฟรีที่ finnhub.io แล้ววาง Finnhub key ด้านบน (ไม่บังคับ)
-    </div>
-
-    <details class="glossary">
-      <summary>อภิธานตัวชี้วัดทั้งหมด — อ่านก่อนตัดสินใจ (มุมขวา/มุมล่างของแต่ละหัวข้อ)</summary>
-
-      <div class="gloss-item">
-        <div class="gloss-title">เทรนด์ (Trend)</div>
-        <div class="gloss-desc">เทียบราคาปัจจุบันเทียบกับเส้นค่าเฉลี่ย SMA20 และ SMA50 เพื่อดูทิศทางของหุ้นในระยะสั้น-กลาง</div>
-        <div class="gloss-row good">ขาขึ้น: ราคา &gt; SMA20 &gt; SMA50 (เรียงจากมาก) = แนวโน้มขาขึ้นชัดเจน ไม่มีดัยยังหุ้น</div>
-        <div class="gloss-row bad">ขาลง: ราคา &lt; SMA20 &lt; SMA50 (เรียงจากน้อย) = แนวโน้มขาลงชัดเจน ยังไม่ควรเข้าซื้อ</div>
-        <div class="gloss-row warn">ข้อควรระวัง: เป็น lagging indicator คำนวณจากราคาย้อนหลัง ไม่ได้บอกอนาคต และไม่บอกว่าเทรนด์จะกลับตัวเมื่อไหร่</div>
-      </div>
-
-      <div class="gloss-item">
-        <div class="gloss-title">RSI (14) — ดัชนีความแรงสัมพันธ์</div>
-        <div class="gloss-desc">วัดความเร็ว/ขนาดของการขึ้นลงราคาในช่วง 14 วัน มีค่า 0-100</div>
-        <div class="gloss-row bad">RSI &gt; 70: ซื้อมากเกินไป (overbought) — ราคาอาจวิ่งเร็วเกินไป เสี่ยงพักตัว/ย่อตัว</div>
-        <div class="gloss-row good">RSI &lt; 30: ขายมากเกินไป (oversold) — อาจเป็นจุดหวะสะสมของ ใช้เอาระวัง เพื่ออาจกลับตัว</div>
-        <div class="gloss-row good">ใช้สูตร Wilder's smoothing มาตรฐาน คำนวณต่อเนื่องจากข้อมูลย้อนหลังทั้งชุด (~100 วัน) — ค่าจะใกล้เคียงกับ TradingView</div>
-      </div>
-
-      <div class="gloss-item">
-        <div class="gloss-title">Relative Strength vs SPY (3 เดือน)</div>
-        <div class="gloss-desc">เทียบผลตอบแทน 3 เดือนของหุ้นตัวนี้กับ SPY (ตัวแทนตลาดรวม)</div>
-        <div class="gloss-row good">บวก (+): หุ้นตัวนี้ทำผลงานดีกว่าตลาดโดยรวม แสดงถึงแรงซื้อที่แข็งกว่าเฉพาะตัว</div>
-        <div class="gloss-row bad">ลบ (-): หุ้นตัวนี้แพ้ตลาด อาจมีปัจจัยลบเฉพาะตัวที่ฉุดราคา</div>
-      </div>
-
-      <div class="gloss-item">
-        <div class="gloss-title">ความผันผวน (Annualized Volatility)</div>
-        <div class="gloss-desc">คำนวณส่วนเบี่ยงเบนมาตรฐานของผลตอบแทนรายวันย้อนหลัง 30 วัน แล้วปรับเป็นรายปี</div>
-        <div class="gloss-row good">ต่ำ (&lt; 20%): ราคานิ่ง ความเสี่ยงต่ำ เหมาะสำหรับสายระมัดระวัง</div>
-        <div class="gloss-row bad">สูง (&gt; 45%): ราคาแกว่งแรง กำไร/ขาดทุนเร็ว ต้องบริหารขนาดสถานะให้เล็กลง</div>
-      </div>
-
-      <div class="gloss-item">
-        <div class="gloss-title">ห่างจากจุดสูงสุด / ขึ้นมาจากจุดต่ำสุด</div>
-        <div class="gloss-desc">Drawdown จากจุดสูงสุดในกรอบข้อมูล (~100 วัน เพราะ 52 สัปดาห์เต็มไม่มีเพราะเก็บข้อมูลแบบ compact) และระยะที่วิ่งขึ้นมาแล้วจากจุดต่ำสุดในกรอบ 6 เดือน</div>
-        <div class="gloss-row good">ห่างจากจุดสูงน้อย = ราคาใกล้จุดสูงสุด เทรนด์แข็งแรง ยังไม่เสี่ยงจุดกลับตัว</div>
-        <div class="gloss-row bad">ขึ้นมาแล้วจากจุดต่ำ (&gt; 80%) = วิ่งมาแล้วมาก อาจเหนื่อย ระวังพักตัว/แรงขายทำกำไร</div>
-      </div>
-
-      <div class="gloss-item">
-        <div class="gloss-title">Volume วันล่าสุด เทียบค่าเฉลี่ย 50 วัน</div>
-        <div class="gloss-desc">ปริมาณการซื้อขายวันล่าสุดหารด้วยค่าเฉลี่ย 50 วัน (แสดงเป็นเท่า)</div>
-        <div class="gloss-row good">&gt; 1.4x: วอลุ่มพุ่งกว่าปกติ อาจมีเงินก้อน/รายใหญ่เข้าเก็บ (เชิงสัญญาณ) เท่านั้น เป็นสัญญาณยืนยันการเคลื่อนไหวของราคา</div>
-        <div class="gloss-row warn">ต่ำกว่านั้น: ไม่มีสัญญาณชัดเจน ราคานั้นอาจอ่อนแรงเป็น noise รายวัน</div>
-      </div>
-
-      <div class="gloss-item">
-        <div class="gloss-title">ระดับความเสี่ยง (Risk Level)</div>
-        <div class="gloss-desc">สรุปความผันผวนรวมกับ drawdown เป็น ต่ำ/ปานกลาง/สูง</div>
-        <div class="gloss-row warn">เป็นระดับการปรับขนาดสถานะเท่านั้น ใช้ Position Size ไม่ได้กำหนดว่าซื้อ-ขาย</div>
-      </div>
-
-      <div class="gloss-item">
-        <div class="gloss-title">P/E Ratio</div>
-        <div class="gloss-desc">ราคาต่อกำไรต่อหุ้น สะท้อนว่าตลาดยอมจ่ายเท่าไหร่ต่อกำไรบริษัท</div>
-        <div class="gloss-row good">P/E ต่ำ (&lt; 15): มูลค่าถูกเมื่อเทียบกำไร เหมาะสำหรับสายเน้นคุณค่า/มีพื้นฐาน</div>
-        <div class="gloss-row bad">P/E สูง (&gt; 40) หรือติดลบ: ตลาดคาดหวังการเติบโตสูงมาก หรือบริษัทยังขาดทุนอยู่ ความเสี่ยงด้าน valuation สูง</div>
-      </div>
-
-      <div class="gloss-item">
-        <div class="gloss-title">SMA20/SMA50, EMA12/EMA26, MACD, ATR</div>
-        <div class="gloss-desc">SMA/EMA = เส้นค่าเฉลี่ยเคลื่อนที่ ใช้ยืนยันทิศทางเทรนด์และจุดตัด (crossover) — EMA คำนวณแบบ warm-up เต็มช่วง (seed ด้วย SMA แล้วไล่ทั้งชุดข้อมูล)</div>
-        <div class="gloss-row good">MACD (12/26/9): ค่าที่แสดงคือ histogram = MACD − Signal. บวก = โมเมนตัมขาขึ้น, ลบ = ขาลง, ตัดผ่าน 0 = สัญญาณเปลี่ยนโมเมนตัม</div>
-        <div class="gloss-row good">ATR (14): ช่วงราคาที่หุ้นแกว่งเฉลี่ยต่อวัน (Wilder) ใช้กะระยะ Stop Loss — ทั่วไปตั้งที่ 1.5–2 เท่าของ ATR จากจุดเข้า</div>
-        <div class="gloss-row good">ตำแหน่งในกรอบ 52 สัปดาห์: 0% = ราคาต่ำสุดของปี, 100% = สูงสุดของปี</div>
-      </div>
-
-      <div class="gloss-item">
-        <div class="gloss-title">คะแนนรวม (Score 0-100)</div>
-        <div class="gloss-desc">คำนวณจากด้าน BULLISH/BEARISH ที่ดูแค่เทรนด์+RS — คะแนนที่รวม 7 ปัจจัย (เทรนด์, ขนาดของ RS, RSI, Volume, ความผันผวน, ระยะยืนตัว, P/E) โดยให้น้ำหนักตาม "ขนาด" ของสัญญาณด้วย ไม่ใช่แค่บวก/ลบ เช่น RS +0.2% กับ +15% จะได้คะแนนไม่เท่ากัน</div>
-        <div class="gloss-row good">70-100: ปัจจัยส่วนใหญ่เอียงข้างบวกพร้อมกัน</div>
-        <div class="gloss-row warn">45-69: ปัจจัยผสมกัน ควรดูภาพรวมประกอบ ยังไม่หนักเอียงไปทางใดทางหนึ่ง</div>
-        <div class="gloss-row bad">0-44: ปัจจัยส่วนใหญ่เอียงลบ</div>
-        <div class="gloss-row warn">คะแนนนี้ "รายละเอียดคะแนน" เปิดผลลัพธ์เพื่อดูว่าแต่ละปัจจัยให้คะแนนเท่าไหร่ — เป็นคะแนนแบบ rule-based ถ่วงน้ำหนักเอง ไม่ใช้โมเดลสถิติหรือ machine learning</div>
-      </div>
-
-      <div class="gloss-item">
-        <div class="gloss-title">Verdict (BULLISH / BEARISH / NEUTRAL)</div>
-        <div class="gloss-desc">รวมคะแนนจากเทรนด์ + relative strength เท่านั้น (metric อื่นเป็นข้อมูลประกอบให้อ่านต่อเท่านั้น ไม่ได้ถูกคำนวณเข้าไปที่คะแนนนี้ — แต่ถูกคำนวณเข้าคะแนนรวม 0-100 ด้านบนแล้ว)</div>
-        <div class="gloss-row warn">เป็นการสรุปเชิงกฎ ไม่ควรใช้เป็นสัญญาณซื้อ-ขายเดี่ยวๆ ควรอ่านประกอบกับคะแนนรวมและ Devil's Advocate ก่อนเสมอ</div>
-      </div>
-
-      <div class="gloss-item">
-        <div class="gloss-title">แนวทางราคาเข้า (เข้าตอนนี้ / รอย่อ / ยังไม่ควรเข้า)</div>
-        <div class="gloss-desc">แนะนำอัตโนมัติ ที่คำนวณจาก SMA20/SMA50, RSI และระยะยืนตัวที่มีอยู่แล้วด้านบน ไม่ใช่ข้อมูลใหม่จากราคา — เป็นหลักเกณฑ์ว่าเทรนด์ขาขึ้นมั่นย่อลงมาใกล้ SMA20 ต่ออีกต่อ และราคาที่ยืนเหนือ/RSI สูงเกินไปมีความเสี่ยงเลื่อนราคาสูงกว่าปกติ</div>
-        <div class="gloss-row good">"อยู่ในโซนที่ควรพิจารณาเข้าซื้อ" = เทรนด์ขาขึ้น + ยังไม่ยืนตัวมาก</div>
-        <div class="gloss-row warn">"รอย่อก่อน" = เทรนด์ดีแต่ RSI overbought หรือราคาขึ้นมาเยอะจากจุดต่ำสุดแล้ว</div>
-        <div class="gloss-row bad">"ยังไม่ควรเข้า" = เทรนด์ยังอยู่ในทิศทางขาลง</div>
-        <div class="gloss-row warn">โซนราคาที่ขึ้นเป็นเพียงแนวทางเชิงเทคนิคเท่านั้น ไม่ใช่ราคาที่รับประกันว่าจะเข้าได้หรือไม่หลุด ควรใช้ร่วมกับ Position Sizing และ Devil's Advocate เสมอ</div>
-      </div>
-    </details>
+    <h2 id="holdSumTitle">มูลค่าพอร์ต
+      <span class="sub">
+        <button class="ghost mini" id="refreshPricesBtn">↻ รีเฟรชราคา</button>
+        <button class="ghost mini" id="cashBtn">💵 ปรับเงินสด</button>
+        <button class="primary mini" id="buyBtn">+ ซื้อ</button>
+      </span>
+    </h2>
+    <div class="tiles" id="holdTiles"></div>
+    <div id="priceMsg" class="muted-note" style="margin-top:8px;"></div>
   </div>
 
-  <div class="error-box" id="errorBox"></div>
+  <div class="panel" id="allocPanel">
+    <h2>สัดส่วนพอร์ต (Allocation)</h2>
+    <div class="alloc-wrap" id="allocWrap"></div>
+  </div>
 
-  <div class="panel hidden" id="resultPanel">
-    <div class="result-top">
-      <div>
-        <div class="sym-name" id="resSymName"></div>
-        <div class="sym-price mono" id="resPrice"></div>
-      </div>
-      <div class="row" style="align-items:center;gap:14px;">
-        <div class="score-badge" id="resScoreBadge">
-          <div class="score-num mono" id="resScoreNum"></div>
-          <div class="score-text" id="resScoreText"></div>
-        </div>
-        <div class="stamp" id="resStamp"></div>
-      </div>
+  <div class="panel">
+    <h2>รายการที่ถือ <span class="sub" id="holdCount"></span></h2>
+    <div class="table-scroll">
+      <table id="holdTbl">
+        <thead><tr>
+          <th>สัญลักษณ์</th><th class="num">จำนวน</th><th class="num">ต้นทุนเฉลี่ย</th>
+          <th class="num">ราคาปัจจุบัน</th><th class="num">มูลค่า</th><th class="num">กำไร/ขาดทุน</th>
+          <th class="num">% พอร์ต</th><th>คะแนน</th><th></th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
     </div>
-    <details class="glossary" id="scoreBreakdownWrap" style="margin-bottom:14px;">
-      <summary>รายละเอียดคะแนน — กดเพื่อดู กดเพื่อปิด</summary>
-      <div id="scoreBreakdownList"></div>
+    <div class="empty" id="holdEmpty" hidden>ยังไม่มีรายการถือครอง — กด "+ ซื้อ" เพื่อเริ่ม</div>
+  </div>
+
+  <div class="panel" id="realizedPanel">
+    <h2>ประวัติการขาย (Realized) <span class="sub" id="realizedSum"></span></h2>
+    <div class="table-scroll">
+      <table id="sellTbl">
+        <thead><tr><th>วันที่</th><th>สัญลักษณ์</th><th class="num">จำนวน</th><th class="num">ราคาขาย</th><th class="num">กำไร/ขาดทุน</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="empty" id="sellEmpty" hidden>ยังไม่มีการขาย</div>
+  </div>
+</div>
+
+<!-- ===================== ANALYZE ===================== -->
+<div id="tab-analyze" class="hidden">
+  <div class="panel">
+    <h2>เครื่องให้คะแนน <span class="sub">RSI · EMA · MACD · ATR · 52w · เทรนด์</span></h2>
+    <div class="frow" style="align-items:flex-end;">
+      <div class="field" style="flex:2;min-width:160px;">
+        <label class="lbl">สัญลักษณ์</label>
+        <input type="text" id="anSym" placeholder="เช่น AAPL, NVDA (หุ้น) หรือ BTC, ETH (คริปโต)">
+      </div>
+      <div class="field" style="flex:1;min-width:120px;">
+        <label class="lbl">ตลาด</label>
+        <select id="anMarket"><option value="stock">หุ้น (Twelve Data)</option><option value="crypto">คริปโต (Binance)</option></select>
+      </div>
+      <div class="field"><button class="primary" id="anRun">วิเคราะห์</button></div>
+    </div>
+    <details style="margin-top:4px;">
+      <summary class="muted-note" style="cursor:pointer;">⚙ API keys (หุ้น)</summary>
+      <div class="frow" style="margin-top:8px;">
+        <div class="field"><label class="lbl">Twelve Data key</label><input type="password" id="apiKeyInput" placeholder="สมัครฟรีที่ twelvedata.com" autocomplete="off"></div>
+        <div class="field"><label class="lbl">Finnhub key (ไม่บังคับ — ROE/Margin)</label><input type="password" id="finnhubKeyInput" placeholder="finnhub.io" autocomplete="off"></div>
+      </div>
+      <button class="ghost mini" id="saveKeysBtn">บันทึกคีย์</button>
+      <span class="muted-note" id="quotaBar" style="margin-left:10px;"></span>
     </details>
-    <div class="metrics-grid" id="resMetrics"></div>
+    <div id="anMsg" class="muted-note" style="margin-top:8px;"></div>
+  </div>
 
-    <div class="entry-card" id="entryCard" style="margin-top:14px;">
-      <div class="entry-title" id="entryTitle"></div>
-      <div class="entry-zone" id="entryZone"></div>
-      <div class="entry-note" id="entryNote"></div>
-    </div>
-
-    <div class="panel analyst-summary" id="analystSummary" style="margin-top:14px;"></div>
-
-    <div class="panel hidden" id="qualPanel" style="margin-top:14px;">
-      <h3>ปัจจัยเชิงคุณภาพเพิ่มเติม (Finnhub)</h3>
-      <div class="metrics-grid" id="qualMetrics"></div>
-      <div class="qual-note">ข้อมูลจาก Finnhub — เป็นประกอบการวิเคราะห์เท่านั้น ไม่ได้ถูกคำนวณรวมเข้าคะแนน verdict ด้านบน</div>
-    </div>
-
-    <div class="panel hidden" id="newsPanel" style="margin-top:14px;">
-      <h3>ข่าวล่าสุด (Finnhub)</h3>
-      <ul class="news-list" id="newsList"></ul>
-      <div class="qual-note">แสดงเฉพาะหัวข้อข่าว — กดเพื่ออ่านเนื้อหาเต็มจากต้นทาง เพื่อหาข่าวไม่ได้ถูกคำมาสรุปหรือให้คะแนนอัตโนมัติ</div>
-    </div>
-
-    <div class="panel hidden" id="insiderPanel" style="margin-top:14px;">
-      <h3>การซื้อขายของผู้บริหาร (Insider Transactions — Finnhub)</h3>
-      <ul class="news-list" id="insiderList"></ul>
-      <div class="qual-note">P = ซื้อในตลาดเปิดด้วยเงินส่วนตัว, S = ขาย — เป็นประกอบการวิเคราะห์เท่านั้น ไม่ได้ถูกคำนวณรวมเข้าคะแนน</div>
-    </div>
-
-    <div class="panel hidden" id="recPanel" style="margin-top:14px;">
-      <h3>มุมมองนักวิเคราะห์ Wall Street (Finnhub)</h3>
-      <div id="recContent"></div>
-      <div class="qual-note">สรุปจำนวนนักวิเคราะห์ที่ให้เรตติ้งล่าสุด — ไม่ได้ถูกคำนวณรวมเข้าคะแนน</div>
-    </div>
-
-    <div class="panel" style="margin-top:14px;background:var(--panel-2);">
-      <h3>เหตุผลค้าน (Devil's Advocate) — ก่อนตัดสินใจ</h3>
-      <div class="field"><textarea rows="1" class="devilNote" placeholder="เหตุผลที่ไม่ควรซื้อ #1"></textarea></div>
-      <div class="field"><textarea rows="1" class="devilNote" placeholder="เหตุผลที่ไม่ควรซื้อ #2"></textarea></div>
-      <div class="field"><textarea rows="1" class="devilNote" placeholder="เหตุผลที่ไม่ควรซื้อ #3"></textarea></div>
-      <div class="row" style="margin-top:8px;">
-        <button class="primary" id="logBuyBtn">บันทึก: ตัดสินใจซื้อ</button>
-        <button class="ghost" id="logSkipBtn">บันทึก: ไม่ซื้อ</button>
+  <div class="panel hidden" id="anResult">
+    <h2 id="anResName">—</h2>
+    <div class="score-hero">
+      <div class="score-num mono" id="anScoreNum">—</div>
+      <div>
+        <div class="badge" id="anVerdict" style="font-size:13px;">—</div>
+        <div class="muted-note" id="anScoreLabel" style="margin-top:4px;"></div>
+      </div>
+      <div style="margin-left:auto;text-align:right;">
+        <div class="mono" style="font-size:20px;font-weight:900;" id="anPrice">—</div>
+        <div class="muted-note" id="anPriceSub"></div>
       </div>
     </div>
-
-    <div class="disclaimer">
-      ข้อมูลนี้เป็นเครื่องมือช่วยวิเคราะห์จากข้อมูลราคาย้อนหลังและปัจจัยเชิงปริมาณเท่านั้น ไม่ใช่คำแนะนำการลงทุน และไม่มีสัญญาณรับประกันผลลัพธ์ของการซื้อขายทุกกรณี
+    <div class="tiles" style="margin-top:14px;" id="anMetrics"></div>
+    <div class="guide-box" id="anGuide"></div>
+    <details style="margin-top:12px;"><summary class="muted-note" style="cursor:pointer;font-weight:700;">รายละเอียดคะแนน</summary>
+      <ul class="breakdown" id="anBreakdown" style="list-style:none;padding:0;margin:8px 0 0;"></ul>
+    </details>
+    <div class="tiles hidden" style="margin-top:12px;" id="anQual"></div>
+    <div class="frow" style="margin-top:14px;">
+      <button class="ghost" id="anAddWatch">+ ใส่ Watchlist</button>
+      <button class="primary" id="anBuyThis">ซื้อตัวนี้</button>
     </div>
   </div>
 </div>
 
-<!-- WATCHLIST TAB -->
+<!-- ===================== WATCHLIST ===================== -->
 <div id="tab-watchlist" class="hidden">
   <div class="panel">
-    <h3>Watchlist</h3>
-    <div class="row" style="margin-bottom:10px;">
-      <button class="primary" id="watchlistRefreshBtn">รีเฟรชคะแนนทั้งหมด</button>
-      <span id="watchlistUpdatedText" class="mono" style="font-size:11px;color:var(--muted);"></span>
+    <h2>Watchlist <span class="sub"><button class="ghost mini" id="wlRefresh">↻ รีเฟรชคะแนน</button></span></h2>
+    <div class="frow" style="align-items:flex-end;">
+      <div class="field" style="flex:2;"><label class="lbl">เพิ่มสัญลักษณ์</label><input type="text" id="wlAddSym" placeholder="เช่น TSLA หรือ SOL"></div>
+      <div class="field" style="flex:1;"><label class="lbl">ตลาด</label><select id="wlAddMarket"><option value="stock">หุ้น</option><option value="crypto">คริปโต</option></select></div>
+      <div class="field"><button class="primary" id="wlAddBtn">เพิ่ม</button></div>
     </div>
-    <div id="watchlistContent"></div>
+    <div class="table-scroll">
+      <table id="wlTbl">
+        <thead><tr><th>สัญลักษณ์</th><th>ตลาด</th><th class="num">ราคา</th><th class="num">คะแนน</th><th>สัญญาณ</th><th class="num">อัปเดต</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="empty" id="wlEmpty" hidden>ยังไม่มีรายการติดตาม</div>
   </div>
 </div>
 
-<!-- POSITION SIZE TAB -->
-<div id="tab-size" class="hidden">
+<!-- ===================== THESIS ===================== -->
+<div id="tab-thesis" class="hidden">
   <div class="panel">
-    <h3>คำนวณขนาดสถานะ (Position Sizing)</h3>
-    <div class="row" style="margin-bottom:12px;">
-      <div class="field">
-        <label class="small">มูลค่าพอร์ต ($)</label>
-        <input type="number" id="portfolioValue" value="100000" min="0" />
-      </div>
-      <div class="field">
-        <label class="small">ความเสี่ยงต่อการเทรด (%)</label>
-        <input type="number" id="riskPct" step="0.1" value="1" min="0" />
-      </div>
-      <div class="field">
-        <label class="small">Stop loss (% จากราคาซื้อ)</label>
-        <input type="number" id="stopLossPct" step="0.5" value="8" min="0" />
-      </div>
-    </div>
-    <div id="sizeContent"></div>
+    <h2>Thesis / รีวิวการถือ <span class="sub muted-note">เขียนเหตุผลที่ถือ แล้วรีวิวเป็นรอบ</span></h2>
+    <div id="thesisList"></div>
+    <div class="empty" id="thesisEmpty" hidden>ยังไม่มีรายการถือครอง — Thesis จะขึ้นให้เขียนเมื่อมีของในพอร์ต</div>
   </div>
 </div>
 
-<!-- LOG TAB -->
-<div id="tab-log" class="hidden">
+<!-- ===================== OLD LOG ===================== -->
+<div id="tab-oldlog" class="hidden">
   <div class="panel">
-    <div class="row" style="justify-content:space-between;align-items:center;">
-      <h3 style="margin:0;">บันทึกการตัดสินใจ</h3>
-      <div class="row" style="gap:8px;flex-wrap:wrap;">
-        <button class="ghost" id="logRefreshPricesBtn" title="ดึงราคาปัจจุบันของทุกสัญลักษณ์ในบันทึก (ใช้ Twelve Data 1 credit ต่อสัญลักษณ์)">↻ อัปเดตราคาปัจจุบัน</button>
-        <input type="text" id="logSearchInput" placeholder="ค้นหาสัญลักษณ์..." style="width:160px;">
-        <select id="logDecisionFilter" style="width:auto;">
-          <option value="">ทุกการตัดสินใจ</option>
-          <option value="ซื้อ">ซื้อ</option>
-          <option value="ไม่ซื้อ">ไม่ซื้อ</option>
-        </select>
-      </div>
-    </div>
-    <div id="trackRecord" style="margin-top:14px;"></div>
-    <div id="logContent" style="margin-top:12px;"></div>
+    <h2>บันทึกการตัดสินใจเดิม <span class="sub muted-note">อ่านอย่างเดียว (ข้อมูลจากเวอร์ชันก่อน)</span></h2>
+    <div class="table-scroll"><table id="oldLogTbl">
+      <thead><tr><th>วันที่</th><th>สัญลักษณ์</th><th>ตัดสินใจ</th><th class="num">คะแนน</th><th class="num">ราคาตอนนั้น</th><th>โน้ต</th></tr></thead>
+      <tbody></tbody>
+    </table></div>
   </div>
 </div>
 
-<!-- BULK SCAN TAB -->
-<div id="tab-bulk" class="hidden">
-  <div class="panel">
-    <h3>Bulk Scan — วิเคราะห์หลายหุ้นพร้อมกันทีเดียว</h3>
-    <div style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.6;">
-      ดึงหุ้นทั้งตลาด NASDAQ (~4,000 กว่าตัว) พร้อมกันไม่ได้จริง เพราะ Twelve Data free key จำกัด 8 request/นาที และ ~800 request/วัน —
-      แนะนำที่ดึงให้วางรายชื่อหุ้นเอง เช่น "ดัชนี" (เช่นเดิมใส่ 60 ตัว/รอบ) แล้วเลือกวิเคราะห์ให้อัตโนมัติเฉพาะไม่เกินโควตา
-      โดยจะข้ามข้อมูล P/E (Statistics) เพื่อประหยัด request — ถ้าอยากได้ P/E เต็ม ให้กดวิเคราะห์เดี่ยวเพื่อวิเคราะห์แบบมีรูปแบบเต็ม [1]
+<!-- ===================== MODALS ===================== -->
+<div class="modal-backdrop" id="tradeModal">
+  <div class="modal">
+    <h3 id="tradeModalTitle">ซื้อ</h3>
+    <div class="frow">
+      <div class="field" style="flex:2;"><label class="lbl">สัญลักษณ์</label><input type="text" id="tmSym" placeholder="AAPL / BTC"></div>
+      <div class="field" style="flex:1;"><label class="lbl">ตลาด</label><select id="tmPf"><option value="stock">หุ้น</option><option value="crypto">คริปโต</option></select></div>
     </div>
-    <div class="field">
-      <label class="small">รายชื่อหุ้น (คั่นด้วย comma / เว้นวรรค / ขึ้นบรรทัดใหม่)</label>
-      <textarea id="bulkSymbols" rows="3" placeholder="AAPL, MSFT, NVDA, AMZN, GOOGL, META, TSLA, AVGO ..."></textarea>
+    <div class="frow">
+      <div class="field"><label class="lbl" id="tmSideLbl">ทำรายการ</label>
+        <select id="tmSide"><option value="buy">ซื้อ (เข้า)</option><option value="sell">ขาย (ออก)</option></select>
+      </div>
+      <div class="field"><label class="lbl">วันที่</label><input type="date" id="tmDate"></div>
     </div>
-    <div class="row">
-      <button class="ghost" id="bulkPresetBtn">โหลดรายชื่อยอดนิยม (30 ตัว)</button>
-      <button class="primary" id="bulkStartBtn">เริ่ม Bulk Scan</button>
-      <button class="ghost" id="bulkStopBtn" disabled>หยุด</button>
+    <div class="frow">
+      <div class="field"><label class="lbl">จำนวน</label><input type="number" id="tmQty" step="any" inputmode="decimal"></div>
+      <div class="field"><label class="lbl">ราคาต่อหน่วย</label><input type="number" id="tmPrice" step="any" inputmode="decimal"></div>
+      <div class="field"><label class="lbl">ค่าธรรมเนียม</label><input type="number" id="tmFee" step="any" inputmode="decimal" placeholder="0"></div>
     </div>
-    <div id="bulkProgressWrap" class="hidden" style="margin-top:12px;">
-      <div class="bulk-progress-bar"><div class="bulk-progress-fill" id="bulkProgressFill"></div></div>
-      <div id="bulkProgressText" class="mono" style="font-size:12px;color:var(--muted);margin-top:6px;"></div>
+    <div class="muted-note" id="tmHint" style="margin-bottom:4px;"></div>
+    <div class="field"><label class="lbl">โน้ต</label><input type="text" id="tmNote" placeholder="ไม่ใส่ก็ได้"></div>
+    <div class="modal-foot">
+      <button class="ghost" id="tmCancel">ยกเลิก</button>
+      <button class="primary" id="tmSave">บันทึก</button>
     </div>
-  </div>
-  <div class="error-box" id="bulkErrorBox"></div>
-  <div class="panel">
-    <h3>ผลลัพธ์ <span id="bulkSortHint" style="text-transform:none;font-weight:400;color:var(--muted);font-size:11px;">(คลิกหัวตารางเพื่อเรียง · คลิกแถวเพื่อดูวิเคราะห์เต็ม)</span></h3>
-    <div id="bulkResultsContent"><div class="empty">ยังไม่มีผลลัพธ์ — วางรายชื่อหุ้นแล้วกดเริ่ม Bulk Scan</div></div>
   </div>
 </div>
 
-<!-- TEAM VS TAB -->
-<div id="tab-teamvs" class="hidden">
-  <div class="panel">
-    <h3>เทียบทีม — คะแนน + ผลตอบแทนย้อนหลัง</h3>
-    <div style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.6;">
-      ใส่รายชื่อหุ้นทีม A และทีม B (แนะนำทีมละไม่เกิน 10 ตัว) เพื่อจะวิเคราะห์ทุกตัวแล้วสรุปคะแนนเฉลี่ยและผลตอบแทนย้อนหลัง 1 เดือน / 3 เดือนของแต่ละทีมมาเทียบกัน —
-      <b>ทีมชนะคือทีมที่ได้คะแนนเฉลี่ยรวมสูงกว่าเท่านั้น ไม่ใช่การรับประกันว่าทีมที่ชนะจะทำผลตอบแทนย้อนหลังดีกว่าจะชนะอนาคตด้วย</b>
+<div class="modal-backdrop" id="cashModal">
+  <div class="modal">
+    <h3>ปรับเงินสด</h3>
+    <div class="frow">
+      <div class="field"><label class="lbl">พอร์ต</label><select id="csPf"><option value="stock">หุ้น</option><option value="crypto">คริปโต</option></select></div>
+      <div class="field"><label class="lbl">วิธี</label><select id="csMode"><option value="set">ตั้งค่าเงินสดคงเหลือ</option><option value="add">ฝากเพิ่ม</option><option value="sub">ถอนออก</option></select></div>
     </div>
-    <div class="row" style="align-items:flex-start;gap:16px;flex-wrap:wrap;">
-      <div class="field" style="flex:1;min-width:260px;">
-        <label class="small">ทีม A</label>
-        <textarea id="teamAInput" rows="2" placeholder="nvda, pltr, avgo, asml, lly, ma, cost"></textarea>
-      </div>
-      <div class="field" style="flex:1;min-width:260px;">
-        <label class="small">ทีม B</label>
-        <textarea id="teamBInput" rows="2" placeholder="lly, nvda, jpm, pltr, asml"></textarea>
-      </div>
+    <div class="field"><label class="lbl">จำนวนเงิน ($)</label><input type="number" id="csAmt" step="any" inputmode="decimal"></div>
+    <div class="muted-note" id="csHint"></div>
+    <div class="modal-foot">
+      <button class="ghost" id="csCancel">ยกเลิก</button>
+      <button class="primary" id="csSave">บันทึก</button>
     </div>
-    <div class="row">
-      <button class="primary" id="teamCompareBtn">เปรียบเทียบ</button>
-      <button class="ghost" id="teamStopBtn" disabled>หยุด</button>
-    </div>
-    <div id="teamProgressWrap" class="hidden" style="margin-top:12px;">
-      <div class="bulk-progress-bar"><div class="bulk-progress-fill" id="teamProgressFill"></div></div>
-      <div id="teamProgressText" class="mono" style="font-size:12px;color:var(--muted);margin-top:6px;"></div>
-    </div>
-  </div>
-  <div class="error-box" id="teamErrorBox"></div>
-  <div id="teamSummaryWrap"></div>
-  <div class="panel hidden" id="teamResultsPanel">
-    <h3>รายละเอียดรายตัว</h3>
-    <div id="teamResultsContent"></div>
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<div class="modal-backdrop" id="thesisModal">
+  <div class="modal">
+    <h3 id="thModalTitle">Thesis</h3>
+    <div class="field"><label class="lbl">เหตุผลที่ถือ / วิทยานิพนธ์</label><textarea id="thText" rows="4" placeholder="ทำไมถึงถือตัวนี้ · เป้าหมาย · จุดตัดขาย"></textarea></div>
+    <div class="frow">
+      <div class="field"><label class="lbl">รอบรีวิว</label><select id="thEvery"><option value="month">ทุกเดือน</option><option value="quarter">ทุกไตรมาส</option><option value="">ไม่กำหนด</option></select></div>
+    </div>
+    <div class="field"><label class="lbl">บันทึกรีวิววันนี้ (ไม่ใส่ก็ได้)</label><textarea id="thReview" rows="2" placeholder="ยังตรงตาม thesis ไหม · มีอะไรเปลี่ยน"></textarea></div>
+    <div id="thHistory" style="margin-top:6px;"></div>
+    <div class="modal-foot">
+      <button class="ghost" id="thCancel">ยกเลิก</button>
+      <button class="primary" id="thSave">บันทึก</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
@@ -508,1810 +408,823 @@
 <script>
 (function () {
   "use strict";
-
+  const $ = (id) => document.getElementById(id);
   const TD_BASE = "https://api.twelvedata.com";
   const FH_BASE = "https://finnhub.io/api/v1";
+  const BN_BASE = "https://data-api.binance.vision/api/v3";
 
-  function todayStr() { return new Date().toISOString().slice(0, 10); }
-  function loadDailyCount(key) {
-    const saved = JSON.parse(localStorage.getItem(key) || "null");
-    if (saved && saved.date === todayStr()) return saved.count;
-    return 0;
-  }
-  function saveDailyCount(key, count) {
-    localStorage.setItem(key, JSON.stringify({ date: todayStr(), count: count }));
-  }
+  /* ---------- theme (shared tj_theme) ---------- */
+  const root = document.documentElement;
+  function applyTheme(t) { root.setAttribute("data-theme", t); try { localStorage.setItem("tj_theme", t); } catch (e) {} }
+  applyTheme((function () { try { return localStorage.getItem("tj_theme"); } catch (e) { return null; } })() ||
+    (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
+  $("themeToggle").addEventListener("click", () => { applyTheme(root.getAttribute("data-theme") === "dark" ? "light" : "dark"); renderAll(); });
 
+  /* ---------- format ---------- */
+  const usd = (n, d) => (n == null || !isFinite(n)) ? "—" : "$" + Number(n).toLocaleString("en-US", { maximumFractionDigits: d == null ? 2 : d, minimumFractionDigits: 0 });
+  const sgn = (n) => (n >= 0 ? "+" : "−") + "$" + Math.abs(n).toLocaleString("en-US", { maximumFractionDigits: 2 });
+  const pctS = (n) => (n == null || !isFinite(n)) ? "—" : (n >= 0 ? "+" : "") + n.toFixed(2) + "%";
+  const num = (n, d) => (n == null || !isFinite(n)) ? "—" : Number(n).toLocaleString("en-US", { maximumFractionDigits: d == null ? 4 : d });
+  function todayKey() { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+
+  /* ---------- state ---------- */
+  const LOTS_KEY = "sd_lots_v1", CASH_KEY = "sd_cash_v1", THESIS_KEY = "sd_thesis_v1", PRICES_KEY = "sd_prices_v1", PF_KEY = "sd_pf_active";
+  function readLS(k, f) { try { const v = JSON.parse(localStorage.getItem(k) || "null"); return v == null ? f : v; } catch (e) { return f; } }
   const state = {
     apiKey: localStorage.getItem("sd_api_key") || "",
     finnhubKey: localStorage.getItem("sd_finnhub_key") || "",
-    watchlist: JSON.parse(localStorage.getItem("sd_watchlist") || "[]"),
-    log: JSON.parse(localStorage.getItem("sd_log") || "[]"),
-    result: null,
-    spyCache: null,
-    bulkResults: [],
-    bulkRunning: false,
-    bulkStop: false,
-    bulkSortKey: null,
-    bulkSortDir: 1,
-    teamResults: { A: [], B: [] },
-    teamRunning: false,
-    teamStop: false,
-    watchlistScores: JSON.parse(localStorage.getItem("sd_watchlist_scores") || "{}"), // {symbol: {price,score,verdict,rsi14,updatedAt}}
-    watchlistRefreshing: false,
-    watchlistJustFlipped: {}, // transient — symbols that just flipped to BULLISH this refresh
-    tdDailyCount: loadDailyCount("sd_td_daily"),
-    tdMinuteLog: [],   // timestamps (ms) of Twelve Data calls in the last 60s
-    fhMinuteLog: [],   // timestamps (ms) of Finnhub calls in the last 60s
+    lots: Array.isArray(readLS(LOTS_KEY, [])) ? readLS(LOTS_KEY, []) : [],
+    cash: Object.assign({ stock: 0, crypto: 0 }, readLS(CASH_KEY, {})),
+    thesis: readLS(THESIS_KEY, {}) || {},
+    prices: readLS(PRICES_KEY, {}) || {},
+    watchlist: readLS("sd_watchlist", []) || [],           // [string] (may carry "crypto:" prefix)
+    watchlistScores: readLS("sd_watchlist_scores", {}) || {},
+    oldLog: readLS("sd_log", []) || [],
+    result: null, spyCache: null, btcCache: null,
+    tdDaily: (function () { const s = readLS("sd_td_daily", null); return s && s.date === todayKey() ? s.count : 0; })(),
+    tdMinute: [], fhMinute: [],
   };
+  let activePf = (function () { try { const v = localStorage.getItem(PF_KEY); return ["all", "stock", "crypto"].includes(v) ? v : "all"; } catch (e) { return "all"; } })();
+  let currentTab = "holdings";
 
-  document.getElementById("apiKeyInput").value = state.apiKey;
-  document.getElementById("finnhubKeyInput").value = state.finnhubKey;
-  updateNoKeyNotice();
-  renderQuotaBar();
-  setupCloudSync();
+  $("apiKeyInput").value = state.apiKey;
+  $("finnhubKeyInput").value = state.finnhubKey;
 
-  // ---------- API quota tracking (นับฝั่ง client เอง — เก็บค่าประมาณ ไม่ใช่ตัวเลขทางการจากผู้ให้บริการ) ----------
-  function pruneMinuteLog(log) {
-    const cutoff = Date.now() - 60000;
-    while (log.length && log[0] < cutoff) log.shift();
-    return log;
+  function saveLots() { try { localStorage.setItem(LOTS_KEY, JSON.stringify(state.lots)); } catch (e) {} pushCloudSync(); }
+  function saveCash() { try { localStorage.setItem(CASH_KEY, JSON.stringify(state.cash)); } catch (e) {} pushCloudSync(); }
+  function saveThesis() { try { localStorage.setItem(THESIS_KEY, JSON.stringify(state.thesis)); } catch (e) {} pushCloudSync(); }
+  function savePrices() { try { localStorage.setItem(PRICES_KEY, JSON.stringify(state.prices)); } catch (e) {} }
+  function saveWatchlist() { try { localStorage.setItem("sd_watchlist", JSON.stringify(state.watchlist)); } catch (e) {} pushCloudSync(); }
+  function saveWatchlistScores() { try { localStorage.setItem("sd_watchlist_scores", JSON.stringify(state.watchlistScores)); } catch (e) {} pushCloudSync(); }
+
+  /* ---------- portfolio helpers ---------- */
+  const PF_LABEL = { all: "ทั้งหมด", stock: "หุ้น", crypto: "คริปโต" };
+  const keyOf = (pf, sym) => pf + ":" + String(sym).toUpperCase().trim();
+  function pfLots() { return activePf === "all" ? state.lots : state.lots.filter(l => l.pf === activePf); }
+  function pfCash() { return activePf === "all" ? (state.cash.stock + state.cash.crypto) : (state.cash[activePf] || 0); }
+
+  // replay all lots (avg-cost) → { positions:{key:{pf,sym,qty,cost,realized}}, sells:[] }
+  function computeBook(lots) {
+    const book = {};
+    const sells = [];
+    lots.slice().sort((a, b) => (a.date || "").localeCompare(b.date || "") || (a.createdAt || 0) - (b.createdAt || 0)).forEach(l => {
+      const k = keyOf(l.pf, l.symbol);
+      const b = book[k] || (book[k] = { pf: l.pf, sym: String(l.symbol).toUpperCase().trim(), qty: 0, cost: 0, realized: 0 });
+      const q = Math.abs(Number(l.qty) || 0), p = Number(l.price) || 0, fee = Number(l.fee) || 0;
+      if (l.side === "sell") {
+        const avg = b.qty > 0 ? b.cost / b.qty : p;
+        const useQ = Math.min(q, b.qty);
+        const pnl = (p - avg) * useQ - fee;
+        b.realized += pnl;
+        b.cost -= avg * useQ;
+        b.qty -= useQ;
+        sells.push({ id: l.id, pf: l.pf, sym: b.sym, date: l.date, qty: useQ, price: p, pnl, note: l.note });
+      } else {
+        b.qty += q;
+        b.cost += p * q + fee;
+      }
+    });
+    return { book, sells };
   }
-  function recordTdCall() {
-    const today = todayStr();
-    const saved = JSON.parse(localStorage.getItem("sd_td_daily") || "null");
-    state.tdDailyCount = (saved && saved.date === today ? saved.count : 0) + 1;
-    saveDailyCount("sd_td_daily", state.tdDailyCount);
-    state.tdMinuteLog.push(Date.now());
-    pruneMinuteLog(state.tdMinuteLog);
-    renderQuotaBar();
+
+  /* ---------- price fetching ---------- */
+  function binancePair(sym) {
+    let s = String(sym).toUpperCase().replace(/[^A-Z0-9]/g, "");
+    s = s.replace(/(USDT|USDC|USD|PERP)$/, "");
+    return s + "USDT";
   }
-  function recordFhCall() {
-    state.fhMinuteLog.push(Date.now());
-    pruneMinuteLog(state.fhMinuteLog);
-    renderQuotaBar();
+  async function fetchStockPrices(syms) {
+    if (!syms.length) return {};
+    if (!state.apiKey) throw new Error("ยังไม่ได้ใส่ Twelve Data key (แท็บวิเคราะห์ → ⚙ API keys)");
+    recordTd();
+    const qs = new URLSearchParams({ symbol: syms.join(","), apikey: state.apiKey }).toString();
+    const res = await fetch(TD_BASE + "/price?" + qs);
+    const j = await res.json();
+    if (j.status === "error" || j.code) throw new Error(j.message || "Twelve Data error");
+    const out = {};
+    if (syms.length === 1) { if (j.price != null) out[syms[0]] = parseFloat(j.price); }
+    else Object.keys(j).forEach(k => { if (j[k] && j[k].price != null) out[k] = parseFloat(j[k].price); });
+    return out;
   }
-  function renderQuotaBar() {
-    pruneMinuteLog(state.tdMinuteLog);
-    pruneMinuteLog(state.fhMinuteLog);
-    const el = document.getElementById("quotaBar");
-    if (!el) return;
-    const tdMin = state.tdMinuteLog.length;
-    const tdDayLeft = Math.max(0, 800 - state.tdDailyCount);
-    const tdMinLeft = Math.max(0, 8 - tdMin);
-    let html = 'Twelve Data: เหลือ <b class="mono">' + tdDayLeft + '/800</b> วันนี้ · <b class="mono">' + tdMinLeft + '/8</b> นาทีนี้';
-    if (state.finnhubKey) {
-      const fhMin = state.fhMinuteLog.length;
-      const fhMinLeft = Math.max(0, 60 - fhMin);
-      html += ' &nbsp;|&nbsp; Finnhub: เหลือ <b class="mono">' + fhMinLeft + '/60</b> นาทีนี้';
+  async function fetchCryptoPrices(syms) {
+    if (!syms.length) return {};
+    const pairs = syms.map(binancePair);
+    try {
+      const res = await fetch(BN_BASE + "/ticker/price?symbols=" + encodeURIComponent(JSON.stringify(pairs)));
+      const arr = await res.json();
+      if (!Array.isArray(arr)) throw new Error("bad");
+      const byPair = {}; arr.forEach(x => { byPair[x.symbol] = parseFloat(x.price); });
+      const out = {};
+      syms.forEach((s, i) => { if (byPair[pairs[i]] != null) out[s] = byPair[pairs[i]]; });
+      if (Object.keys(out).length) return out;
+      throw new Error("empty");
+    } catch (e) {
+      // OKX fallback (one by one)
+      const out = {};
+      for (const s of syms) {
+        try {
+          const inst = binancePair(s).replace(/USDT$/, "-USDT");
+          const r = await fetch("https://www.okx.com/api/v5/market/ticker?instId=" + inst);
+          const j = await r.json();
+          const last = j && j.data && j.data[0] && j.data[0].last;
+          if (last != null) out[s] = parseFloat(last);
+        } catch (_) {}
+      }
+      return out;
     }
-    el.innerHTML = html;
   }
-
-  // ---------- data helpers ----------
-  async function tdFetch(endpoint, params) {
-    recordTdCall();
-    const qs = new URLSearchParams(Object.assign({}, params, { apikey: state.apiKey })).toString();
-    const res = await fetch(`${TD_BASE}${endpoint}?${qs}`);
-    if (!res.ok) throw new Error(`เครือข่ายผิดพลาด (${res.status})`);
-    const json = await res.json();
-    if (json.status === "error" || json.code) {
-      const code = json.code;
-      if (code === 429) throw new Error("เกินโควตา API (8 ครั้ง/นาที หรือ ~800 ครั้ง/วัน) รอสักครู่แล้วลองใหม่");
-      if (code === 401 || code === 403) throw new Error("API key ไม่ถูกต้องหรือไม่มีสิทธิ์เข้าถึงข้อมูลนี้");
-      if (code === 400 && /not found/i.test(json.message || "")) throw new Error("ไม่พบสัญลักษณ์หุ้นนี้");
-      throw new Error(json.message || "เกิดข้อผิดพลาดจาก API");
+  async function refreshPrices() {
+    const msg = $("priceMsg");
+    const { book } = computeBook(state.lots);
+    const held = Object.values(book).filter(b => b.qty > 1e-9);
+    // also refresh watchlist that belongs to current pf view is done separately
+    const stockSyms = [...new Set(held.filter(b => b.pf === "stock").map(b => b.sym))];
+    const cryptoSyms = [...new Set(held.filter(b => b.pf === "crypto").map(b => b.sym))];
+    if (!stockSyms.length && !cryptoSyms.length) { msg.textContent = "ยังไม่มีของในพอร์ต"; return; }
+    msg.textContent = "กำลังดึงราคา…";
+    let errs = [];
+    try {
+      const results = await Promise.allSettled([
+        stockSyms.length ? fetchStockPrices(stockSyms) : Promise.resolve({}),
+        cryptoSyms.length ? fetchCryptoPrices(cryptoSyms) : Promise.resolve({}),
+      ]);
+      [["stock", results[0]], ["crypto", results[1]]].forEach(([pf, r]) => {
+        if (r.status === "fulfilled") {
+          Object.keys(r.value).forEach(s => { state.prices[keyOf(pf, s)] = { price: r.value[s], at: Date.now() }; });
+        } else errs.push(r.reason && r.reason.message || String(r.reason));
+      });
+      savePrices();
+      const stamp = new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
+      msg.textContent = "อัปเดตราคาเมื่อ " + stamp + (errs.length ? " · บางส่วนล้มเหลว: " + errs.join(" / ") : "");
+    } catch (e) {
+      msg.textContent = "ดึงราคาไม่สำเร็จ: " + (e.message || e);
     }
-    return json;
+    renderHoldings();
   }
+  function lastPrice(pf, sym) { const p = state.prices[keyOf(pf, sym)]; return p ? p.price : null; }
 
-  function parseDailySeries(json) {
-    const values = json.values;
-    if (!values || !values.length) return { closes: [], volumes: [], highs: [], lows: [] };
-    // Twelve Data ส่งข้อมูลเรียงจากล่าสุด -> เก่าสุด (descending) อยู่แล้ว
+  /* ---------- quota (client-side estimate) ---------- */
+  function pruneMin(a) { const c = Date.now() - 60000; while (a.length && a[0] < c) a.shift(); return a; }
+  function recordTd() {
+    const t = todayKey(); const s = readLS("sd_td_daily", null);
+    state.tdDaily = (s && s.date === t ? s.count : 0) + 1;
+    try { localStorage.setItem("sd_td_daily", JSON.stringify({ date: t, count: state.tdDaily })); } catch (e) {}
+    state.tdMinute.push(Date.now()); pruneMin(state.tdMinute); renderQuota();
+  }
+  function recordFh() { state.fhMinute.push(Date.now()); pruneMin(state.fhMinute); renderQuota(); }
+  function renderQuota() {
+    pruneMin(state.tdMinute); pruneMin(state.fhMinute);
+    const el = $("quotaBar"); if (!el) return;
+    let h = "Twelve Data: เหลือ <b class='mono'>" + Math.max(0, 800 - state.tdDaily) + "/800</b> วันนี้ · <b class='mono'>" + Math.max(0, 8 - state.tdMinute.length) + "/8</b> นาทีนี้";
+    if (state.finnhubKey) h += " | Finnhub <b class='mono'>" + Math.max(0, 60 - state.fhMinute.length) + "/60</b> นาที";
+    el.innerHTML = h;
+  }
+  renderQuota();
+
+  /* =======================================================================
+     SCORING ENGINE  (ported from the previous version)
+     ======================================================================= */
+  function pctUpFromRecentLow(c, lb) { lb = lb || 126; const w = c.slice(0, Math.min(lb, c.length)); const lo = Math.min.apply(null, w); return ((c[0] - lo) / lo) * 100; }
+  function volumeSpikeRatio(v, lb) { lb = lb || 50; if (!v || v.length < 2) return null; const t = v[0]; const pw = v.slice(1, Math.min(lb + 1, v.length)); if (!pw.length) return null; const avg = pw.reduce((a, b) => a + b, 0) / pw.length; if (!avg) return null; return t / avg; }
+  function sma(c, p) { const s = c.slice(0, p); return s.length ? s.reduce((a, b) => a + b, 0) / s.length : null; }
+  function emaSeriesAsc(asc, p) { if (asc.length < p) return []; const k = 2 / (p + 1); let prev = asc.slice(0, p).reduce((a, b) => a + b, 0) / p; const out = [prev]; for (let i = p; i < asc.length; i++) { prev = (asc[i] - prev) * k + prev; out.push(prev); } return out; }
+  function ema(c, p) { const s = emaSeriesAsc(c.slice().reverse(), p); return s.length ? s[s.length - 1] : null; }
+  function rsi(c, p) { p = p || 14; const a = c.slice().reverse(); if (a.length < p + 1) return null; let g = 0, l = 0; for (let i = 1; i <= p; i++) { const d = a[i] - a[i - 1]; if (d >= 0) g += d; else l -= d; } let ag = g / p, al = l / p; for (let i = p + 1; i < a.length; i++) { const d = a[i] - a[i - 1]; ag = (ag * (p - 1) + (d > 0 ? d : 0)) / p; al = (al * (p - 1) + (d < 0 ? -d : 0)) / p; } if (al === 0) return 100; return 100 - 100 / (1 + ag / al); }
+  function macd(c, f, s, sig) { f = f || 12; s = s || 26; sig = sig || 9; const a = c.slice().reverse(); if (a.length < s + sig) return null; const ef = emaSeriesAsc(a, f), es = emaSeriesAsc(a, s); const off = ef.length - es.length; const ml = es.map((v, i) => ef[i + off] - v); const sg = emaSeriesAsc(ml, sig); if (!sg.length) return null; const m = ml[ml.length - 1], ss = sg[sg.length - 1]; return { macd: m, signal: ss, hist: m - ss }; }
+  function atr(h, l, c, p) { p = p || 14; if (!h || !l || !h.length) return null; const H = h.slice().reverse(), L = l.slice().reverse(), C = c.slice().reverse(); if (H.length < p + 1) return null; const tr = []; for (let i = 1; i < H.length; i++) tr.push(Math.max(H[i] - L[i], Math.abs(H[i] - C[i - 1]), Math.abs(L[i] - C[i - 1]))); let x = tr.slice(0, p).reduce((u, y) => u + y, 0) / p; for (let i = p; i < tr.length; i++) x = (x * (p - 1) + tr[i]) / p; return x; }
+  function range52w(c, h, l) { const n = Math.min(252, c.length); const hs = (h && h.length ? h : c).slice(0, n), ls = (l && l.length ? l : c).slice(0, n); const hi = Math.max.apply(null, hs), lo = Math.min.apply(null, ls); const pos = hi > lo ? ((c[0] - lo) / (hi - lo)) * 100 : 50; return { high: hi, low: lo, pos: Math.max(0, Math.min(100, pos)) }; }
+  function annualizedVolatility(c, lb) { lb = lb || 30; const r = c.slice(0, lb + 1); const rr = []; for (let i = 0; i < r.length - 1; i++) rr.push((r[i] - r[i + 1]) / r[i + 1]); if (!rr.length) return 0; const m = rr.reduce((a, b) => a + b, 0) / rr.length; const v = rr.reduce((a, b) => a + Math.pow(b - m, 2), 0) / rr.length; return Math.sqrt(v) * Math.sqrt(252) * 100; }
+  function drawdownFrom52wHigh(c) { const w = c.slice(0, Math.min(252, c.length)); const hi = Math.max.apply(null, w); return ((hi - c[0]) / hi) * 100; }
+  function periodReturn(c, d) { const i = Math.min(d, c.length - 1); return ((c[0] - c[i]) / c[i]) * 100; }
+
+  function analyzeStock(closes, vols, benchCloses, overview, highs, lows) {
+    const price = closes[0];
+    const upFromLow = pctUpFromRecentLow(closes);
+    const volSpike = volumeSpikeRatio(vols);
+    const sma20 = sma(closes, 20), sma50 = sma(closes, 50);
+    const rsi14 = rsi(closes, 14);
+    const macdV = macd(closes);
+    const atr14 = atr(highs, lows, closes, 14);
+    const r52 = range52w(closes, highs, lows);
+    const vol = annualizedVolatility(closes);
+    const drawdown = drawdownFrom52wHigh(closes);
+    const ret3m = periodReturn(closes, 63);
+    const bench3m = benchCloses ? periodReturn(benchCloses, 63) : null;
+    const relStrength = bench3m !== null ? ret3m - bench3m : null;
+    const pe = overview && overview.PERatio && overview.PERatio !== "None" ? parseFloat(overview.PERatio) : null;
+
+    let trendLabel = "เท่าตัวกลาง";
+    if (price > sma20 && sma20 > sma50) trendLabel = "ขาขึ้นชัดเจน";
+    else if (price < sma20 && sma20 < sma50) trendLabel = "ขาลงชัดเจน";
+    let momentumFlag = "ปกติ";
+    if (rsi14 !== null) { if (rsi14 > 70) momentumFlag = "ซื้อมากเกินไป (overbought)"; else if (rsi14 < 30) momentumFlag = "ขายมากเกินไป (oversold)"; }
+    let riskLevel = "ปานกลาง";
+    if (vol > 45 || drawdown > 25) riskLevel = "สูง"; else if (vol < 20 && drawdown < 10) riskLevel = "ต่ำ";
+
+    const sc = computeScore({ trendLabel, relStrength, rsi14, volSpike, vol, upFromLow, extendedFromHigh: drawdown, pe });
     return {
-      closes: values.map((v) => parseFloat(v.close)),
-      volumes: values.map((v) => parseFloat(v.volume || 0)),
-      highs: values.map((v) => parseFloat(v.high)),
-      lows: values.map((v) => parseFloat(v.low)),
+      price, sma20, sma50, ema12: ema(closes, 12), ema26: ema(closes, 26), rsi14, vol, drawdown, relStrength, pe,
+      macd: macdV, atr14, atrPct: (atr14 != null && price) ? (atr14 / price) * 100 : null, range52w: r52,
+      trendLabel, momentumFlag, riskLevel, extendedFromHigh: drawdown, upFromLow, volSpike,
+      name: (overview && overview.Name) || null, score: sc.score, scoreBreakdown: sc.breakdown,
     };
   }
+  function computeScore(m) {
+    const items = [];
+    if (m.trendLabel === "ขาขึ้นชัดเจน") items.push({ label: "เทรนด์ขาขึ้น (ราคา>SMA20>SMA50)", points: 2 });
+    else if (m.trendLabel === "ขาลงชัดเจน") items.push({ label: "เทรนด์ขาลง (ราคา<SMA20<SMA50)", points: -2 });
+    else items.push({ label: "เทรนด์ไม่ชัดเจน", points: 0 });
+    if (m.relStrength === null) items.push({ label: "ไม่มีข้อมูล Relative Strength", points: 0 });
+    else if (m.relStrength > 10) items.push({ label: "แข็งแกร่งกว่าตลาดชัดเจน (RS > +10%)", points: 2 });
+    else if (m.relStrength > 1) items.push({ label: "แข็งแกร่งกว่าตลาดเล็กน้อย", points: 1 });
+    else if (m.relStrength >= -1) items.push({ label: "ใกล้เคียงตลาด", points: 0 });
+    else if (m.relStrength >= -10) items.push({ label: "อ่อนกว่าตลาดเล็กน้อย", points: -1 });
+    else items.push({ label: "อ่อนกว่าตลาดชัดเจน (RS < -10%)", points: -2 });
+    if (m.rsi14 === null) items.push({ label: "ไม่มีข้อมูล RSI", points: 0 });
+    else if (m.rsi14 >= 70) items.push({ label: "RSI overbought (≥70)", points: -1 });
+    else if (m.rsi14 >= 50) items.push({ label: "โมเมนตัมเอนเอียงบวก (50-70)", points: 1 });
+    else if (m.rsi14 > 30) items.push({ label: "โมเมนตัมอ่อน (30-50)", points: 0 });
+    else items.push({ label: "RSI oversold (≤30)", points: -1 });
+    if (m.volSpike === null) items.push({ label: "ไม่มีข้อมูล Volume", points: 0 });
+    else if (m.volSpike > 1.4) items.push({ label: "Volume พุ่ง (>1.4x)", points: 1 });
+    else if (m.volSpike < 0.7) items.push({ label: "Volume ต่ำกว่าเฉลี่ยมาก", points: -1 });
+    else items.push({ label: "Volume ปกติ", points: 0 });
+    if (m.vol < 20) items.push({ label: "ความผันผวนต่ำ (<20%)", points: 1 });
+    else if (m.vol > 45) items.push({ label: "ความผันผวนสูง (>45%)", points: -1 });
+    else items.push({ label: "ความผันผวนกลาง", points: 0 });
+    if (m.upFromLow > 80) items.push({ label: "วิ่งขึ้นมาเยอะแล้ว (>80% จากจุดต่ำ)", points: -1 });
+    else if (m.extendedFromHigh < 5 && m.upFromLow < 50) items.push({ label: "ใกล้จุดสูงแต่ยังไม่ยืนมาก", points: 1 });
+    else items.push({ label: "ระยะยืนตัวปกติ", points: 0 });
+    if (m.pe === null) items.push({ label: "ไม่มีข้อมูล P/E", points: 0 });
+    else if (m.pe > 0 && m.pe < 15) items.push({ label: "P/E ต่ำ (<15)", points: 1 });
+    else if (m.pe > 40 || m.pe < 0) items.push({ label: "P/E สูงมาก/ติดลบ", points: -1 });
+    else items.push({ label: "P/E ระดับกลาง", points: 0 });
+    const raw = items.reduce((s, it) => s + it.points, 0);
+    return { score: Math.max(0, Math.min(100, Math.round(((raw + 9) / 18) * 100))), breakdown: items };
+  }
+  function scoreLabel(s) {
+    if (s >= 70) return { text: "เอนเอียงบวก", color: "var(--bull)" };
+    if (s >= 45) return { text: "ปานกลาง", color: "var(--neutral)" };
+    return { text: "เอนเอียงลบ", color: "var(--bear)" };
+  }
+  function computeEntryGuidance(r) {
+    const price = r.price;
+    const overext = (r.rsi14 !== null && r.rsi14 >= 70) || r.upFromLow > 80;
+    if (r.trendLabel === "ขาลงชัดเจน") return { status: "avoid", title: "ยังไม่ควรเข้า", note: "เทรนด์เป็นขาลงชัดเจน รอราคากลับมายืนเหนือ SMA20 และ SMA20 ตัดขึ้นเหนือ SMA50 ก่อน", zoneLow: null, zoneHigh: null, stopRef: null };
+    if (r.trendLabel === "ขาขึ้นชัดเจน" && overext) return { status: "wait", title: "เทรนด์ดี แต่ราคายืนตัวมาก — รอย่อ", note: (r.rsi14 >= 70 ? "RSI " + r.rsi14.toFixed(1) + " เข้าเขต overbought " : "") + (r.upFromLow > 80 ? "ราคาขึ้นมา " + r.upFromLow.toFixed(0) + "% จากจุดต่ำ " : "") + "แนะนำรอราคาย่อลงใกล้ SMA20", zoneLow: r.sma20 * 0.97, zoneHigh: r.sma20 * 1.02, stopRef: r.atr14 != null ? price - 2 * r.atr14 : r.sma50 };
+    if (r.trendLabel === "ขาขึ้นชัดเจน") return { status: "now", title: "อยู่ในโซนที่พิจารณาเข้าได้", note: "เทรนด์ขาขึ้นและราคายังไม่ยืนตัวมาก อยู่ใกล้เหนือ SMA20 ซึ่งมักเป็นแนวรับเทรนด์", zoneLow: Math.min(r.sma20, price), zoneHigh: price * 1.02, stopRef: r.atr14 != null ? price - 2 * r.atr14 : r.sma50 };
+    return { status: "neutral", title: "สัญญาณยังไม่ชัดเจน — รอดูก่อน", note: "SMA20/SMA50 ยังไม่ตัดเรียงชัดเจน รอ 1-2 วันถัดไป", zoneLow: r.sma50, zoneHigh: r.sma20, stopRef: null };
+  }
 
+  /* ---------- data for the analyze tab ---------- */
+  async function tdFetch(endpoint, params) {
+    recordTd();
+    const qs = new URLSearchParams(Object.assign({}, params, { apikey: state.apiKey })).toString();
+    const res = await fetch(TD_BASE + endpoint + "?" + qs);
+    const j = await res.json();
+    if (j.status === "error" || j.code) {
+      if (j.code === 429) throw new Error("เกินโควตา API — รอสักครู่");
+      if (j.code === 401 || j.code === 403) throw new Error("API key ไม่ถูกต้อง");
+      throw new Error(j.message || "Twelve Data error");
+    }
+    return j;
+  }
+  function parseTD(j) {
+    const v = j.values || [];
+    return { closes: v.map(x => parseFloat(x.close)), volumes: v.map(x => parseFloat(x.volume || 0)), highs: v.map(x => parseFloat(x.high)), lows: v.map(x => parseFloat(x.low)) };
+  }
   async function fetchOverview(sym) {
+    try { const s = await tdFetch("/statistics", { symbol: sym }); const pe = s.statistics && s.statistics.valuations_metrics && s.statistics.valuations_metrics.trailing_pe; return { Name: (s.meta && s.meta.name) || null, PERatio: pe != null ? String(pe) : null }; }
+    catch (e) { return null; }
+  }
+  async function fhMetric(sym) {
+    if (!state.finnhubKey) return null;
     try {
-      const stats = await tdFetch("/statistics", { symbol: sym });
-      const name = (stats.meta && stats.meta.name) || null;
-      const peRaw = stats.statistics && stats.statistics.valuations_metrics && stats.statistics.valuations_metrics.trailing_pe;
-      return { Name: name, PERatio: peRaw != null ? String(peRaw) : null };
+      recordFh();
+      const qs = new URLSearchParams({ symbol: sym, metric: "all", token: state.finnhubKey }).toString();
+      const j = await (await fetch(FH_BASE + "/stock/metric?" + qs)).json();
+      const m = j.metric || {};
+      return { roeTTM: m.roeTTM, netMargin: m.netMargin, grossMargin: m.grossMargin, totalDebtToEquity: m.totalDebtToEquity, currentRatio: m.currentRatio };
+    } catch (e) { return null; }
+  }
+  async function fetchBinanceDaily(sym) {
+    const res = await fetch(BN_BASE + "/klines?symbol=" + binancePair(sym) + "&interval=1d&limit=400");
+    const arr = await res.json();
+    if (!Array.isArray(arr) || !arr.length) throw new Error("ไม่พบข้อมูลเหรียญนี้บน Binance");
+    const asc = arr; // [ openTime,o,h,l,c,vol,... ]
+    return {
+      closes: asc.map(k => parseFloat(k[4])).reverse(),
+      volumes: asc.map(k => parseFloat(k[5])).reverse(),
+      highs: asc.map(k => parseFloat(k[2])).reverse(),
+      lows: asc.map(k => parseFloat(k[3])).reverse(),
+    };
+  }
+  async function getBench(market) {
+    if (market === "crypto") {
+      if (state.btcCache) return state.btcCache;
+      try { state.btcCache = (await fetchBinanceDaily("BTC")).closes; } catch (e) { state.btcCache = null; }
+      return state.btcCache;
+    }
+    if (state.spyCache) return state.spyCache;
+    try { state.spyCache = parseTD(await tdFetch("/time_series", { symbol: "SPY", interval: "1day", outputsize: "300" })).closes; } catch (e) { state.spyCache = null; }
+    return state.spyCache;
+  }
+
+  async function runAnalyze(sym, market, opts) {
+    opts = opts || {};
+    const msg = $("anMsg");
+    sym = String(sym).toUpperCase().trim();
+    if (!sym) { msg.textContent = "ใส่สัญลักษณ์ก่อน"; return null; }
+    msg.textContent = "กำลังวิเคราะห์ " + sym + "…";
+    try {
+      let series, overview = null, qual = null;
+      if (market === "crypto") {
+        series = await fetchBinanceDaily(sym);
+        overview = { Name: sym + " / USDT", PERatio: null };
+      } else {
+        series = parseTD(await tdFetch("/time_series", { symbol: sym, interval: "1day", outputsize: "400" }));
+        if (!series.closes.length) throw new Error("ไม่พบข้อมูลหุ้นนี้");
+        [overview, qual] = await Promise.all([fetchOverview(sym), fhMetric(sym)]);
+      }
+      const bench = await getBench(market);
+      const r = analyzeStock(series.closes, series.volumes, bench, overview, series.highs, series.lows);
+      r._sym = sym; r._market = market; r._qual = qual;
+      msg.textContent = "";
+      if (!opts.quiet) renderAnalyzeResult(r);
+      return r;
     } catch (e) {
+      msg.textContent = "วิเคราะห์ไม่สำเร็จ: " + (e.message || e);
       return null;
     }
   }
 
-  // ---------- finnhub (ข่าว + ปัจจัยเชิงคุณภาพ, ไม่บังคับ) ----------
-  async function fhFetch(path, params) {
-    recordFhCall();
-    const qs = new URLSearchParams(Object.assign({}, params, { token: state.finnhubKey })).toString();
-    const res = await fetch(`${FH_BASE}${path}?${qs}`);
-    if (!res.ok) throw new Error(`Finnhub เครือข่ายผิดพลาด (${res.status})`);
-    const json = await res.json();
-    if (json.error) throw new Error(json.error);
-    return json;
-  }
-
-  async function fetchQualitativeMetrics(sym) {
-    if (!state.finnhubKey) return null;
-    try {
-      const json = await fhFetch("/stock/metric", { symbol: sym, metric: "all" });
-      const m = json.metric || {};
-      return {
-        roeTTM: m.roeTTM != null ? m.roeTTM : null,
-        netMargin: m.netMargin != null ? m.netMargin : null,
-        grossMargin: m.grossMargin != null ? m.grossMargin : null,
-        totalDebtToEquity: m.totalDebtToEquity != null ? m.totalDebtToEquity : null,
-        currentRatio: m.currentRatio != null ? m.currentRatio : null,
-      };
-    } catch (e) {
-      return { error: e.message || "ดึงข้อมูล Finnhub ไม่สำเร็จ" };
-    }
-  }
-
-  async function fetchCompanyNews(sym) {
-    if (!state.finnhubKey) return null;
-    try {
-      const to = new Date();
-      const from = new Date(to.getTime() - 14 * 24 * 60 * 60 * 1000);
-      const fmt = (d) => d.toISOString().slice(0, 10);
-      const json = await fhFetch("/company-news", { symbol: sym, from: fmt(from), to: fmt(to) });
-      if (!Array.isArray(json)) return [];
-      return json
-        .sort((a, b) => b.datetime - a.datetime)
-        .slice(0, 6)
-        .map((n) => ({ headline: n.headline, url: n.url, source: n.source, datetime: n.datetime }));
-    } catch (e) {
-      return { error: e.message || "ดึงข่าวไม่สำเร็จ" };
-    }
-  }
-
-  async function fetchInsiderTransactions(sym) {
-    if (!state.finnhubKey) return null;
-    try {
-      const json = await fhFetch("/stock/insider-transactions", { symbol: sym });
-      const data = (json && json.data) || [];
-      return data
-        .sort((a, b) => new Date(b.transactionDate) - new Date(a.transactionDate))
-        .slice(0, 8)
-        .map((t) => ({
-          name: t.name,
-          date: t.transactionDate,
-          code: t.transactionCode, // P = ซื้อในตลาดเปิด, S = ขาย
-          shares: t.share,
-          price: t.transactionPrice,
-        }));
-    } catch (e) {
-      return { error: e.message || "ดึงข้อมูล Insider ไม่สำเร็จ" };
-    }
-  }
-
-  async function fetchRecommendationTrends(sym) {
-    if (!state.finnhubKey) return null;
-    try {
-      const json = await fhFetch("/stock/recommendation", { symbol: sym });
-      if (!Array.isArray(json) || json.length === 0) return [];
-      // ตัวแรกลิสต์คือเดือนล่าสุด
-      const latest = json[0];
-      return {
-        period: latest.period,
-        strongBuy: latest.strongBuy || 0,
-        buy: latest.buy || 0,
-        hold: latest.hold || 0,
-        sell: latest.sell || 0,
-        strongSell: latest.strongSell || 0,
-      };
-    } catch (e) {
-      return { error: e.message || "ดึงข้อมูล Recommendation ไม่สำเร็จ" };
-    }
-  }
-
-  function renderQualPanel(qual) {
-    const panel = document.getElementById("qualPanel");
-    if (!qual) { panel.classList.add("hidden"); return; }
-    panel.classList.remove("hidden");
-    const el = document.getElementById("qualMetrics");
-    if (qual.error) {
-      el.innerHTML = '<div class="empty">' + qual.error + '</div>';
-      return;
-    }
-    const pct = (v) => (v == null ? "—" : (v * 100).toFixed(1) + "%");
-    el.innerHTML = [
-      metricHtml("ROE (TTM)", pct(qual.roeTTM), null, qual.roeTTM == null ? "" : qual.roeTTM > 0.15 ? "pos" : qual.roeTTM < 0 ? "neg" : "neu"),
-      metricHtml("Net Margin", pct(qual.netMargin), null, qual.netMargin == null ? "" : qual.netMargin > 0.10 ? "pos" : qual.netMargin < 0 ? "neg" : "neu"),
-      metricHtml("Gross Margin", pct(qual.grossMargin)),
-      metricHtml("Debt/Equity", qual.totalDebtToEquity != null ? qual.totalDebtToEquity.toFixed(2) : "—", null, qual.totalDebtToEquity == null ? "" : qual.totalDebtToEquity > 2 ? "neg" : "neu"),
-      metricHtml("Current Ratio", qual.currentRatio != null ? qual.currentRatio.toFixed(2) : "—", null, qual.currentRatio == null ? "" : qual.currentRatio < 1 ? "neg" : "pos"),
+  function renderAnalyzeResult(r) {
+    state.result = r;
+    $("anResult").classList.remove("hidden");
+    $("anResName").textContent = (r.name || r._sym) + "  ·  " + r._sym;
+    $("anScoreNum").textContent = r.score;
+    const lab = scoreLabel(r.score);
+    $("anScoreNum").style.color = lab.color;
+    $("anScoreLabel").textContent = lab.text;
+    const vb = $("anVerdict");
+    vb.textContent = r.trendLabel;
+    vb.className = "badge " + (r.trendLabel === "ขาขึ้นชัดเจน" ? "up" : r.trendLabel === "ขาลงชัดเจน" ? "down" : "warn");
+    $("anPrice").textContent = usd(r.price, r.price < 1 ? 5 : 2);
+    $("anPriceSub").textContent = r.range52w ? ("ในกรอบ 52 สัปดาห์ที่ " + r.range52w.pos.toFixed(0) + "%") : "";
+    const t = (k, v, cls) => `<div class="tile"><div class="k">${k}</div><div class="v small ${cls || ""}">${v}</div></div>`;
+    $("anMetrics").innerHTML = [
+      t("RSI(14)", r.rsi14 == null ? "—" : r.rsi14.toFixed(1), r.rsi14 >= 70 ? "neg" : r.rsi14 <= 30 ? "neg" : r.rsi14 >= 50 ? "pos" : ""),
+      t("SMA20 / 50", num(r.sma20, 2) + " / " + num(r.sma50, 2)),
+      t("MACD hist", r.macd ? r.macd.hist.toFixed(3) : "—", r.macd && r.macd.hist > 0 ? "pos" : "neg"),
+      t("ATR%", r.atrPct == null ? "—" : r.atrPct.toFixed(2) + "%"),
+      t("ผันผวน (ปี)", r.vol.toFixed(0) + "%", r.vol > 45 ? "neg" : r.vol < 20 ? "pos" : ""),
+      t("ห่างจุดสูง 52w", "−" + r.drawdown.toFixed(1) + "%"),
+      t("RS vs " + (r._market === "crypto" ? "BTC" : "SPY"), r.relStrength == null ? "—" : pctS(r.relStrength), r.relStrength == null ? "" : r.relStrength >= 0 ? "pos" : "neg"),
+      t("P/E", r.pe == null ? "—" : r.pe.toFixed(1)),
+      t("ความเสี่ยง", r.riskLevel, r.riskLevel === "สูง" ? "neg" : r.riskLevel === "ต่ำ" ? "pos" : ""),
     ].join("");
+    const g = computeEntryGuidance(r);
+    const gcol = g.status === "now" ? "var(--bull)" : g.status === "avoid" ? "var(--bear)" : "var(--neutral)";
+    $("anGuide").innerHTML = `<b style="color:${gcol}">${esc(g.title)}</b><br>${esc(g.note)}` +
+      (g.zoneLow ? `<br><span class="muted-note">โซนพิจารณา ~ ${usd(g.zoneLow)} – ${usd(g.zoneHigh)}${g.stopRef ? " · จุดอ้างอิง SL ~ " + usd(g.stopRef) : ""}</span>` : "");
+    $("anBreakdown").innerHTML = r.scoreBreakdown.map(it => `<li><span>${esc(it.label)}</span><span class="mono ${it.points > 0 ? "pos" : it.points < 0 ? "neg" : "muted-note"}">${it.points > 0 ? "+" : ""}${it.points}</span></li>`).join("");
+    const q = r._qual, qEl = $("anQual");
+    if (q) {
+      const p = (v) => v == null ? "—" : (v).toFixed(1) + "%";
+      qEl.classList.remove("hidden");
+      qEl.innerHTML = [
+        t("ROE (TTM)", p(q.roeTTM), q.roeTTM == null ? "" : q.roeTTM > 15 ? "pos" : q.roeTTM < 0 ? "neg" : ""),
+        t("Net Margin", p(q.netMargin), q.netMargin == null ? "" : q.netMargin > 10 ? "pos" : q.netMargin < 0 ? "neg" : ""),
+        t("Gross Margin", p(q.grossMargin)),
+        t("Debt/Equity", q.totalDebtToEquity == null ? "—" : q.totalDebtToEquity.toFixed(2), q.totalDebtToEquity > 200 ? "neg" : ""),
+        t("Current Ratio", q.currentRatio == null ? "—" : q.currentRatio.toFixed(2), q.currentRatio < 1 ? "neg" : "pos"),
+      ].join("");
+    } else qEl.classList.add("hidden");
+    // stash score for a held position / watchlist chip
+    stashScore(r);
+  }
+  function stashScore(r) {
+    const rec = { price: r.price, score: r.score, verdict: r.trendLabel, rsi14: r.rsi14, updatedAt: Date.now() };
+    state.watchlistScores[r._market + ":" + r._sym] = rec;
+    state.watchlistScores[r._sym] = rec; // legacy plain-key too
+    saveWatchlistScores();
+  }
+  function scoreFor(pf, sym) {
+    return state.watchlistScores[pf + ":" + sym] || state.watchlistScores[sym] || null;
   }
 
-  function renderNewsPanel(news) {
-    const panel = document.getElementById("newsPanel");
-    if (!news) { panel.classList.add("hidden"); return; }
-    panel.classList.remove("hidden");
-    const el = document.getElementById("newsList");
-    if (news.error) {
-      el.innerHTML = '<div class="empty">' + news.error + '</div>';
-      return;
-    }
-    if (news.length === 0) {
-      el.innerHTML = '<div class="empty">ไม่พบข่าวล่าสุดในรอบ 14 วัน</div>';
-      return;
-    }
-    el.innerHTML = news.map(function (n) {
-      const d = new Date(n.datetime * 1000);
-      const dateStr = d.toLocaleDateString("th-TH", { day: "numeric", month: "short" });
-      return '<li class="news-item"><a href="' + n.url + '" target="_blank" rel="noopener noreferrer">' + n.headline + '</a>' +
-        '<div class="news-meta">' + (n.source || "") + ' · ' + dateStr + '</div></li>';
+  /* =======================================================================
+     RENDER: HOLDINGS
+     ======================================================================= */
+  const PALETTE = ["#7c5cff", "#ff5ca8", "#38e0ff", "#10b981", "#f59e0b", "#b74bff", "#f43f5e", "#22d3ee", "#a3e635", "#fb923c"];
+  function donut(slices) {
+    const total = slices.reduce((s, x) => s + x.value, 0);
+    if (!(total > 0)) return `<div class="empty">ยังไม่มีมูลค่าให้แสดง</div>`;
+    const R = 52, C = 2 * Math.PI * R; let off = 0;
+    const arcs = slices.map(s => {
+      const len = (s.value / total) * C;
+      const el = `<circle r="${R}" cx="70" cy="70" fill="none" stroke="${s.color}" stroke-width="20" stroke-dasharray="${len.toFixed(2)} ${(C - len).toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}" transform="rotate(-90 70 70)"/>`;
+      off += len; return el;
     }).join("");
+    return `<svg viewBox="0 0 140 140" width="140" height="140" style="flex:none;">${arcs}<circle r="30" cx="70" cy="70" fill="var(--surface)"/></svg>`;
   }
 
-  function renderInsiderPanel(insider) {
-    const panel = document.getElementById("insiderPanel");
-    if (!insider) { panel.classList.add("hidden"); return; }
-    panel.classList.remove("hidden");
-    const el = document.getElementById("insiderList");
-    if (insider.error) { el.innerHTML = '<div class="empty">' + insider.error + '</div>'; return; }
-    if (insider.length === 0) { el.innerHTML = '<div class="empty">ไม่พบรายการซื้อขายของผู้บริหารล่าสุด</div>'; return; }
-    el.innerHTML = insider.map(function (t) {
-      const isBuy = t.code === "P";
-      const isSell = t.code === "S";
-      const tag = isBuy ? '<span class="badge up">ซื้อ</span>' : isSell ? '<span class="badge down">ขาย</span>' : '<span class="badge flat">' + (t.code || "อื่นๆ") + '</span>';
-      const sharesTxt = t.shares != null ? Number(t.shares).toLocaleString() + " หุ้น" : "—";
-      const priceTxt = t.price != null && t.price > 0 ? " · $" + Number(t.price).toFixed(2) + "/หุ้น" : "";
-      return '<li class="news-item"><span class="mono">' + (t.date || "—") + '</span> ' + tag + ' ' + (t.name || "ไม่ระบุชื่อ") +
-        '<div class="news-meta">' + sharesTxt + priceTxt + '</div></li>';
+  function renderHoldings() {
+    const lots = pfLots();
+    const { book, sells } = computeBook(lots);
+    const held = Object.values(book).filter(b => b.qty > 1e-9);
+    const cash = pfCash();
+
+    let mktValue = 0, costValue = 0, unreal = 0, missing = 0;
+    held.forEach(b => {
+      const lp = lastPrice(b.pf, b.sym);
+      const v = lp != null ? lp * b.qty : b.cost;
+      if (lp == null) missing++;
+      b._lp = lp; b._value = v; b._avg = b.cost / b.qty; b._unreal = lp != null ? (lp - b._avg) * b.qty : null;
+      mktValue += v; costValue += b.cost; if (b._unreal != null) unreal += b._unreal;
+    });
+    const realized = sells.reduce((s, x) => s + x.pnl, 0);
+    const totalValue = mktValue + cash;
+    const totalPL = unreal + realized;
+    const investBase = costValue + cash; // rough denominator for % return
+
+    $("holdSumTitle").firstChild.textContent = "มูลค่าพอร์ต" + (activePf === "all" ? " (รวม)" : " · " + PF_LABEL[activePf]) + " ";
+    const tl = (k, v, note, cls) => `<div class="tile"><div class="k">${k}</div><div class="v ${cls || ""}">${v}</div>${note ? `<div class="note">${note}</div>` : ""}</div>`;
+    $("holdTiles").innerHTML = [
+      tl("มูลค่ารวม", usd(totalValue), "ของถือ " + usd(mktValue) + " + เงินสด " + usd(cash)),
+      tl("กำไร/ขาดทุนรวม", (totalPL >= 0 ? "+" : "−") + usd(Math.abs(totalPL)), (investBase > 0 ? pctS(totalPL / investBase * 100) + " จากต้นทุน" : ""), totalPL >= 0 ? "pos" : "neg"),
+      tl("ยังไม่ขาย (unrealized)", (unreal >= 0 ? "+" : "−") + usd(Math.abs(unreal)), held.length + " รายการ", unreal >= 0 ? "pos" : "neg"),
+      tl("ขายแล้ว (realized)", (realized >= 0 ? "+" : "−") + usd(Math.abs(realized)), sells.length + " ครั้ง", realized >= 0 ? "pos" : "neg"),
+      tl("เงินสดคงเหลือ", usd(cash), activePf === "all" ? "หุ้น " + usd(state.cash.stock) + " · คริปโต " + usd(state.cash.crypto) : ""),
+    ].join("");
+    if (missing) $("priceMsg").textContent = "มี " + missing + " รายการยังไม่มีราคาปัจจุบัน — กด \"↻ รีเฟรชราคา\"";
+
+    // allocation
+    const slices = held.slice().sort((a, b) => b._value - a._value).map((b, i) => ({ label: b.sym, value: b._value, color: PALETTE[i % PALETTE.length] }));
+    if (cash > 0) slices.push({ label: "เงินสด", value: cash, color: "var(--border)" });
+    $("allocWrap").innerHTML = slices.length
+      ? donut(slices) + `<div class="alloc-legend">` + slices.map(s => {
+        const pc = totalValue > 0 ? (s.value / totalValue * 100).toFixed(1) : "0";
+        return `<div><span class="alloc-dot" style="background:${s.color}"></span><b>${esc(s.label)}</b> <span class="muted-note">${pc}% · ${usd(s.value)}</span></div>`;
+      }).join("") + `</div>`
+      : `<div class="empty">ยังไม่มีของในพอร์ต</div>`;
+
+    // holdings table
+    const tb = $("holdTbl").querySelector("tbody");
+    held.sort((a, b) => b._value - a._value);
+    $("holdEmpty").hidden = held.length > 0;
+    $("holdCount").textContent = held.length + " รายการ";
+    tb.innerHTML = held.map(b => {
+      const sc = scoreFor(b.pf, b.sym);
+      const scBadge = sc ? `<span class="badge ${sc.score >= 70 ? "up" : sc.score >= 45 ? "warn" : "down"}">${sc.score}</span>` : `<span class="muted-note">—</span>`;
+      const w = totalValue > 0 ? (b._value / totalValue * 100) : 0;
+      const up = b._unreal;
+      return `<tr class="clk" data-k="${b.pf}:${b.sym}">
+        <td><b>${esc(b.sym)}</b> <span class="chip">${b.pf === "crypto" ? "คริปโต" : "หุ้น"}</span></td>
+        <td class="num mono">${num(b.qty, b.qty < 1 ? 6 : 3)}</td>
+        <td class="num mono">${usd(b._avg, b._avg < 1 ? 5 : 2)}</td>
+        <td class="num mono">${b._lp == null ? "—" : usd(b._lp, b._lp < 1 ? 5 : 2)}</td>
+        <td class="num mono">${usd(b._value)}</td>
+        <td class="num mono ${up == null ? "" : up >= 0 ? "pos" : "neg"}">${up == null ? "—" : (up >= 0 ? "+" : "−") + usd(Math.abs(up)) + " (" + pctS(up / b.cost * 100) + ")"}</td>
+        <td class="num mono">${w.toFixed(1)}%</td>
+        <td>${scBadge}</td>
+        <td class="num"><button class="ghost mini pb-sell" data-pf="${b.pf}" data-sym="${esc(b.sym)}">ขาย</button></td>
+      </tr>`;
     }).join("");
+    tb.querySelectorAll("tr.clk").forEach(tr => tr.addEventListener("click", (e) => {
+      if (e.target.closest("button")) return;
+      const [pf, sym] = tr.dataset.k.split(":");
+      $("anSym").value = sym; $("anMarket").value = pf; switchTab("analyze"); $("anRun").click();
+    }));
+    tb.querySelectorAll(".pb-sell").forEach(btn => btn.addEventListener("click", () => openTradeModal({ pf: btn.dataset.pf, symbol: btn.dataset.sym, side: "sell" })));
+
+    // realized table
+    const stb = $("sellTbl").querySelector("tbody");
+    const sortedSells = sells.slice().reverse();
+    $("sellEmpty").hidden = sortedSells.length > 0;
+    $("realizedSum").textContent = sortedSells.length ? ((realized >= 0 ? "+" : "−") + usd(Math.abs(realized)) + " รวม") : "";
+    stb.innerHTML = sortedSells.map(s => `<tr>
+      <td class="mono">${esc(s.date || "—")}</td><td><b>${esc(s.sym)}</b></td>
+      <td class="num mono">${num(s.qty, s.qty < 1 ? 6 : 3)}</td><td class="num mono">${usd(s.price, s.price < 1 ? 5 : 2)}</td>
+      <td class="num mono ${s.pnl >= 0 ? "pos" : "neg"}">${(s.pnl >= 0 ? "+" : "−") + usd(Math.abs(s.pnl))}</td>
+      <td class="num"><button class="ghost mini danger del-lot" data-id="${s.id}">ลบ</button></td>
+    </tr>`).join("");
+    stb.querySelectorAll(".del-lot").forEach(btn => btn.addEventListener("click", () => delLot(btn.dataset.id)));
   }
 
-  function renderRecPanel(rec) {
-    const panel = document.getElementById("recPanel");
-    if (!rec) { panel.classList.add("hidden"); return; }
-    panel.classList.remove("hidden");
-    const el = document.getElementById("recContent");
-    if (rec.error) { el.innerHTML = '<div class="empty">' + rec.error + '</div>'; return; }
-    if (Array.isArray(rec) && rec.length === 0) { el.innerHTML = '<div class="empty">ไม่พบข้อมูล analyst recommendation</div>'; return; }
-    const total = rec.strongBuy + rec.buy + rec.hold + rec.sell + rec.strongSell;
-    if (total === 0) { el.innerHTML = '<div class="empty">ไม่พบข้อมูล analyst recommendation</div>'; return; }
-    const bars = [
-      { label: "Strong Buy", n: rec.strongBuy, color: "var(--bull)" },
-      { label: "Buy", n: rec.buy, color: "var(--bull)" },
-      { label: "Hold", n: rec.hold, color: "var(--neutral)" },
-      { label: "Sell", n: rec.sell, color: "var(--bear)" },
-      { label: "Strong Sell", n: rec.strongSell, color: "var(--bear)" },
-    ];
-    el.innerHTML = '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">ช่วงล่าสุด: ' + (rec.period || "—") + ' · นักวิเคราะห์ทั้งหมด ' + total + ' คน</div>' +
-      bars.map(function (b) {
-        const pctWidth = total > 0 ? (b.n / total) * 100 : 0;
-        return '<div style="margin-bottom:6px;"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px;"><span>' + b.label + '</span><span class="mono">' + b.n + '</span></div>' +
-          '<div style="height:6px;background:var(--panel-2);border-radius:3px;overflow:hidden;"><div style="height:100%;width:' + pctWidth + '%;background:' + b.color + ';"></div></div></div>';
-      }).join("");
+  function delLot(id) {
+    Swal.fire({ icon: "warning", title: "ลบรายการนี้?", text: "มูลค่าพอร์ต/กำไรจะคำนวณใหม่", showCancelButton: true, confirmButtonText: "ลบ", cancelButtonText: "ยกเลิก", confirmButtonColor: "#dc2626", reverseButtons: true })
+      .then(r => { if (!r.isConfirmed) return; state.lots = state.lots.filter(l => l.id !== id); saveLots(); renderAll(); });
   }
 
-  function pctUpFromRecentLow(closesDesc, lookback) {
-    lookback = lookback || 126; // ~6 months of trading days
-    const window = closesDesc.slice(0, Math.min(lookback, closesDesc.length));
-    const low = Math.min.apply(null, window);
-    return ((closesDesc[0] - low) / low) * 100;
+  /* =======================================================================
+     RENDER: WATCHLIST / THESIS / OLD LOG
+     ======================================================================= */
+  function wlEntries() {
+    // normalise: entries may be "SOL" or "crypto:SOL"
+    return state.watchlist.map(w => {
+      const m = /^crypto:(.+)$/.exec(w);
+      return m ? { pf: "crypto", sym: m[1].toUpperCase() } : { pf: "stock", sym: String(w).toUpperCase() };
+    }).filter(e => activePf === "all" || e.pf === activePf);
+  }
+  function renderWatchlist() {
+    const es = wlEntries();
+    const tb = $("wlTbl").querySelector("tbody");
+    $("wlEmpty").hidden = es.length > 0;
+    tb.innerHTML = es.map(e => {
+      const sc = scoreFor(e.pf, e.sym);
+      const price = sc ? sc.price : lastPrice(e.pf, e.sym);
+      const upd = sc && sc.updatedAt ? new Date(sc.updatedAt).toLocaleDateString("th-TH", { day: "2-digit", month: "short" }) : "—";
+      return `<tr>
+        <td><b>${esc(e.sym)}</b></td><td class="chip">${e.pf === "crypto" ? "คริปโต" : "หุ้น"}</td>
+        <td class="num mono">${price == null ? "—" : usd(price, price < 1 ? 5 : 2)}</td>
+        <td class="num">${sc ? `<span class="badge ${sc.score >= 70 ? "up" : sc.score >= 45 ? "warn" : "down"}">${sc.score}</span>` : "—"}</td>
+        <td>${sc ? esc(sc.verdict || "") : "<span class='muted-note'>ยังไม่วิเคราะห์</span>"}</td>
+        <td class="num muted-note">${upd}</td>
+        <td class="num">
+          <button class="ghost mini wl-an" data-pf="${e.pf}" data-sym="${esc(e.sym)}">วิเคราะห์</button>
+          <button class="ghost mini wl-buy" data-pf="${e.pf}" data-sym="${esc(e.sym)}">ซื้อ</button>
+          <button class="ghost mini danger wl-del" data-w="${esc(e.pf === "crypto" ? "crypto:" + e.sym : e.sym)}">✕</button>
+        </td>
+      </tr>`;
+    }).join("");
+    tb.querySelectorAll(".wl-an").forEach(b => b.addEventListener("click", () => { $("anSym").value = b.dataset.sym; $("anMarket").value = b.dataset.pf; switchTab("analyze"); $("anRun").click(); }));
+    tb.querySelectorAll(".wl-buy").forEach(b => b.addEventListener("click", () => openTradeModal({ pf: b.dataset.pf, symbol: b.dataset.sym, side: "buy" })));
+    tb.querySelectorAll(".wl-del").forEach(b => b.addEventListener("click", () => { state.watchlist = state.watchlist.filter(x => x !== b.dataset.w); saveWatchlist(); renderWatchlist(); }));
   }
 
-  function volumeSpikeRatio(volumesDesc, lookback) {
-    lookback = lookback || 50;
-    if (!volumesDesc || volumesDesc.length < 2) return null;
-    const todayVol = volumesDesc[0];
-    const priorWindow = volumesDesc.slice(1, Math.min(lookback + 1, volumesDesc.length));
-    if (priorWindow.length === 0) return null;
-    const avgVol = priorWindow.reduce((a, b) => a + b, 0) / priorWindow.length;
-    if (avgVol === 0) return null;
-    return todayVol / avgVol;
+  function thesisKeyList() {
+    const { book } = computeBook(pfLots());
+    return Object.values(book).filter(b => b.qty > 1e-9).map(b => ({ pf: b.pf, sym: b.sym, key: keyOf(b.pf, b.sym) }));
+  }
+  function reviewDue(th) {
+    if (!th || !th.every) return false;
+    if (!th.lastReview) return true;
+    const last = new Date(th.lastReview + "T00:00:00");
+    const days = (Date.now() - last) / 86400000;
+    return days >= (th.every === "quarter" ? 90 : 30);
+  }
+  function renderThesis() {
+    const list = thesisKeyList();
+    $("thesisEmpty").hidden = list.length > 0;
+    $("thesisList").innerHTML = list.map(it => {
+      const th = state.thesis[it.key] || {};
+      const due = reviewDue(th);
+      const reviews = (th.reviews || []).slice().reverse().slice(0, 3);
+      return `<div class="panel" style="margin:0 0 12px;background:var(--surface-alt);">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <b style="font-size:15px;">${esc(it.sym)}</b>
+          <span class="chip">${it.pf === "crypto" ? "คริปโต" : "หุ้น"}</span>
+          ${due ? `<span class="badge warn">⏰ ถึงรอบรีวิว</span>` : (th.lastReview ? `<span class="muted-note">รีวิวล่าสุด ${esc(th.lastReview)}</span>` : "")}
+          <button class="ghost mini th-edit" data-k="${it.key}" data-sym="${esc(it.sym)}" style="margin-left:auto;">${th.text ? "แก้ไข / รีวิว" : "+ เขียน Thesis"}</button>
+        </div>
+        ${th.text ? `<div style="font-size:13px;line-height:1.6;margin-top:8px;white-space:pre-wrap;">${esc(th.text)}</div>` : `<div class="muted-note" style="margin-top:8px;">ยังไม่ได้เขียนเหตุผลที่ถือ</div>`}
+        ${reviews.length ? `<div style="margin-top:8px;font-size:12.5px;">` + reviews.map(rv => `<div style="border-top:1px dashed var(--border);padding-top:5px;margin-top:5px;"><b class="muted-note">${esc(rv.date)}</b> — ${esc(rv.note)}</div>`).join("") + `</div>` : ""}
+      </div>`;
+    }).join("");
+    $("thesisList").querySelectorAll(".th-edit").forEach(b => b.addEventListener("click", () => openThesisModal(b.dataset.k, b.dataset.sym)));
   }
 
-  function sma(closesDesc, period) {
-    const s = closesDesc.slice(0, period);
-    if (!s.length) return null;
-    return s.reduce((a, b) => a + b, 0) / s.length;
+  function renderOldLog() {
+    const rows = (state.oldLog || []).slice().sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+    $("oldlogTabBtn").classList.toggle("hidden", rows.length === 0);
+    if (!rows.length) return;
+    $("oldLogTbl").querySelector("tbody").innerHTML = rows.map(e => `<tr>
+      <td class="mono">${esc(e.date || "—")}</td><td><b>${esc(e.symbol || e.sym || "—")}</b></td>
+      <td>${esc(e.decision || e.verdict || "—")}</td>
+      <td class="num mono">${e.score != null ? e.score : "—"}</td>
+      <td class="num mono">${e.price != null ? usd(e.price) : "—"}</td>
+      <td class="muted-note">${esc((e.note || e.notes || "").slice(0, 120))}</td>
+    </tr>`).join("");
   }
-  // EMA with full warm-up: seed with the SMA of the oldest `period` points, iterate forward over ALL data.
-  // Input is ascending (oldest first); returns the ascending EMA series.
-  function emaSeriesAsc(asc, period) {
-    if (asc.length < period) return [];
-    const k = 2 / (period + 1);
-    let prev = asc.slice(0, period).reduce((a, b) => a + b, 0) / period;
-    const out = [prev];
-    for (let i = period; i < asc.length; i++) { prev = (asc[i] - prev) * k + prev; out.push(prev); }
-    return out;
+
+  /* =======================================================================
+     MODALS
+     ======================================================================= */
+  let tmCtx = null;
+  function openTradeModal(ctx) {
+    tmCtx = ctx || {};
+    const isSell = tmCtx.side === "sell";
+    $("tradeModalTitle").textContent = isSell ? "ขาย" : "ซื้อ / เพิ่มรายการ";
+    $("tmSym").value = tmCtx.symbol || "";
+    $("tmPf").value = tmCtx.pf || (activePf === "crypto" ? "crypto" : "stock");
+    $("tmSide").value = isSell ? "sell" : "buy";
+    $("tmDate").value = todayKey();
+    $("tmQty").value = ""; $("tmPrice").value = ""; $("tmFee").value = ""; $("tmNote").value = "";
+    // prefill price with last known
+    const lp = lastPrice($("tmPf").value, tmCtx.symbol || "");
+    if (lp != null) $("tmPrice").value = lp;
+    updateTmHint();
+    $("tradeModal").classList.add("open");
   }
-  function ema(closesDesc, period) {
-    const s = emaSeriesAsc(closesDesc.slice().reverse(), period);
-    return s.length ? s[s.length - 1] : null;
+  function updateTmHint() {
+    const q = parseFloat($("tmQty").value), p = parseFloat($("tmPrice").value), f = parseFloat($("tmFee").value) || 0;
+    if (isFinite(q) && isFinite(p)) {
+      const gross = q * p;
+      const side = $("tmSide").value;
+      $("tmHint").textContent = (side === "sell" ? "รับเข้า ~ " + usd(gross - f) : "จ่ายออก ~ " + usd(gross + f)) + " (เงินสดพอร์ตจะปรับให้อัตโนมัติ)";
+    } else $("tmHint").textContent = "";
   }
-  // Wilder's RSI over all available history
-  function rsi(closesDesc, period) {
-    period = period || 14;
-    const asc = closesDesc.slice().reverse();
-    if (asc.length < period + 1) return null;
-    let gain = 0, loss = 0;
-    for (let i = 1; i <= period; i++) {
-      const d = asc[i] - asc[i - 1];
-      if (d >= 0) gain += d; else loss -= d;
+  ["tmQty", "tmPrice", "tmFee", "tmSide"].forEach(id => $(id).addEventListener("input", updateTmHint));
+  $("tmCancel").addEventListener("click", () => $("tradeModal").classList.remove("open"));
+  $("tmSave").addEventListener("click", () => {
+    const sym = $("tmSym").value.trim().toUpperCase();
+    const pf = $("tmPf").value, side = $("tmSide").value;
+    const qty = parseFloat($("tmQty").value), price = parseFloat($("tmPrice").value), fee = parseFloat($("tmFee").value) || 0;
+    if (!sym || !isFinite(qty) || qty <= 0 || !isFinite(price) || price < 0) { Swal.fire({ icon: "warning", title: "กรอกสัญลักษณ์ / จำนวน / ราคาให้ครบ" }); return; }
+    if (side === "sell") {
+      const { book } = computeBook(state.lots.filter(l => l.pf === pf && String(l.symbol).toUpperCase() === sym));
+      const cur = Object.values(book)[0];
+      if (!cur || cur.qty + 1e-9 < qty) { Swal.fire({ icon: "warning", title: "ขายเกินจำนวนที่ถือ", text: "ถืออยู่ " + (cur ? cur.qty : 0) }); return; }
     }
-    let avgGain = gain / period, avgLoss = loss / period;
-    for (let i = period + 1; i < asc.length; i++) {
-      const d = asc[i] - asc[i - 1];
-      avgGain = (avgGain * (period - 1) + (d > 0 ? d : 0)) / period;
-      avgLoss = (avgLoss * (period - 1) + (d < 0 ? -d : 0)) / period;
-    }
-    if (avgLoss === 0) return 100;
-    return 100 - 100 / (1 + avgGain / avgLoss);
-  }
-  // MACD (default 12/26/9) — returns { macd, signal, hist } or null
-  function macd(closesDesc, fast, slow, signal) {
-    fast = fast || 12; slow = slow || 26; signal = signal || 9;
-    const asc = closesDesc.slice().reverse();
-    if (asc.length < slow + signal) return null;
-    const ef = emaSeriesAsc(asc, fast);
-    const es = emaSeriesAsc(asc, slow);
-    const off = ef.length - es.length;
-    const macdLine = es.map((v, i) => ef[i + off] - v);
-    const sig = emaSeriesAsc(macdLine, signal);
-    if (!sig.length) return null;
-    const m = macdLine[macdLine.length - 1], s = sig[sig.length - 1];
-    return { macd: m, signal: s, hist: m - s };
-  }
-  // Wilder's ATR(14) — needs highs/lows/closes (descending)
-  function atr(highsDesc, lowsDesc, closesDesc, period) {
-    period = period || 14;
-    if (!highsDesc || !lowsDesc || !highsDesc.length) return null;
-    const h = highsDesc.slice().reverse(), l = lowsDesc.slice().reverse(), c = closesDesc.slice().reverse();
-    if (h.length < period + 1) return null;
-    const tr = [];
-    for (let i = 1; i < h.length; i++) {
-      tr.push(Math.max(h[i] - l[i], Math.abs(h[i] - c[i - 1]), Math.abs(l[i] - c[i - 1])));
-    }
-    let a = tr.slice(0, period).reduce((x, y) => x + y, 0) / period;
-    for (let i = period; i < tr.length; i++) a = (a * (period - 1) + tr[i]) / period;
-    return a;
-  }
-  // Position within the ~52-week (252 bar) range, 0-100%
-  function range52w(closesDesc, highsDesc, lowsDesc) {
-    const n = Math.min(252, closesDesc.length);
-    const hs = (highsDesc && highsDesc.length ? highsDesc : closesDesc).slice(0, n);
-    const ls = (lowsDesc && lowsDesc.length ? lowsDesc : closesDesc).slice(0, n);
-    const hi = Math.max.apply(null, hs), lo = Math.min.apply(null, ls);
-    const pos = hi > lo ? ((closesDesc[0] - lo) / (hi - lo)) * 100 : 50;
-    return { high: hi, low: lo, pos: Math.max(0, Math.min(100, pos)) };
-  }
-  function annualizedVolatility(closesDesc, lookback) {
-    lookback = lookback || 30;
-    const recent = closesDesc.slice(0, lookback + 1);
-    const returns = [];
-    for (let i = 0; i < recent.length - 1; i++) returns.push((recent[i] - recent[i + 1]) / recent[i + 1]);
-    if (returns.length === 0) return 0;
-    const mean = returns.reduce((a, b) => a + b, 0) / returns.length;
-    const variance = returns.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / returns.length;
-    return Math.sqrt(variance) * Math.sqrt(252) * 100;
-  }
-  function drawdownFrom52wHigh(closesDesc) {
-    const w = closesDesc.slice(0, Math.min(252, closesDesc.length));
-    const high = Math.max.apply(null, w);
-    return ((high - closesDesc[0]) / high) * 100;
-  }
-  function periodReturn(closesDesc, days) {
-    const idx = Math.min(days, closesDesc.length - 1);
-    return ((closesDesc[0] - closesDesc[idx]) / closesDesc[idx]) * 100;
-  }
-
-  function analyzeStock(closesDesc, volumesDesc, spyClosesDesc, overview, highsDesc, lowsDesc) {
-    const price = closesDesc[0];
-    const upFromLow = pctUpFromRecentLow(closesDesc);
-    const volSpike = volumeSpikeRatio(volumesDesc);
-    const sma20 = sma(closesDesc, 20), sma50 = sma(closesDesc, 50);
-    const ema12 = ema(closesDesc, 12), ema26 = ema(closesDesc, 26);
-    const rsi14 = rsi(closesDesc, 14);
-    const macdV = macd(closesDesc);
-    const atr14 = atr(highsDesc, lowsDesc, closesDesc, 14);
-    const r52 = range52w(closesDesc, highsDesc, lowsDesc);
-    const vol = annualizedVolatility(closesDesc);
-    const drawdown = drawdownFrom52wHigh(closesDesc);
-    const stockReturn3m = periodReturn(closesDesc, 63);
-    const spyReturn3m = spyClosesDesc ? periodReturn(spyClosesDesc, 63) : null;
-    const relStrength = spyReturn3m !== null ? stockReturn3m - spyReturn3m : null;
-    const pe = overview && overview.PERatio && overview.PERatio !== "None" ? parseFloat(overview.PERatio) : null;
-
-    let trendScore = 0, trendLabel = "เท่าตัวกลาง";
-    if (price > sma20 && sma20 > sma50) { trendScore = 1; trendLabel = "ขาขึ้นชัดเจน"; }
-    else if (price < sma20 && sma20 < sma50) { trendScore = -1; trendLabel = "ขาลงชัดเจน"; }
-
-    let momentumFlag = "ปกติ";
-    if (rsi14 !== null) {
-      if (rsi14 > 70) momentumFlag = "ซื้อมากเกินไป (overbought)";
-      else if (rsi14 < 30) momentumFlag = "ขายมากเกินไป (oversold)";
-    }
-
-    let rsScore = 0;
-    if (relStrength !== null) rsScore = relStrength > 0 ? 1 : -1;
-
-    let riskLevel = "ปานกลาง";
-    if (vol > 45 || drawdown > 25) riskLevel = "สูง";
-    else if (vol < 20 && drawdown < 10) riskLevel = "ต่ำ";
-
-    let valuationFlag = "ไม่มีข้อมูล";
-    if (pe !== null) {
-      if (pe < 0) valuationFlag = "ขาดทุน (P/E ติดลบ)";
-      else if (pe > 40) valuationFlag = "แพง (คาดหวังสูง)";
-      else if (pe > 15) valuationFlag = "ปานกลาง";
-      else valuationFlag = "ถูก (เทียบกำไร)";
-    }
-
-    const compositeScore = trendScore + rsScore;
-    let verdict = "เท่าตัวกลาง";
-    if (compositeScore >= 2) verdict = "ขาขึ้น";
-    else if (compositeScore <= -2) verdict = "ขาลง";
-
-    const scoreResult = computeScore({
-      trendLabel, relStrength, rsi14, volSpike, vol, upFromLow, extendedFromHigh: drawdown, pe,
-    });
-
-    return {
-      price, sma20, sma50, ema12, ema26, rsi14, vol, drawdown, relStrength, pe,
-      macd: macdV, atr14, atrPct: (atr14 != null && price) ? (atr14 / price) * 100 : null, range52w: r52,
-      trendLabel, momentumFlag, riskLevel, valuationFlag, verdict,
-      extendedFromHigh: drawdown, name: (overview && overview.Name) || null,
-      upFromLow, volSpike, score: scoreResult.score, scoreBreakdown: scoreResult.breakdown,
-    };
-  }
-
-  // ---------- composite score (0-100) ----------
-  function computeScore(m) {
-    const items = [];
-
-    if (m.trendLabel === "ขาขึ้นชัดเจน") items.push({ label: "เทรนด์ขาขึ้น (ราคา>SMA20>SMA50)", points: 2 });
-    else if (m.trendLabel === "ขาลงชัดเจน") items.push({ label: "เทรนด์ขาลง (ราคา<SMA20<SMA50)", points: -2 });
-    else items.push({ label: "เทรนด์ไม่ชัดเจน", points: 0 });
-
-    if (m.relStrength === null) {
-      items.push({ label: "ไม่มีข้อมูล Relative Strength", points: 0 });
-    } else if (m.relStrength > 10) items.push({ label: "แข็งแกร่งกว่าตลาดชัดเจน (RS > +10%)", points: 2 });
-    else if (m.relStrength > 1) items.push({ label: "แข็งแกร่งกว่าตลาดเล็กน้อย (RS +1% ถึง +10%)", points: 1 });
-    else if (m.relStrength >= -1) items.push({ label: "ใกล้เคียงตลาด (RS อยู่ในช่วง ±1%)", points: 0 });
-    else if (m.relStrength >= -10) items.push({ label: "อ่อนกว่าตลาดเล็กน้อย (RS -1% ถึง -10%)", points: -1 });
-    else items.push({ label: "อ่อนกว่าตลาดชัดเจน (RS < -10%)", points: -2 });
-
-    if (m.rsi14 === null) items.push({ label: "ไม่มีข้อมูล RSI", points: 0 });
-    else if (m.rsi14 >= 70) items.push({ label: "RSI overbought (≥70) — เสี่ยงพักตัว", points: -1 });
-    else if (m.rsi14 >= 50) items.push({ label: "โมเมนตัมเอนเอียงบวก (50-70)", points: 1 });
-    else if (m.rsi14 > 30) items.push({ label: "โมเมนตัมเอนเอียงอ่อน (30-50)", points: 0 });
-    else items.push({ label: "RSI oversold (≤30) — โมเมนตัมอ่อนแรง", points: -1 });
-
-    if (m.volSpike === null) items.push({ label: "ไม่มีข้อมูล Volume", points: 0 });
-    else if (m.volSpike > 1.4) items.push({ label: "Volume พุ่ง (>1.4x เฉลี่ย) — มีแรงยืนยัน", points: 1 });
-    else if (m.volSpike < 0.7) items.push({ label: "Volume ต่ำกว่าเฉลี่ยมาก (<0.7x) — ขาดแรงยืนยัน", points: -1 });
-    else items.push({ label: "Volume อยู่ในระดับปกติ", points: 0 });
-
-    if (m.vol < 20) items.push({ label: "ความผันผวนต่ำ (<20%)", points: 1 });
-    else if (m.vol > 45) items.push({ label: "ความผันผวนสูง (>45%)", points: -1 });
-    else items.push({ label: "ความผันผวนระดับกลาง", points: 0 });
-
-    if (m.upFromLow > 80) items.push({ label: "วิ่งขึ้นมาเยอะแล้ว (>80% จากจุดต่ำสุด) — เสี่ยงพลาดเทรนด์", points: -1 });
-    else if (m.extendedFromHigh < 5 && m.upFromLow < 50) items.push({ label: "ใกล้จุดสูงสุดแต่ยังไม่ยืนมาก — อาจเป็นช่วงต้นเทรนด์", points: 1 });
-    else items.push({ label: "ระยะยืนตัวอยู่ในระดับปกติ", points: 0 });
-
-    if (m.pe === null) items.push({ label: "ไม่มีข้อมูล P/E", points: 0 });
-    else if (m.pe > 0 && m.pe < 15) items.push({ label: "P/E ต่ำ (<15) — มูลค่าถูกเทียบกำไร", points: 1 });
-    else if (m.pe > 40 || m.pe < 0) items.push({ label: "P/E สูงมากหรือติดลบ — เสี่ยงด้าน valuation", points: -1 });
-    else items.push({ label: "P/E อยู่ในระดับกลาง", points: 0 });
-
-    const raw = items.reduce((sum, it) => sum + it.points, 0); // -9..+9
-    const score = Math.round(((raw + 9) / 18) * 100);
-    return { score: Math.max(0, Math.min(100, score)), breakdown: items };
-  }
-
-  function scoreLabel(score) {
-    if (score >= 70) return { text: "เอนเอียงบวก", color: "var(--bull)" };
-    if (score >= 45) return { text: "ปานกลาง", color: "var(--neutral)" };
-    return { text: "เอนเอียงลบ", color: "var(--bear)" };
-  }
-
-  function computeEntryGuidance(r) {
-    const price = r.price;
-    const overextended = (r.rsi14 !== null && r.rsi14 >= 70) || r.upFromLow > 80;
-
-    if (r.trendLabel === "ขาลงชัดเจน") {
-      return {
-        status: "avoid",
-        title: "ยังไม่ควรเข้า",
-        note: "เทรนด์เป็นขาลงชัดเจน (ราคา < SMA20 < SMA50) รอให้ราคากลับมายืนเหนือ SMA20 และ SMA20 ตัดขึ้นเหนือ SMA50 อีกครั้งก่อน จึงค่อยพิจารณาเข้าตามทิศทางที่แข็งแรงกว่า",
-        zoneLow: null, zoneHigh: null, stopRef: null,
-      };
-    }
-
-    if (r.trendLabel === "ขาขึ้นชัดเจน" && overextended) {
-      const zoneLow = r.sma20 * 0.97;
-      const zoneHigh = r.sma20 * 1.02;
-      return {
-        status: "wait",
-        title: "เทรนด์ดี แต่ราคายืนตัวมาก — รอย่อก่อน",
-        note: (r.rsi14 !== null && r.rsi14 >= 70 ? "RSI " + r.rsi14.toFixed(1) + " เข้าเขต overbought แล้ว " : "") +
-          (r.upFromLow > 80 ? "และราคาขึ้นมาแล้ว " + r.upFromLow.toFixed(0) + "% จากจุดต่ำสุดในกรอบข้อมูล " : "") +
-          "เสี่ยงไล่ราคาสูงเกินไป แนะนำรอราคาย่อลงมาใกล้ SMA20 ก่อนพิจารณาเข้า",
-        zoneLow, zoneHigh, stopRef: (r.atr14 != null ? r.price - 2 * r.atr14 : r.sma50),
-      };
-    }
-
-    if (r.trendLabel === "ขาขึ้นชัดเจน") {
-      const zoneLow = Math.min(r.sma20, price);
-      const zoneHigh = price * 1.02;
-      return {
-        status: "now",
-        title: "อยู่ในโซนที่พิจารณาเข้าได้",
-        note: "เทรนด์เป็นขาขึ้นและราคายังไม่ยืนตัวมากเกินไป ราคาปัจจุบันอยู่ใกล้เหนือ SMA20 ซึ่งมักถูกใช้เป็นแนวรับของเทรนด์ ถือเป็นจุดที่ความเสี่ยงเทียบผลตอบแทนมักคุ้มค่ากว่าไล่ราคาสูง",
-        zoneLow, zoneHigh, stopRef: (r.atr14 != null ? r.price - 2 * r.atr14 : r.sma50),
-      };
-    }
-
-    return {
-      status: "neutral",
-      title: "สัญญาณยังไม่ชัดเจน — รอดูก่อน",
-      note: "เทรนด์ SMA20/SMA50 ยังไม่ตัดเรียงชัดเจนทั้งขาขึ้นหรือขาลงชัดเจน แนะนำรอราคาสัก 1-2 วันถัดไปว่าจะให้สัญญาณเอนเอียงทางใดก่อนกำหนดราคาเข้า",
-      zoneLow: r.sma50, zoneHigh: r.sma20, stopRef: null,
-    };
-  }
-
-  // ---------- persistence ----------
-  function saveWatchlist() { localStorage.setItem("sd_watchlist", JSON.stringify(state.watchlist)); pushCloudSync(); }
-  function saveLog() { localStorage.setItem("sd_log", JSON.stringify(state.log)); pushCloudSync(); }
-
-  // ---------- cross-app backup (Elliott Wave + Trade Journal + Stock/Decide) ----------
-  // All three pages share one origin, so localStorage/IndexedDB are visible from any
-  // of them — export/import cover the whole suite from a single button, regardless of
-  // which page you're on, without a build step or shared JS file.
-  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
-
-  function triggerDownload(blob, filename) {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = filename;
-    document.body.appendChild(a); a.click(); a.remove();
-    URL.revokeObjectURL(url);
-  }
-
-  function ewOpenDB() {
-    return new Promise(function (resolve, reject) {
-      const req = indexedDB.open("ewReviewDB", 1);
-      req.onupgradeneeded = function () { req.result.createObjectStore("chapters"); };
-      req.onsuccess = function () { resolve(req.result); };
-      req.onerror = function () { reject(req.error); };
-    });
-  }
-  function ewGetChapters() {
-    return ewOpenDB().then(function (db) {
-      return new Promise(function (resolve, reject) {
-        const tx = db.transaction("chapters", "readonly");
-        const req = tx.objectStore("chapters").get("data");
-        req.onsuccess = function () { resolve(req.result || []); };
-        req.onerror = function () { reject(req.error); };
-      });
-    });
-  }
-  function ewSetChapters(data) {
-    return ewOpenDB().then(function (db) {
-      return new Promise(function (resolve, reject) {
-        const tx = db.transaction("chapters", "readwrite");
-        tx.objectStore("chapters").put(data, "data");
-        tx.oncomplete = function () { resolve(); };
-        tx.onerror = function () { reject(tx.error); };
-      });
-    });
-  }
-  function blobToBase64(blob) {
-    return new Promise(function (resolve, reject) {
-      const reader = new FileReader();
-      reader.onload = function () { resolve(reader.result); };
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
-  }
-  function base64ToBlob(dataUrl) {
-    return fetch(dataUrl).then(function (res) { return res.blob(); });
-  }
-
-  async function collectAllData() {
-    const ewChapters = await ewGetChapters().catch(function () { return []; });
-    const exportChapters = [];
-    for (const ch of ewChapters) {
-      const sections = [];
-      for (const sec of (ch.sections || [])) {
-        const copy = Object.assign({}, sec);
-        if (sec.pdf instanceof Blob) copy.pdf = await blobToBase64(sec.pdf);
-        sections.push(copy);
-      }
-      exportChapters.push({ id: ch.id, title: ch.title, desc: ch.desc, sections: sections });
-    }
-    return {
-      version: 1,
-      app: "ee-suite-backup",
-      exportedAt: new Date().toISOString(),
-      elliottWave: { chapters: exportChapters },
-      tradeJournal: {
-        trades: JSON.parse(localStorage.getItem("tj_trades_v1") || "[]"),
-        capital: Number(localStorage.getItem("tj_capital") || 0),
-      },
-      stockDecide: {
-        watchlist: state.watchlist,
-        log: state.log,
-        watchlistScores: state.watchlistScores,
-        apiKey: state.apiKey,
-        finnhubKey: state.finnhubKey,
-      },
-    };
-  }
-
-  async function restoreAllData(parsed) {
-    const counts = { chapters: 0, trades: 0, watchlist: 0, log: 0 };
-
-    // Stock/Decide (own data)
-    if (parsed.stockDecide) {
-      const sd = parsed.stockDecide;
-      if (Array.isArray(sd.watchlist) && sd.watchlist.length) {
-        state.watchlist = Array.from(new Set(state.watchlist.concat(sd.watchlist)));
-        saveWatchlist();
-        counts.watchlist = sd.watchlist.length;
-      }
-      if (Array.isArray(sd.log) && sd.log.length) {
-        const existingLogIds = new Set(state.log.map(function (e) { return e.id; }).filter(Boolean));
-        const importedLog = sd.log.filter(function (e) { return !(e.id && existingLogIds.has(e.id)); });
-        state.log = state.log.concat(importedLog);
-        saveLog();
-        counts.log = importedLog.length;
-      }
-      if (sd.watchlistScores && typeof sd.watchlistScores === "object") {
-        state.watchlistScores = Object.assign({}, state.watchlistScores, sd.watchlistScores);
-        saveWatchlistScores();
-      }
-      if (sd.apiKey) { state.apiKey = sd.apiKey; localStorage.setItem("sd_api_key", sd.apiKey); }
-      if (sd.finnhubKey) { state.finnhubKey = sd.finnhubKey; localStorage.setItem("sd_finnhub_key", sd.finnhubKey); }
-    }
-
-    // Trade Journal (remote — merge straight into its localStorage keys)
-    if (parsed.tradeJournal) {
-      const tj = parsed.tradeJournal;
-      if (Array.isArray(tj.trades) && tj.trades.length) {
-        const existing = JSON.parse(localStorage.getItem("tj_trades_v1") || "[]");
-        const existingIds = new Set(existing.map(function (t) { return t.id; }));
-        const imported = tj.trades
-          .filter(function (t) { return !(t.id && existingIds.has(t.id)); })
-          .map(function (t) { return Object.assign({}, t, { id: t.id || uid() }); });
-        localStorage.setItem("tj_trades_v1", JSON.stringify(existing.concat(imported)));
-        counts.trades = imported.length;
-      }
-      if (tj.capital != null && !isNaN(Number(tj.capital))) {
-        localStorage.setItem("tj_capital", String(Number(tj.capital)));
-      }
-    }
-
-    // Elliott Wave (remote — merge straight into its IndexedDB)
-    const ewChapters = (parsed.elliottWave && parsed.elliottWave.chapters) || [];
-    if (Array.isArray(ewChapters) && ewChapters.length) {
-      const existing = await ewGetChapters().catch(function () { return []; });
-      const existingChapterIds = new Set(existing.map(function (c) { return c.id; }));
-      const importedChapters = [];
-      for (const ch of ewChapters) {
-        if (ch.id && existingChapterIds.has(ch.id)) continue; // already imported before — skip duplicate
-        const sections = [];
-        for (const sec of (ch.sections || [])) {
-          const newSec = Object.assign({}, sec, { id: sec.id || uid() });
-          if (typeof newSec.pdf === "string" && newSec.pdf.indexOf("data:") === 0) {
-            newSec.pdf = await base64ToBlob(newSec.pdf);
-          }
-          sections.push(newSec);
-        }
-        importedChapters.push({ id: ch.id || uid(), title: ch.title || "บทที่นำเข้า", desc: ch.desc || "", sections: sections });
-      }
-      await ewSetChapters(existing.concat(importedChapters));
-      counts.chapters = importedChapters.length;
-    }
-
-    return counts;
-  }
-
-  document.getElementById("exportBtn").addEventListener("click", async function () {
-    try {
-      const payload = await collectAllData();
-      const blob = new Blob([JSON.stringify(payload)], { type: "application/json" });
-      const stamp = new Date().toISOString().slice(0, 10);
-      triggerDownload(blob, "ee-suite-backup-" + stamp + ".json");
-    } catch (err) {
-      console.error(err);
-      Swal.fire({ icon: "error", title: "ส่งออกข้อมูลไม่สำเร็จ" });
-    }
+    state.lots.push({ id: uid(), pf, symbol: sym, side, qty, price, fee, date: $("tmDate").value || todayKey(), note: $("tmNote").value.trim(), createdAt: Date.now() });
+    // adjust cash
+    const delta = qty * price + (side === "sell" ? -fee : fee);
+    state.cash[pf] = (state.cash[pf] || 0) + (side === "sell" ? delta : -delta);
+    saveLots(); saveCash();
+    $("tradeModal").classList.remove("open");
+    renderAll();
+    // fetch a fresh price for it
+    (pf === "crypto" ? fetchCryptoPrices([sym]) : fetchStockPrices([sym]).catch(() => ({}))).then(m => {
+      if (m && m[sym] != null) { state.prices[keyOf(pf, sym)] = { price: m[sym], at: Date.now() }; savePrices(); renderHoldings(); }
+    }).catch(() => {});
   });
 
-  const importInput = document.getElementById("importInput");
-  document.getElementById("importBtn").addEventListener("click", function () { importInput.click(); });
-  importInput.addEventListener("change", async function () {
-    const file = importInput.files[0];
-    importInput.value = "";
-    if (!file) return;
-    try {
-      const parsed = JSON.parse(await file.text());
-      if (!parsed || typeof parsed !== "object") { Swal.fire({ icon: "error", title: "รูปแบบไฟล์ไม่ถูกต้อง" }); return; }
-      const counts = await restoreAllData(parsed);
-      renderWatchlist();
-      renderLog();
-      Swal.fire({
-        icon: "success",
-        title: "นำเข้าข้อมูลเรียบร้อย",
-        html: "Watchlist: " + counts.watchlist + "<br>บันทึกการตัดสินใจ: " + counts.log + "<br>เทรด: " + counts.trades + "<br>บทความ Elliott Wave: " + counts.chapters,
-      });
-    } catch (err) {
-      console.error(err);
-      Swal.fire({ icon: "error", title: "นำเข้าข้อมูลไม่สำเร็จ", text: "ไฟล์อาจเสียหายหรือไม่ใช่ไฟล์สำรองที่ถูกต้อง" });
-    }
+  $("cashBtn").addEventListener("click", () => {
+    $("csPf").value = activePf === "crypto" ? "crypto" : "stock";
+    $("csMode").value = "set"; $("csAmt").value = state.cash[$("csPf").value] || 0;
+    updateCsHint(); $("cashModal").classList.add("open");
+  });
+  function updateCsHint() {
+    const pf = $("csPf").value, mode = $("csMode").value, amt = parseFloat($("csAmt").value) || 0;
+    const cur = state.cash[pf] || 0;
+    let after = cur;
+    if (mode === "set") after = amt; else if (mode === "add") after = cur + amt; else after = cur - amt;
+    $("csHint").textContent = "เงินสด " + PF_LABEL[pf] + " ปัจจุบัน " + usd(cur) + " → " + usd(after);
+  }
+  ["csPf", "csMode", "csAmt"].forEach(id => $(id).addEventListener("input", updateCsHint));
+  $("csCancel").addEventListener("click", () => $("cashModal").classList.remove("open"));
+  $("csSave").addEventListener("click", () => {
+    const pf = $("csPf").value, mode = $("csMode").value, amt = parseFloat($("csAmt").value);
+    if (!isFinite(amt)) { Swal.fire({ icon: "warning", title: "ใส่จำนวนเงิน" }); return; }
+    const cur = state.cash[pf] || 0;
+    state.cash[pf] = mode === "set" ? amt : mode === "add" ? cur + amt : cur - amt;
+    saveCash(); $("cashModal").classList.remove("open"); renderAll();
   });
 
-  /* ---------- cloud sync (Google sign-in, cross-device realtime) ----------
-     Off by default — the app works fully offline/local-only until the user
-     signs in. Every local save also pushes to Firestore when signed in, and
-     a realtime listener pulls in changes made from any other signed-in
-     device. `syncApplyingRemote` breaks the write→snapshot→write feedback
-     loop: while applying a remote update we skip pushing it right back.
-     API keys are intentionally NOT synced — each device keeps its own. */
-  let syncApplyingRemote = false;
-  let syncUnsub = null;
+  let thCtx = null;
+  function openThesisModal(key, sym) {
+    thCtx = key;
+    const th = state.thesis[key] || {};
+    $("thModalTitle").textContent = "Thesis · " + sym;
+    $("thText").value = th.text || "";
+    $("thEvery").value = th.every || "";
+    $("thReview").value = "";
+    const reviews = (th.reviews || []).slice().reverse();
+    $("thHistory").innerHTML = reviews.length ? `<label class="lbl">ประวัติรีวิว</label>` + reviews.map(r => `<div class="muted-note" style="font-size:12px;border-top:1px dashed var(--border);padding:4px 0;"><b>${esc(r.date)}</b> — ${esc(r.note)}</div>`).join("") : "";
+    $("thesisModal").classList.add("open");
+  }
+  $("thCancel").addEventListener("click", () => $("thesisModal").classList.remove("open"));
+  $("thSave").addEventListener("click", () => {
+    const th = state.thesis[thCtx] || (state.thesis[thCtx] = { reviews: [] });
+    th.text = $("thText").value.trim();
+    th.every = $("thEvery").value;
+    const rv = $("thReview").value.trim();
+    if (rv) { th.reviews = th.reviews || []; th.reviews.push({ date: todayKey(), note: rv }); th.lastReview = todayKey(); }
+    saveThesis(); $("thesisModal").classList.remove("open"); renderThesis();
+  });
 
+  /* =======================================================================
+     WIRING
+     ======================================================================= */
+  document.querySelectorAll(".tab-btn").forEach(b => b.addEventListener("click", () => switchTab(b.dataset.tab)));
+  function switchTab(tab) {
+    currentTab = tab;
+    document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
+    ["holdings", "analyze", "watchlist", "thesis", "oldlog"].forEach(t => $("tab-" + t).classList.toggle("hidden", t !== tab));
+    if (tab === "thesis") renderThesis();
+    if (tab === "watchlist") renderWatchlist();
+    if (tab === "oldlog") renderOldLog();
+  }
+  document.querySelectorAll("#pfSwitch button").forEach(btn => btn.addEventListener("click", () => {
+    activePf = btn.dataset.pf;
+    try { localStorage.setItem(PF_KEY, activePf); } catch (e) {}
+    document.querySelectorAll("#pfSwitch button").forEach(b => b.classList.toggle("active", b.dataset.pf === activePf));
+    renderAll();
+  }));
+
+  $("buyBtn").addEventListener("click", () => openTradeModal({ side: "buy" }));
+  $("refreshPricesBtn").addEventListener("click", refreshPrices);
+  $("anRun").addEventListener("click", () => runAnalyze($("anSym").value, $("anMarket").value));
+  $("anSym").addEventListener("keydown", (e) => { if (e.key === "Enter") $("anRun").click(); });
+  $("anAddWatch").addEventListener("click", () => {
+    if (!state.result) return;
+    const w = state.result._market === "crypto" ? "crypto:" + state.result._sym : state.result._sym;
+    if (!state.watchlist.includes(w)) { state.watchlist.push(w); saveWatchlist(); }
+    Swal.fire({ icon: "success", title: "ใส่ Watchlist แล้ว", timer: 1200, showConfirmButton: false });
+  });
+  $("anBuyThis").addEventListener("click", () => { if (state.result) openTradeModal({ pf: state.result._market, symbol: state.result._sym, side: "buy" }); });
+  $("saveKeysBtn").addEventListener("click", () => {
+    state.apiKey = $("apiKeyInput").value.trim(); state.finnhubKey = $("finnhubKeyInput").value.trim();
+    try { localStorage.setItem("sd_api_key", state.apiKey); localStorage.setItem("sd_finnhub_key", state.finnhubKey); } catch (e) {}
+    renderQuota(); Swal.fire({ icon: "success", title: "บันทึกคีย์แล้ว", timer: 1000, showConfirmButton: false });
+  });
+  $("wlAddBtn").addEventListener("click", () => {
+    const s = $("wlAddSym").value.trim().toUpperCase(); if (!s) return;
+    const w = $("wlAddMarket").value === "crypto" ? "crypto:" + s : s;
+    if (!state.watchlist.includes(w)) state.watchlist.push(w);
+    $("wlAddSym").value = ""; saveWatchlist(); renderWatchlist();
+  });
+  $("wlRefresh").addEventListener("click", async () => {
+    const es = wlEntries();
+    if (!es.length) return;
+    $("wlRefresh").disabled = true; $("wlRefresh").textContent = "กำลังสแกน…";
+    for (const e of es) { await runAnalyze(e.sym, e.pf, { quiet: true }); }
+    $("wlRefresh").disabled = false; $("wlRefresh").textContent = "↻ รีเฟรชคะแนน";
+    renderWatchlist();
+  });
+
+  function renderAll() {
+    renderHoldings();
+    if (currentTab === "watchlist") renderWatchlist();
+    if (currentTab === "thesis") renderThesis();
+    renderOldLog();
+  }
+
+  /* =======================================================================
+     CLOUD SYNC
+     ======================================================================= */
+  let syncApplyingRemote = false, syncUnsub = null;
   function pushCloudSync() {
     if (syncApplyingRemote) return;
     if (!window.FirebaseSync || !FirebaseSync.getUser()) return;
-    const db = FirebaseSync.getDb();
-    const uid = FirebaseSync.getUser().uid;
+    const db = FirebaseSync.getDb(), uid = FirebaseSync.getUser().uid;
     db.collection("users").doc(uid).collection("sync").doc("stockDecide")
-      .set({ watchlist: state.watchlist, log: state.log, watchlistScores: state.watchlistScores, updatedAt: Date.now() })
-      .catch(function (err) { console.error("sync push failed", err); });
+      .set({ lots: state.lots, cash: state.cash, thesis: state.thesis, watchlist: state.watchlist, watchlistScores: state.watchlistScores, log: state.oldLog, updatedAt: Date.now() })
+      .catch(err => console.error("sync push failed", err));
   }
-
-  function mergeById(localList, remoteList) {
-    const map = {};
-    (remoteList || []).forEach(function (item) { if (item && item.id) map[item.id] = item; });
-    (localList || []).forEach(function (item) { if (item && item.id) map[item.id] = item; }); // local wins on collision
-    return Object.values(map);
+  function mergeById(local, remote) {
+    const m = {}; (remote || []).forEach(x => { if (x && x.id) m[x.id] = x; }); (local || []).forEach(x => { if (x && x.id) m[x.id] = x; });
+    return Object.values(m);
   }
-
+  function adoptRemote(d) {
+    if (Array.isArray(d.lots)) state.lots = mergeById(state.lots, d.lots);
+    if (d.cash && typeof d.cash === "object") state.cash = Object.assign({ stock: 0, crypto: 0 }, d.cash, (state.cash.stock || state.cash.crypto) ? state.cash : {});
+    if (d.thesis && typeof d.thesis === "object") state.thesis = Object.assign({}, d.thesis, state.thesis);
+    if (Array.isArray(d.watchlist)) state.watchlist = Array.from(new Set((d.watchlist || []).concat(state.watchlist)));
+    if (d.watchlistScores) state.watchlistScores = Object.assign({}, d.watchlistScores, state.watchlistScores);
+    if (Array.isArray(d.log)) state.oldLog = mergeById(state.oldLog, d.log);
+    try {
+      localStorage.setItem(LOTS_KEY, JSON.stringify(state.lots));
+      localStorage.setItem(CASH_KEY, JSON.stringify(state.cash));
+      localStorage.setItem(THESIS_KEY, JSON.stringify(state.thesis));
+      localStorage.setItem("sd_watchlist", JSON.stringify(state.watchlist));
+      localStorage.setItem("sd_watchlist_scores", JSON.stringify(state.watchlistScores));
+      localStorage.setItem("sd_log", JSON.stringify(state.oldLog));
+    } catch (e) {}
+  }
   async function startCloudSync(uid) {
-    const db = FirebaseSync.getDb();
-    const ref = db.collection("users").doc(uid).collection("sync").doc("stockDecide");
+    const ref = FirebaseSync.getDb().collection("users").doc(uid).collection("sync").doc("stockDecide");
     try {
       const snap = await ref.get();
-      if (snap.exists) {
-        const remote = snap.data() || {};
-        state.watchlist = Array.from(new Set((remote.watchlist || []).concat(state.watchlist)));
-        state.log = mergeById(state.log, remote.log);
-        state.watchlistScores = Object.assign({}, remote.watchlistScores || {}, state.watchlistScores);
-        syncApplyingRemote = true;
-        saveWatchlist();
-        saveLog();
-        saveWatchlistScores();
-        syncApplyingRemote = false;
-        await ref.set({ watchlist: state.watchlist, log: state.log, watchlistScores: state.watchlistScores, updatedAt: Date.now() });
-      } else {
-        await ref.set({ watchlist: state.watchlist, log: state.log, watchlistScores: state.watchlistScores, updatedAt: Date.now() });
-      }
-    } catch (err) {
-      console.error("initial sync failed", err);
-    }
-    renderWatchlist();
-    renderLog();
-    renderTickerStrip();
-
-    if (syncUnsub) syncUnsub();
-    syncUnsub = ref.onSnapshot(function (snap) {
-      if (!snap.exists) return;
-      const data = snap.data();
+      if (snap.exists) { adoptRemote(snap.data() || {}); }
       syncApplyingRemote = true;
-      state.watchlist = data.watchlist || [];
-      state.log = data.log || [];
-      state.watchlistScores = data.watchlistScores || {};
-      saveWatchlist();
-      saveLog();
-      saveWatchlistScores();
+      await ref.set({ lots: state.lots, cash: state.cash, thesis: state.thesis, watchlist: state.watchlist, watchlistScores: state.watchlistScores, log: state.oldLog, updatedAt: Date.now() });
       syncApplyingRemote = false;
-      renderWatchlist();
-      renderLog();
-      renderTickerStrip();
-    }, function (err) { console.error("sync listener error", err); });
+    } catch (err) { console.error("initial sync failed", err); }
+    renderAll();
+    if (syncUnsub) syncUnsub();
+    syncUnsub = ref.onSnapshot(snap => {
+      if (!snap.exists) return;
+      syncApplyingRemote = true; adoptRemote(snap.data()); syncApplyingRemote = false;
+      renderAll();
+    }, err => console.error("sync listener error", err));
   }
-
   function setupCloudSync() {
-    if (!window.FirebaseSync || !FirebaseSync.enabled) return;
-    const signInBtn = document.getElementById("syncSignInBtn");
-    const signOutBtn = document.getElementById("syncSignOutBtn");
-    const statusEl = document.getElementById("syncStatus");
-    const avatarEl = document.getElementById("syncAvatar");
-
-    signInBtn.addEventListener("click", async function () {
-      signInBtn.disabled = true;
-      try {
-        await FirebaseSync.signIn();
-      } catch (err) {
-        console.error(err);
-        Swal.fire({ icon: "error", title: "เข้าสู่ระบบไม่สำเร็จ", text: err.message || "" });
-      } finally {
-        signInBtn.disabled = false;
-      }
-    });
-    signOutBtn.addEventListener("click", async function () {
-      if (syncUnsub) { syncUnsub(); syncUnsub = null; }
-      await FirebaseSync.signOut();
-    });
-
-    FirebaseSync.onAuthChange(async function (user) {
+    if (!window.FirebaseSync || !FirebaseSync.enabled) { $("syncSignInBtn").disabled = true; return; }
+    $("syncSignInBtn").addEventListener("click", () => FirebaseSync.signIn().catch(err => Swal.fire({ icon: "error", title: "เข้าสู่ระบบไม่สำเร็จ", text: err.message || "" })));
+    $("syncSignOutBtn").addEventListener("click", () => { if (syncUnsub) { syncUnsub(); syncUnsub = null; } FirebaseSync.signOut(); });
+    FirebaseSync.onAuthChange(async (user) => {
       if (user) {
-        signInBtn.classList.add("hidden");
-        signOutBtn.classList.remove("hidden");
-        avatarEl.classList.remove("hidden");
-        avatarEl.src = user.photoURL || "";
-        statusEl.classList.remove("hidden");
-        statusEl.textContent = "กำลังซิงค์...";
+        $("syncSignInBtn").classList.add("hidden"); $("syncSignOutBtn").classList.remove("hidden");
+        $("syncAvatar").classList.remove("hidden"); $("syncAvatar").src = user.photoURL || "";
+        $("syncStatus").classList.remove("hidden"); $("syncStatus").textContent = "กำลังซิงค์…";
         await startCloudSync(user.uid);
-        statusEl.textContent = "ซิงค์แล้ว · " + (user.displayName || user.email || "");
+        $("syncStatus").textContent = "ซิงค์แล้ว";
       } else {
         if (syncUnsub) { syncUnsub(); syncUnsub = null; }
-        signInBtn.classList.remove("hidden");
-        signOutBtn.classList.add("hidden");
-        avatarEl.classList.add("hidden");
-        statusEl.classList.add("hidden");
+        $("syncSignInBtn").classList.remove("hidden"); $("syncSignOutBtn").classList.add("hidden");
+        $("syncAvatar").classList.add("hidden"); $("syncStatus").classList.add("hidden");
       }
     });
   }
 
-  function updateNoKeyNotice() {
-    document.getElementById("noKeyNotice").style.display = state.apiKey ? "none" : "block";
-  }
-
-  document.getElementById("saveKeyBtn").addEventListener("click", function () {
-    state.apiKey = document.getElementById("apiKeyInput").value.trim();
-    state.finnhubKey = document.getElementById("finnhubKeyInput").value.trim();
-    localStorage.setItem("sd_api_key", state.apiKey);
-    localStorage.setItem("sd_finnhub_key", state.finnhubKey);
-    updateNoKeyNotice();
-    renderQuotaBar();
-  });
-
-  document.getElementById("downloadBtn").addEventListener("click", function () {
-    const html = "<!DOCTYPE html>\n" + document.documentElement.outerHTML;
-    const blob = new Blob([html], { type: "text/html" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "stock-decide.html";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  });
-
-  // ---------- tabs ----------
-  document.querySelectorAll(".tab-btn").forEach(function (btn) {
-    btn.addEventListener("click", function () {
-      document.querySelectorAll(".tab-btn").forEach(function (b) { b.classList.remove("active"); });
-      btn.classList.add("active");
-      ["analyze", "watchlist", "size", "log", "bulk", "teamvs"].forEach(function (t) {
-        document.getElementById("tab-" + t).classList.toggle("hidden", t !== btn.dataset.tab);
-      });
-      if (btn.dataset.tab === "watchlist") renderWatchlist();
-      if (btn.dataset.tab === "size") renderSize();
-      if (btn.dataset.tab === "log") renderLog();
-      if (btn.dataset.tab === "bulk") renderBulkResults();
-    });
-  });
-
-  // ---------- analyze ----------
-  function showError(msg) {
-    const box = document.getElementById("errorBox");
-    box.textContent = msg;
-    box.classList.toggle("show", !!msg);
-  }
-
-  async function runAnalysis(sym) {
-    if (!state.apiKey) { showError("ใส่ Twelve Data API key ก่อน (ฟรี สมัครไม่ใช้บัตร)"); return; }
-    const btn = document.getElementById("analyzeBtn");
-    btn.disabled = true;
-    btn.textContent = "กำลังโหลด...";
-    showError("");
-    document.getElementById("resultPanel").classList.add("hidden");
-    document.getElementById("addWatchlistBtn").classList.add("hidden");
-    try {
-      const stockJson = await tdFetch("/time_series", { symbol: sym, interval: "1day", outputsize: 100 });
-      const parsed = parseDailySeries(stockJson);
-      const closes = parsed.closes;
-      const volumes = parsed.volumes;
-      if (closes.length < 50) throw new Error("ข้อมูลย้อนหลังไม่พอสำหรับวิเคราะห์");
-
-      if (!state.spyCache) {
-        try {
-          const spyJson = await tdFetch("/time_series", { symbol: "SPY", interval: "1day", outputsize: 100 });
-          state.spyCache = parseDailySeries(spyJson).closes;
-        } catch (e) { state.spyCache = null; }
-      }
-
-      const overview = await fetchOverview(sym);
-
-      const analysis = analyzeStock(closes, volumes, state.spyCache, overview, parsed.highs, parsed.lows);
-      state.result = Object.assign({ symbol: sym.toUpperCase() }, analysis);
-      renderResult();
-      document.getElementById("addWatchlistBtn").classList.remove("hidden");
-
-      renderQualPanel(null);
-      renderNewsPanel(null);
-      renderInsiderPanel(null);
-      renderRecPanel(null);
-      if (state.finnhubKey) {
-        fetchQualitativeMetrics(sym).then(renderQualPanel);
-        fetchCompanyNews(sym).then(renderNewsPanel);
-        fetchInsiderTransactions(sym).then(renderInsiderPanel);
-        fetchRecommendationTrends(sym).then(renderRecPanel);
-      }
-    } catch (e) {
-      showError(e.message || "เกิดข้อผิดพลาด");
-    } finally {
-      btn.disabled = false;
-      btn.textContent = "วิเคราะห์";
-    }
-  }
-
-  function metricHtml(label, value, sub, sentiment) {
-    const cls = sentiment ? ' ' + sentiment : '';
-    return '<div class="metric' + cls + '"><div class="metric-label">' + label + '</div><div class="metric-value">' + value +
-      '</div>' + (sub ? '<div class="metric-sub">' + sub + '</div>' : '') + '</div>';
-  }
-
-  function buildAnalystSummary(r) {
-    const sym = r.symbol;
-    const stampMap2 = { "ขาขึ้น": "var(--bull)", "ขาลง": "var(--bear)", "เท่าตัวกลาง": "var(--neutral)" };
-    const verdictColor = stampMap2[r.verdict] || stampMap2["เท่าตัวกลาง"];
-
-    let p1;
-    if (r.trendLabel === "ขาขึ้นชัดเจน") {
-      p1 = sym + " กำลังเทรนอยู่เหนือเส้นค่าเฉลี่ยทั้ง SMA20 และ SMA50 โดยเส้นสั้นอยู่เหนือเส้นยาว ซึ่งเป็นเครื่องยืนยันของแนวโน้มขาขึ้นที่เป็นรูปแบบคลาสสิก";
-    } else if (r.trendLabel === "ขาลงชัดเจน") {
-      p1 = sym + " เทรนอยู่ต่ำกว่าเส้นค่าเฉลี่ยทั้ง SMA20 และ SMA50 โดยเส้นสั้นอยู่ต่ำกว่าเส้นยาว สะท้อนแรงขายที่ยังคงกดดันราคาอยู่ เทรนด์ขาลงชัดเจนยังไม่เอื้ออำนวยการเข้าซื้อ";
-    } else {
-      p1 = sym + " ยังไม่มีเทรนด์ที่ชัดเจนทั้งขาขึ้นหรือขาลง ราคาแกว่งตัวสลับเส้นค่าเฉลี่ย จัดอยู่ในภาวะไร้ทิศทาง (sideways) ที่คลาดกำลังรอสัญญาณใหม่มายืนยันทาง";
-    }
-    if (r.rsi14 !== null) {
-      if (r.rsi14 > 70) p1 += " โดยด้านโมเมนตัม RSI อยู่ในเขต overbought ที่ " + r.rsi14.toFixed(1) + " ซึ่งเพิ่มความเสี่ยงของการพักตัวระยะสั้นหากไม่มีข่าวหรือแรงซื้อใหม่มาหนุนต่อ";
-      else if (r.rsi14 < 30) p1 += " และในขณะเดียวกันโมเมนตัมส่งสัญญาณด้าน RSI ที่ " + r.rsi14.toFixed(1) + " เข้าสู่โซน oversold ซึ่งบางครั้งอาจเป็นจุดสะสมของนักลงทุนระยะยาว แต่ก็ต้องระวังว่าอาจเป็นการตกต่อเนื่อง (falling knife) ได้เช่นกัน";
-      else p1 += " ด้านโมเมนตัม RSI ที่ " + r.rsi14.toFixed(1) + " ยังอยู่ในกรอบปกติ ไม่มีสัญญาณสุดโต่งไปด้านใดด้านหนึ่ง";
-    }
-
-    let p2 = "";
-    if (r.relStrength !== null) {
-      if (r.relStrength > 0) p2 += "เมื่อเทียบกับตลาดโดยรวม (SPY) ในรอบ 3 เดือนที่ผ่านมา หุ้นตัวนี้ทำผลงานดีกว่าตลาดอยู่ " + r.relStrength.toFixed(1) + " จุด สะท้อนแรงซื้อเฉพาะตัวที่แข็งแกร่งกว่าค่าเฉลี่ยอุตสาหกรรม ";
-      else p2 += "เมื่อเทียบกับตลาดโดยรวม (SPY) ในรอบ 3 เดือนที่ผ่านมา หุ้นตัวนี้ทำผลงานด้อยกว่าตลาดอยู่ " + Math.abs(r.relStrength).toFixed(1) + " จุด ซึ่งเป็นสัญญาณเตือนว่าอาจมีปัจจัยกดดันเฉพาะตัวที่ทำให้ลดความควรร่วมสองเพิ่มเติมก่อนตัดสินใจ ";
-    }
-    if (r.volSpike !== null && r.volSpike > 1.4) {
-      p2 += "ปริมาณการซื้อขายล่าสุดพุ่งขึ้นมาอยู่ที่ " + r.volSpike.toFixed(2) + " เท่าของค่าเฉลี่ย 50 วัน ซึ่งเป็นสัญญาณยืนยัน (confirmation) ที่มีนัยสำคัญ อาจมาจากเม็ดเงินสถาบันหรือข่าวเฉพาะตัว ควรติดตามว่าการเคลื่อนไหวครั้งนี้เป็นสัญญาณเดียวกับวอลุ่มหรือไม่";
-    } else {
-      p2 += "ปริมาณการซื้อขายยังอยู่ในระดับปกติ ไม่มีสัญญาณการเข้าซื้อ/ขายผิดปกติมาเข้าต่อยืนยันเทรนด์นี้";
-    }
-
-    let p3 = "เรื่องความเสี่ยง ความผันผวนรายปีของหุ้นตัวนี้อยู่ที่ " + r.vol.toFixed(1) + "% จัดอยู่ในระดับ" + r.riskLevel + " ";
-    if (r.riskLevel === "สูง") p3 += "นักลงทุนควรพิจารณาลดขนาดสถานะเพื่อควบคุมมูลค่าความเสียหายต่อพอร์ตในกรณีที่ราคาแกว่งตัวมาก ";
-    else if (r.riskLevel === "ต่ำ") p3 += "เหมาะสำหรับนักลงทุนที่เน้นความมั่นคงของเงินทุนมากกว่าผลตอบแทนระยะสั้น ";
-    else p3 += "อยู่ในระดับที่ต้องการความเสี่ยงที่เหมาะสมควบคู่กับการตั้ง stop-loss และการควบคุมขนาดสถานะตามปกติ ";
-    if (r.pe !== null) {
-      if (r.pe < 0) p3 += "โดยพิจารณามูลค่า บริษัทยังมีผลกำไรติดลบ (P/E ติดลบ) ทำให้การประเมินมูลค่าอิงกำไรไม่สามารถทำได้ นักลงทุนที่เน้นพื้นฐานควรพิจารณาการเติบโตของรายได้และกระแสเงินสดแทนหลัก";
-      else if (r.pe > 40) p3 += "ระดับ P/E ที่ " + r.pe.toFixed(1) + " เท่า ถือว่าค่อนข้างสูง มูลค่าตลาดกำลังคาดหวังการเติบโตของกำไรระดับสูงมาก หากผลประกอบการไม่เป็นไปตามคาด ราคาอาจถูกปรับฐานแรง";
-      else if (r.pe > 15) p3 += "ระดับ P/E ที่ " + r.pe.toFixed(1) + " เท่า อยู่ในกรอบปานกลาง ไม่แพงหรือถูกจนเกินไปเมื่อเทียบกับกำไรปัจจุบัน";
-      else p3 += "ระดับ P/E ที่ " + r.pe.toFixed(1) + " เท่า ถือว่าค่อนข้างถูกเมื่อเทียบกำไร อาจเกิดจากตลาดยังไม่ให้มูลค่าเต็มที่ หรือควรตรวจสอบเพิ่มเติมว่าทำไมตลาดถึงให้มูลค่าต่ำ (คุณภาพกำไร แนวโน้มอุตสาหกรรม ฯลฯ)";
-    } else {
-      p3 += "ไม่มีข้อมูล P/E ให้ประเมินมูลค่าครบถ้วนที่นี่ อาจเพราะบริษัทยังไม่มีกำไรสุทธิที่รายงาน หรือข้อมูลจากผู้ให้บริการยังไม่ครบถ้วน";
-    }
-
-    let p4;
-    if (r.verdict === "ขาขึ้น") {
-      p4 = "โดยสรุป ภาพรวมเชิงปริมาณของ " + sym + " เอียงไปทาง <strong>เชิงบวก</strong> จากเทรนด์และความแข็งแกร่งเทียบตลาด แต่การตัดสินใจซื้อควรร่วมด้านการควบคุมหุ้นละเป้า (Devil's Advocate) ด้านล่างก่อนทุกครั้ง และกำหนดขนาดสถานะที่เหมาะสมควบคู่ไปด้วย";
-    } else if (r.verdict === "ขาลง") {
-      p4 = "โดยสรุป ภาพรวมเชิงปริมาณของ " + sym + " เอียงไปทาง <strong>เชิงลบ</strong> ทั้งจากเทรนด์และความแข็งแกร่งเทียบตลาด หากพิจารณาเข้าซื้อควรพิจารณาหาจุดกลับตัวที่ชัดเจนก่วยเหตุผลเพิ่มมูลค่าระยะยาวเข้าหลัก ไม่ใช่จับจังหวะการหวังกลับตัว";
-    } else {
-      p4 = "โดยสรุป สัญญาณเชิงปริมาณของ " + sym + " ยังอยู่ใน<strong>ภาวะกำกวม</strong> ไม่เอียงไปทางใดชัดเจนอย่างชัดเจน การรอสัญญาณยืนยันเพิ่มเติม (เช่น การ breakout พร้อมวอลุ่ม หรือสัญญาณเทรนด์ที่ชัดขึ้น) อาจเป็นทางเลือกที่มีความเสี่ยงต่ำกว่าการรีบเข้าสถานะเข้าตอนนี้";
-    }
-
-    return '<div class="as-head"><h3 style="margin:0;">มุมมองวิเคราะห์ (สรุปอัตโนมัติจากข้อมูลเชิงปริมาณ)</h3>' +
-      '<span class="as-verdict" style="color:' + verdictColor + '">' + r.verdict + '</span></div>' +
-      '<p>' + p1 + '</p><p>' + p2 + '</p><p>' + p3 + '</p><p>' + p4 + '</p>' +
-      '<div class="as-caveat">สรุปนี้สร้างขึ้นจากกฎเชิงปริมาณ (rule-based) จากข้อมูลราคาย้อนหลังเท่านั้น ไม่รวมข่าวหรือปัจจัยเชิงคุณภาพเข้าไปในการคำนวณ verdict (ดูข่าว/ROE/Margin เพิ่มเติมด้านล่างถ้าใส่ Finnhub key ไว้) ไม่ถือเป็นคำแนะนำการลงทุน</div>';
-  }
-
-  function renderResult() {
-    const r = state.result;
-    document.getElementById("resSymName").textContent = r.symbol + (r.name ? " — " + r.name : "");
-    document.getElementById("resPrice").textContent = "ราคาปัจจุบัน $" + r.price.toFixed(2);
-
-    const stampMap = { "ขาขึ้น": ["var(--bull)", "BULLISH"], "ขาลง": ["var(--bear)", "BEARISH"], "เท่าตัวกลาง": ["var(--neutral)", "NEUTRAL"] };
-    const s = stampMap[r.verdict] || stampMap["เท่าตัวกลาง"];
-    const stampEl = document.getElementById("resStamp");
-    stampEl.textContent = s[1];
-    stampEl.style.borderColor = s[0];
-    stampEl.style.color = s[0];
-
-    const sl = scoreLabel(r.score);
-    document.getElementById("resScoreNum").textContent = r.score;
-    document.getElementById("resScoreText").textContent = sl.text;
-    const badgeEl = document.getElementById("resScoreBadge");
-    badgeEl.style.color = sl.color;
-
-    document.getElementById("scoreBreakdownList").innerHTML = r.scoreBreakdown.map(function (it) {
-      const cls = it.points > 0 ? "p" : it.points < 0 ? "n" : "z";
-      const sign = it.points > 0 ? "+" : "";
-      return '<div class="breakdown-row"><span>' + it.label + '</span><span class="breakdown-pts ' + cls + '">' + sign + it.points + '</span></div>';
-    }).join("");
-
-    const metrics = [
-      metricHtml("เทรนด์", r.trendLabel, null, r.trendLabel === "ขาขึ้นชัดเจน" ? "pos" : r.trendLabel === "ขาลงชัดเจน" ? "neg" : "neu"),
-      metricHtml("RSI (14)", r.rsi14 !== null ? r.rsi14.toFixed(1) : "—", r.momentumFlag, r.rsi14 !== null && r.rsi14 > 70 ? "neg" : r.rsi14 !== null && r.rsi14 < 30 ? "pos" : "neu"),
-      metricHtml("Relative Strength vs SPY (3m)", r.relStrength !== null ? (r.relStrength > 0 ? "+" : "") + r.relStrength.toFixed(1) + "%" : "—", null, r.relStrength === null ? "" : r.relStrength > 0 ? "pos" : "neg"),
-      metricHtml("ความผันผวน (annualized)", r.vol.toFixed(1) + "%", null, r.vol > 45 ? "neg" : r.vol < 20 ? "pos" : "neu"),
-      metricHtml("ห่างจากจุดสูงสุดในกรอบข้อมูล (~100 วัน)", r.extendedFromHigh.toFixed(1) + "%", null, r.extendedFromHigh > 25 ? "neg" : r.extendedFromHigh < 10 ? "pos" : "neu"),
-      metricHtml("ขึ้นมาแล้วจากจุดต่ำสุด (~6 เดือน)", "+" + r.upFromLow.toFixed(1) + "%", r.upFromLow > 80 ? "วิ่งมาเยอะแล้ว ระวังพลาดเทรนด์" : "ยังพอมีที่วิ่งต่อ", r.upFromLow > 80 ? "neg" : "neu"),
-      metricHtml("Volume วันล่าสุด เทียบค่าเฉลี่ย 50 วัน", r.volSpike !== null ? r.volSpike.toFixed(2) + "x" : "—", r.volSpike !== null && r.volSpike > 1.4 ? "พุ่งกว่าปกติ — อาจมีแรงเข้าสะสม" : "ปกติ", r.volSpike !== null && r.volSpike > 1.4 ? "pos" : "neu"),
-      metricHtml("ระดับความเสี่ยง", r.riskLevel, null, r.riskLevel === "สูง" ? "neg" : r.riskLevel === "ต่ำ" ? "pos" : "neu"),
-      metricHtml("P/E", r.pe !== null ? r.pe.toFixed(1) : "ไม่มีข้อมูล", r.valuationFlag, r.pe === null ? "" : (r.pe < 0 || r.pe > 40) ? "neg" : r.pe > 15 ? "neu" : "pos"),
-      metricHtml("SMA20 / SMA50", "$" + r.sma20.toFixed(2) + " / $" + r.sma50.toFixed(2)),
-      metricHtml("EMA12 / EMA26", "$" + r.ema12.toFixed(2) + " / $" + r.ema26.toFixed(2)),
-      metricHtml("MACD (12/26/9)", r.macd ? (r.macd.hist >= 0 ? "+" : "") + r.macd.hist.toFixed(3) : "—",
-        r.macd ? (r.macd.hist >= 0 ? "MACD เหนือ Signal — โมเมนตัมบวก" : "MACD ใต้ Signal — โมเมนตัมลบ") : "ข้อมูลไม่พอ",
-        r.macd ? (r.macd.hist >= 0 ? "pos" : "neg") : ""),
-      metricHtml("ATR (14)", r.atr14 != null ? "$" + r.atr14.toFixed(2) + (r.atrPct != null ? " · " + r.atrPct.toFixed(1) + "%/วัน" : "") : "—",
-        "ช่วงแกว่งเฉลี่ยต่อวัน — ใช้กะระยะ SL (เช่น 1.5–2×ATR)", "neu"),
-      metricHtml("ตำแหน่งในกรอบ 52 สัปดาห์", r.range52w ? r.range52w.pos.toFixed(0) + "%" : "—",
-        r.range52w ? "ต่ำสุด $" + r.range52w.low.toFixed(2) + " · สูงสุด $" + r.range52w.high.toFixed(2) : "", "neu"),
-    ].join("");
-    document.getElementById("resMetrics").innerHTML = metrics;
-
-    const eg = computeEntryGuidance(r);
-    const entryCard = document.getElementById("entryCard");
-    entryCard.className = "entry-card " + eg.status;
-    document.getElementById("entryTitle").textContent = eg.title;
-    const zoneEl = document.getElementById("entryZone");
-    if (eg.zoneLow !== null && eg.zoneHigh !== null) {
-      zoneEl.textContent = "โซนอ้างอิง: $" + Math.min(eg.zoneLow, eg.zoneHigh).toFixed(2) + " – $" + Math.max(eg.zoneLow, eg.zoneHigh).toFixed(2) +
-        (eg.stopRef ? "  ·  แนวอ้างอิง stop-loss ~$" + eg.stopRef.toFixed(2) : "");
-    } else {
-      zoneEl.textContent = "";
-    }
-    document.getElementById("entryNote").textContent = eg.note + " (เป็นแนวทางเชิงเทคนิคจากข้อมูลที่มีอยู่เท่านั้น ไม่ใช่คำแนะนำการลงทุนหรือราคาที่รับประกันผลลัพธ์)";
-
-    document.getElementById("analystSummary").innerHTML = buildAnalystSummary(r);
-    document.querySelectorAll(".devilNote").forEach(function (t) { t.value = ""; });
-    document.getElementById("resultPanel").classList.remove("hidden");
-  }
-
-  document.getElementById("analyzeBtn").addEventListener("click", function () {
-    runAnalysis(document.getElementById("symbolInput").value.trim().toUpperCase());
-  });
-  document.getElementById("symbolInput").addEventListener("keydown", function (e) {
-    if (e.key === "Enter") runAnalysis(e.target.value.trim().toUpperCase());
-  });
-
-  // ---------- watchlist ----------
-  document.getElementById("addWatchlistBtn").addEventListener("click", function () {
-    if (!state.result) return;
-    if (state.watchlist.indexOf(state.result.symbol) === -1) {
-      state.watchlist.push(state.result.symbol);
-      saveWatchlist();
-      renderTickerStrip();
-    }
-  });
-
-  function saveWatchlistScores() { localStorage.setItem("sd_watchlist_scores", JSON.stringify(state.watchlistScores)); pushCloudSync(); }
-
-  function watchlistUpdatedLabel() {
-    const times = Object.values(state.watchlistScores).map(function (s) { return s.updatedAt || 0; });
-    if (times.length === 0) return "";
-    const latest = Math.max.apply(null, times);
-    const d = new Date(latest);
-    return "อัปเดตล่าสุด: " + d.toLocaleDateString("th-TH", { day: "numeric", month: "short" }) + " " + d.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
-  }
-
-  async function refreshWatchlistScores() {
-    if (state.watchlist.length === 0) return;
-    if (!state.apiKey) {
-      document.getElementById("watchlistUpdatedText").textContent = "ใส่ Twelve Data API key ก่อน (มุมบนขวา)";
-      return;
-    }
-    state.watchlistRefreshing = true;
-    state.watchlistJustFlipped = {};
-    const btn = document.getElementById("watchlistRefreshBtn");
-    btn.disabled = true;
-
-    for (let i = 0; i < state.watchlist.length; i++) {
-      const sym = state.watchlist[i];
-      btn.textContent = "กำลังรีเฟรช " + sym + " (" + (i + 1) + "/" + state.watchlist.length + ")";
-      try {
-        const r = await fetchOneForCompare(sym);
-        const prev = state.watchlistScores[sym];
-        if (prev && prev.verdict !== "ขาขึ้น" && r.verdict === "ขาขึ้น") {
-          state.watchlistJustFlipped[sym] = true;
-        }
-        state.watchlistScores[sym] = {
-          price: r.price, score: r.score, verdict: r.verdict, rsi14: r.rsi14,
-          relStrength: r.relStrength, updatedAt: Date.now(),
-        };
-        saveWatchlistScores();
-      } catch (e) {
-        state.watchlistScores[sym] = Object.assign({}, state.watchlistScores[sym], { error: e.message || "ดึงข้อมูลไม่สำเร็จ", updatedAt: Date.now() });
-        saveWatchlistScores();
-        if (e.message && e.message.indexOf("เกินโควตา") !== -1) break;
-      }
-      renderWatchlist();
-      if (i < state.watchlist.length - 1) await sleep(8000);
-    }
-
-    state.watchlistRefreshing = false;
-    btn.disabled = false;
-    btn.textContent = "รีเฟรชคะแนนทั้งหมด";
-    renderWatchlist();
-  }
-
-  function renderWatchlist() {
-    const el = document.getElementById("watchlistContent");
-    document.getElementById("watchlistUpdatedText").textContent = watchlistUpdatedLabel();
-    if (state.watchlist.length === 0) {
-      el.innerHTML = '<div class="empty">ยังไม่มีหุ้นใน watchlist — วิเคราะห์แล้วกด "เพิ่มลง watchlist"</div>';
-      return;
-    }
-    let html = '<div class="wl-grid">';
-    state.watchlist.forEach(function (s) {
-      const data = state.watchlistScores[s];
-      const flipped = !!state.watchlistJustFlipped[s];
-      html += '<div class="wl-card' + (flipped ? ' flipped' : '') + '">';
-      if (flipped) html += '<div class="wl-flip-tag">เพิ่งเข้า BULLISH</div>';
-      html += '<div class="wl-sym">' + s + '</div>';
-      if (!data) {
-        html += '<div class="wl-price">ยังไม่มีข้อมูล — กด "รีเฟรชคะแนนทั้งหมด"</div>';
-      } else if (data.error) {
-        html += '<div class="wl-price" style="color:var(--bear);">' + data.error + '</div>';
-      } else {
-        const sl = scoreLabel(data.score);
-        const badgeClass = data.verdict === "ขาขึ้น" ? "up" : data.verdict === "ขาลง" ? "down" : "flat";
-        html += '<div class="wl-price">$' + data.price.toFixed(2) + '</div>' +
-          '<div class="wl-score-row">' +
-          '<span class="wl-score-num" style="color:' + sl.color + ';">' + data.score + '</span>' +
-          '<span class="badge ' + badgeClass + '">' + data.verdict + '</span>' +
-          '</div>' +
-          '<div style="font-size:11px;color:var(--muted);">RSI ' + (data.rsi14 !== null ? data.rsi14.toFixed(0) : "—") +
-          ' · RS ' + (data.relStrength !== null ? (data.relStrength > 0 ? "+" : "") + data.relStrength.toFixed(1) + "%" : "—") + '</div>';
-      }
-      html += '<div class="wl-actions">' +
-        '<button class="ghost" data-sym="' + s + '" data-action="analyze-from-watchlist">วิเคราะห์เพิ่ม</button>' +
-        '<button class="link-btn" data-sym="' + s + '" data-action="remove-watchlist">ลบ</button>' +
-        '</div></div>';
-    });
-    html += '</div>';
-    el.innerHTML = html;
-    el.querySelectorAll('[data-action="analyze-from-watchlist"]').forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        document.getElementById("symbolInput").value = btn.dataset.sym;
-        document.querySelector('.tab-btn[data-tab="analyze"]').click();
-        runAnalysis(btn.dataset.sym);
-      });
-    });
-    el.querySelectorAll('[data-action="remove-watchlist"]').forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        const sym = btn.dataset.sym;
-        Swal.fire({
-          icon: "warning",
-          title: "ลบ " + sym + " ออกจาก watchlist?",
-          showCancelButton: true,
-          confirmButtonText: "ลบ",
-          cancelButtonText: "ยกเลิก",
-          confirmButtonColor: "#dc2626",
-        }).then(function (result) {
-          if (!result.isConfirmed) return;
-          state.watchlist = state.watchlist.filter(function (s) { return s !== sym; });
-          saveWatchlist();
-          renderWatchlist();
-          renderTickerStrip();
-        });
-      });
-    });
-  }
-
-  document.getElementById("watchlistRefreshBtn").addEventListener("click", refreshWatchlistScores);
-
-
-
-  function renderTickerStrip() {
-    const strip = document.getElementById("tickerStrip");
-    const inner = document.getElementById("tickerStripInner");
-    if (state.watchlist.length === 0) { strip.classList.remove("show"); return; }
-    const items = state.watchlist.concat(state.watchlist);
-    inner.innerHTML = items.map(function (s) { return '<span class="ticker-item"><b>' + s + '</b> · watchlist</span>'; }).join("");
-    strip.classList.add("show");
-  }
-
-  // ---------- position size ----------
-  function renderSize() {
-    const el = document.getElementById("sizeContent");
-    if (!state.result) { el.innerHTML = '<div class="empty">วิเคราะห์หุ้นเข้าก่อนอย่างน้อยหนึ่งตัวจึงจะคำนวณขนาดสถานะได้</div>'; return; }
-    const portfolioValue = Number(document.getElementById("portfolioValue").value);
-    const riskPct = Number(document.getElementById("riskPct").value);
-    const stopLossPct = Number(document.getElementById("stopLossPct").value);
-    if (!(portfolioValue > 0) || !(riskPct > 0) || !(stopLossPct > 0)) {
-      el.innerHTML = '<div class="empty">กรอกเงินทุน, % ความเสี่ยง และ % Stop Loss เป็นค่ามากกว่า 0 ทั้งหมดก่อนจึงจะคำนวณได้</div>';
-      return;
-    }
-    const riskDollars = (portfolioValue * riskPct) / 100;
-    const riskPerShare = (state.result.price * stopLossPct) / 100;
-    const shares = riskPerShare > 0 ? Math.floor(riskDollars / riskPerShare) : 0;
-    const positionCost = shares * state.result.price;
-    el.innerHTML = [
-      metricHtml("ความเสี่ยงที่ยอมรับได้ ($)", "$" + riskDollars.toFixed(2)),
-      metricHtml("ความเสี่ยงต่อหุ้น ($)", "$" + riskPerShare.toFixed(2)),
-      metricHtml("จำนวนหุ้นที่ควรซื้อ", shares + " หุ้น", state.result.symbol),
-      metricHtml("มูลค่าตำแหน่งเข้าซื้อ", "$" + positionCost.toFixed(2)),
-    ].map(function (h) { return h; }).join("");
-    el.innerHTML = '<div class="metrics-grid">' + el.innerHTML + '</div>';
-  }
-  ["portfolioValue", "riskPct", "stopLossPct"].forEach(function (id) {
-    document.getElementById(id).addEventListener("input", renderSize);
-  });
-
-  // ---------- decision log ----------
-  function logDecision(decision) {
-    if (!state.result) return;
-    const notes = Array.prototype.slice.call(document.querySelectorAll(".devilNote")).map(function (t) { return t.value; }).filter(Boolean);
-    const entry = {
-      id: uid(),
-      symbol: state.result.symbol,
-      date: new Date().toISOString().slice(0, 10),
-      price: state.result.price,
-      verdict: state.result.verdict,
-      riskLevel: state.result.riskLevel,
-      score: state.result.score != null ? state.result.score : null,
-      rsi14: state.result.rsi14 != null ? Math.round(state.result.rsi14 * 10) / 10 : null,
-      decision: decision,
-      acted: decision === "ซื้อ",
-      curPrice: null, curAt: null, exitPrice: null, closedAt: null,
-      notes: notes,
-    };
-    state.log.unshift(entry);
-    state.log = state.log.slice(0, 100);
-    saveLog();
-    document.querySelectorAll(".devilNote").forEach(function (t) { t.value = ""; });
-  }
-  document.getElementById("logBuyBtn").addEventListener("click", function () { logDecision("ซื้อ"); });
-  document.getElementById("logSkipBtn").addEventListener("click", function () { logDecision("ไม่ซื้อ"); });
-
-  // outcome helpers — evaluate a logged decision against a later price
-  function logEntryRefPrice(e) {
-    return e.exitPrice != null ? e.exitPrice : (e.curPrice != null ? e.curPrice : null);
-  }
-  function logEntryReturn(e) {
-    const ref = logEntryRefPrice(e);
-    if (ref == null || !e.price) return null;
-    return ((ref - e.price) / e.price) * 100;
-  }
-  function logEntryDays(e) {
-    const start = Date.parse(e.date + "T00:00:00Z");
-    const end = e.closedAt || e.curAt || Date.now();
-    if (isNaN(start)) return 0;
-    return (end - start) / 86400000;
-  }
-  function verdictHit(e) {
-    // returns true/false/null (null = not directional or not evaluable)
-    const r = logEntryReturn(e);
-    if (r == null || logEntryDays(e) < 5) return null;
-    if (e.verdict === "ขาขึ้น") return r > 1;
-    if (e.verdict === "ขาลง") return r < -1;
-    return null; // "เท่าตัวกลาง" makes no directional claim
-  }
-
-  async function refreshLogPrices() {
-    if (!state.apiKey) { Swal.fire({ icon: "info", title: "ใส่ Twelve Data API key ก่อน (มุมบนขวา)" }); return; }
-    const syms = Array.from(new Set(state.log.map(function (e) { return e.symbol; }).filter(Boolean)));
-    if (!syms.length) return;
-    const btn = document.getElementById("logRefreshPricesBtn");
-    btn.disabled = true; btn.textContent = "กำลังดึงราคา… (" + syms.length + " ตัว)";
-    try {
-      const priceMap = {};
-      // Twelve Data /price accepts a comma list; single symbol returns {price}, multi returns {SYM:{price}}
-      const CHUNK = 60;
-      for (let i = 0; i < syms.length; i += CHUNK) {
-        const part = syms.slice(i, i + CHUNK);
-        const j = await tdFetch("/price", { symbol: part.join(",") });
-        if (part.length === 1) {
-          if (j && j.price != null) priceMap[part[0]] = parseFloat(j.price);
-        } else {
-          part.forEach(function (s) { if (j[s] && j[s].price != null) priceMap[s] = parseFloat(j[s].price); });
-        }
-      }
-      const now = Date.now();
-      state.log.forEach(function (e) {
-        if (priceMap[e.symbol] != null && !isNaN(priceMap[e.symbol])) {
-          e.curPrice = priceMap[e.symbol];
-          e.curAt = now;
-        }
-      });
-      saveLog();
-      renderLog();
-    } catch (err) {
-      Swal.fire({ icon: "error", title: "อัปเดตราคาไม่สำเร็จ", text: err.message || "" });
-    } finally {
-      btn.disabled = false; btn.textContent = "↻ อัปเดตราคาปัจจุบัน";
-    }
-  }
-
-  function renderTrackRecord() {
-    const el = document.getElementById("trackRecord");
-    const ev26 = state.log.filter(function (e) { return logEntryReturn(e) != null; });
-    if (ev26.length < 3) {
-      el.innerHTML = '<div class="empty" style="padding:14px;">Track record: บันทึก ' + state.log.length + ' รายการ · มีราคาอัปเดต ' + ev26.length +
-        ' รายการ — กด "↻ อัปเดตราคาปัจจุบัน" แล้วรอผลสัก 1-2 สัปดาห์ ระบบจะสรุปว่าสัญญาณแม่นแค่ไหน</div>';
-      return;
-    }
-    const dir = ev26.filter(function (e) { return verdictHit(e) !== null; });
-    const hits = dir.filter(function (e) { return verdictHit(e) === true; }).length;
-    const acc = dir.length ? (hits / dir.length) * 100 : null;
-    const avg = function (arr) { return arr.length ? arr.reduce(function (s, x) { return s + x; }, 0) / arr.length : null; };
-    const rets = ev26.map(logEntryReturn);
-
-    function bucket(name, filterFn) {
-      const es = ev26.filter(filterFn);
-      const rs = es.map(logEntryReturn);
-      return { name: name, n: es.length, avg: avg(rs), win: rs.length ? (rs.filter(function (x) { return x > 0; }).length / rs.length) * 100 : null };
-    }
-    const byScore = [
-      bucket("คะแนน < 45", function (e) { return e.score != null && e.score < 45; }),
-      bucket("คะแนน 45–69", function (e) { return e.score != null && e.score >= 45 && e.score < 70; }),
-      bucket("คะแนน ≥ 70", function (e) { return e.score != null && e.score >= 70; }),
-    ].filter(function (b) { return b.n > 0; });
-
-    const buy = ev26.filter(function (e) { return e.decision === "ซื้อ"; });
-    const buyRets = buy.map(logEntryReturn);
-    const fmtPct = function (v) { return v == null ? "—" : (v >= 0 ? "+" : "") + v.toFixed(1) + "%"; };
-    const colorPct = function (v) { return v == null ? "" : v >= 0 ? "pos" : "neg"; };
-
-    const lo = byScore.find(function (b) { return b.name === "คะแนน < 45"; });
-    const hi = byScore.find(function (b) { return b.name === "คะแนน ≥ 70"; });
-    let edge = "เก็บข้อมูลเพิ่มเพื่อดูว่าคะแนนสูงให้ผลดีกว่าจริงไหม";
-    if (lo && hi && lo.avg != null && hi.avg != null) {
-      edge = hi.avg - lo.avg >= 3
-        ? "✓ คะแนนสูง (≥70) ให้ผลตอบแทนเฉลี่ยดีกว่าคะแนนต่ำ (<45) อยู่ " + (hi.avg - lo.avg).toFixed(1) + " จุด% — สัญญาณมีความหมาย"
-        : "ยังไม่เห็นว่าคะแนนสูงได้เปรียบคะแนนต่ำชัดเจน (ต่างกัน " + (hi.avg - lo.avg).toFixed(1) + " จุด%)";
-    }
-
-    let html = '<div class="metrics-grid">' +
-      metricHtml("ความแม่นสัญญาณทิศทาง", acc == null ? "—" : acc.toFixed(0) + "%", hits + "/" + dir.length + " ครั้ง (นับเฉพาะที่ผ่านไป ≥ 5 วัน)", acc == null ? "" : acc >= 55 ? "pos" : acc < 45 ? "neg" : "neu") +
-      metricHtml("ผลเฉลี่ยหลังบันทึก", fmtPct(avg(rets)), ev26.length + " รายการที่มีราคา", colorPct(avg(rets))) +
-      metricHtml("ตามสัญญาณ 'ขาขึ้น'", (function () { var e = ev26.filter(function (x) { return x.verdict === "ขาขึ้น"; }); return fmtPct(avg(e.map(logEntryReturn))); })(), (function () { var e = ev26.filter(function (x) { return x.verdict === "ขาขึ้น"; }); return e.length + " รายการ"; })(), "") +
-      metricHtml("ตัดสินใจ 'ซื้อ' (ผลเฉลี่ย)", fmtPct(avg(buyRets)), buy.length ? buy.length + " ครั้ง · กำไร " + (buyRets.filter(function (x) { return x > 0; }).length) + " ครั้ง" : "ยังไม่มี", colorPct(avg(buyRets))) +
-      '</div>';
-
-    if (byScore.length) {
-      html += '<div class="table-scroll" style="margin-top:10px;"><table><thead><tr><th>ช่วงคะแนน</th><th>จำนวน</th><th>ผลเฉลี่ย</th><th>% ที่กำไร</th></tr></thead><tbody>';
-      byScore.forEach(function (b) {
-        html += '<tr><td>' + b.name + '</td><td class="mono">' + b.n + '</td><td class="mono ' + colorPct(b.avg) + '">' + fmtPct(b.avg) +
-          '</td><td class="mono">' + (b.win == null ? "—" : b.win.toFixed(0) + "%") + '</td></tr>';
-      });
-      html += '</tbody></table></div>';
-    }
-    html += '<div class="gloss-row ' + (lo && hi && lo.avg != null && hi.avg != null && hi.avg - lo.avg >= 3 ? "good" : "warn") + '" style="margin-top:8px;">' + edge + '</div>';
-    el.innerHTML = html;
-  }
-
-  function renderLog() {
-    const el = document.getElementById("logContent");
-    renderTrackRecord();
-    if (state.log.length === 0) { el.innerHTML = '<div class="empty">ยังไม่มีบันทึก — วิเคราะห์หุ้นแล้วกดบันทึกการตัดสินใจเข้าที่นี่</div>'; return; }
-
-    const searchQuery = (document.getElementById("logSearchInput").value || "").trim().toUpperCase();
-    const decisionFilter = document.getElementById("logDecisionFilter").value;
-    let rows = state.log;
-    if (searchQuery) rows = rows.filter(function (entry) { return entry.symbol.toUpperCase().indexOf(searchQuery) !== -1; });
-    if (decisionFilter) rows = rows.filter(function (entry) { return entry.decision === decisionFilter; });
-    if (rows.length === 0) { el.innerHTML = '<div class="empty">ไม่มีบันทึกที่ตรงเงื่อนไข</div>'; return; }
-
-    let html = '<div class="table-scroll"><table><thead><tr><th>วันที่</th><th>สัญลักษณ์</th><th>ราคาบันทึก</th><th>คะแนน</th><th>สัญญาณ</th><th>ตัดสินใจ</th><th>ราคาล่าสุด/ปิด</th><th>ผล %</th><th>ถูก?</th><th></th></tr></thead><tbody>';
-    rows.forEach(function (entry) {
-      const badgeClass = entry.verdict === "ขาขึ้น" ? "up" : entry.verdict === "ขาลง" ? "down" : "flat";
-      const ref = logEntryRefPrice(entry);
-      const ret = logEntryReturn(entry);
-      const hit = verdictHit(entry);
-      const retCls = ret == null ? "" : ret >= 0 ? "pos" : "neg";
-      const idx = state.log.indexOf(entry);
-      html += '<tr><td class="mono">' + entry.date + '</td><td class="mono">' + entry.symbol + '</td>' +
-        '<td class="mono">$' + entry.price.toFixed(2) + '</td>' +
-        '<td class="mono">' + (entry.score != null ? entry.score : "—") + '</td>' +
-        '<td><span class="badge ' + badgeClass + '">' + entry.verdict + '</span></td>' +
-        '<td>' + entry.decision + '</td>' +
-        '<td class="mono">' + (ref != null ? "$" + ref.toFixed(2) + (entry.exitPrice != null ? " (ปิด)" : "") : "—") + '</td>' +
-        '<td class="mono ' + retCls + '">' + (ret == null ? "—" : (ret >= 0 ? "+" : "") + ret.toFixed(1) + "%") + '</td>' +
-        '<td>' + (hit == null ? "–" : hit ? "✓" : "✗") + '</td>' +
-        '<td><button type="button" class="link-btn set-log-exit" data-idx="' + idx + '">ปิดผล</button> · ' +
-        '<button type="button" class="link-btn del-log-entry" data-idx="' + idx + '">ลบ</button></td></tr>';
-    });
-    html += '</tbody></table></div>';
-    el.innerHTML = html;
-
-    el.querySelectorAll(".set-log-exit").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        const idx = Number(btn.dataset.idx);
-        const entry = state.log[idx];
-        if (!entry) return;
-        Swal.fire({
-          title: "ปิดผล " + entry.symbol,
-          input: "number",
-          inputLabel: "ราคาที่ขาย/ปิด (เว้นว่าง = ล้างผลที่ปิดไว้)",
-          inputValue: entry.exitPrice != null ? entry.exitPrice : "",
-          showCancelButton: true,
-          confirmButtonText: "บันทึก",
-          cancelButtonText: "ยกเลิก",
-        }).then(function (r) {
-          if (!r.isConfirmed) return;
-          const v = r.value === "" || r.value == null ? null : Number(r.value);
-          entry.exitPrice = (v != null && !isNaN(v) && v > 0) ? v : null;
-          entry.closedAt = entry.exitPrice != null ? Date.now() : null;
-          saveLog();
-          renderLog();
-        });
-      });
-    });
-    el.querySelectorAll(".del-log-entry").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        const idx = Number(btn.dataset.idx);
-        const entry = state.log[idx];
-        if (!entry) return;
-        Swal.fire({
-          icon: "warning",
-          title: "ลบบันทึกนี้?",
-          text: entry.symbol + " · " + entry.date,
-          showCancelButton: true,
-          confirmButtonText: "ลบ",
-          cancelButtonText: "ยกเลิก",
-          confirmButtonColor: "#dc2626",
-        }).then(function (result) {
-          if (!result.isConfirmed) return;
-          state.log.splice(idx, 1);
-          saveLog();
-          renderLog();
-        });
-      });
-    });
-  }
-  document.getElementById("logSearchInput").addEventListener("input", renderLog);
-  document.getElementById("logDecisionFilter").addEventListener("change", renderLog);
-  document.getElementById("logRefreshPricesBtn").addEventListener("click", refreshLogPrices);
-
-  // ---------- bulk scan ----------
-  const BULK_PRESET = ["AAPL","MSFT","NVDA","AMZN","GOOGL","META","TSLA","AVGO","COST","PEP",
-    "ADBE","NFLX","AMD","INTC","CSCO","CMCSA","QCOM","TXN","INTU","AMGN",
-    "HON","SBUX","GILD","MDLZ","ADI","BKNG","ISRG","VRTX","REGN","PANW"];
-
-  document.getElementById("bulkPresetBtn").addEventListener("click", function () {
-    document.getElementById("bulkSymbols").value = BULK_PRESET.join(", ");
-  });
-
-  function parseBulkSymbols(raw) {
-    const list = raw.split(/[\s,]+/).map(function (s) { return s.trim().toUpperCase(); }).filter(Boolean);
-    const seen = {};
-    const out = [];
-    list.forEach(function (s) { if (!seen[s]) { seen[s] = true; out.push(s); } });
-    return out;
-  }
-
-  function sleep(ms) { return new Promise(function (res) { setTimeout(res, ms); }); }
-
-  function showBulkError(msg) {
-    const box = document.getElementById("bulkErrorBox");
-    box.textContent = msg;
-    box.classList.toggle("show", !!msg);
-  }
-
-  function setBulkRunningUI(running) {
-    document.getElementById("bulkStartBtn").disabled = running;
-    document.getElementById("bulkPresetBtn").disabled = running;
-    document.getElementById("bulkStopBtn").disabled = !running;
-    document.getElementById("bulkProgressWrap").classList.toggle("hidden", !running && state.bulkResults.length === 0);
-  }
-
-  async function runBulkScan() {
-    const symbols = parseBulkSymbols(document.getElementById("bulkSymbols").value);
-    if (symbols.length === 0) { showBulkError("ใส่รายชื่อหุ้นอย่างน้อย 1 ตัว"); return; }
-    if (!state.apiKey) { showBulkError("ใส่ Twelve Data API key ก่อน (มุมบนขวา)"); return; }
-    if (symbols.length > 60) { showBulkError("จำกัดไม่เกิน 60 ตัว/รอบ เพื่อไม่ให้เกินโควตา free tier (~800 request/วัน, 8/นาที)"); return; }
-
-    showBulkError("");
-    state.bulkResults = [];
-    state.bulkRunning = true;
-    state.bulkStop = false;
-    setBulkRunningUI(true);
-    renderBulkResults();
-
-    const DELAY_MS = 8000; // ~7.5 req/min, กันภายในลิมิต 8 req/min ของ Twelve Data free tier
-
-    for (let i = 0; i < symbols.length; i++) {
-      if (state.bulkStop) break;
-      const sym = symbols[i];
-      const pct = Math.round((i / symbols.length) * 100);
-      document.getElementById("bulkProgressFill").style.width = pct + "%";
-      document.getElementById("bulkProgressText").textContent =
-        "กำลังวิเคราะห์ " + sym + " (" + (i + 1) + "/" + symbols.length + ") — เว้นช่วงประมาณ ~8 วิ/ตัว เพื่อไม่ให้เกินโควตา API";
-
-      try {
-        const stockJson = await tdFetch("/time_series", { symbol: sym, interval: "1day", outputsize: 100 });
-        const parsed = parseDailySeries(stockJson);
-        if (parsed.closes.length < 50) throw new Error("ข้อมูลย้อนหลังไม่พอ");
-
-        if (!state.spyCache) {
-          try {
-            const spyJson = await tdFetch("/time_series", { symbol: "SPY", interval: "1day", outputsize: 100 });
-            state.spyCache = parseDailySeries(spyJson).closes;
-          } catch (e) { state.spyCache = null; }
-        }
-
-        const analysis = analyzeStock(parsed.closes, parsed.volumes, state.spyCache, null, parsed.highs, parsed.lows);
-        state.bulkResults.push(Object.assign({ symbol: sym, error: null }, analysis));
-      } catch (e) {
-        state.bulkResults.push({ symbol: sym, error: e.message || "เกิดข้อผิดพลาด" });
-        if (e.message && e.message.indexOf("เกินโควตา") !== -1) {
-          showBulkError("เกินโควตา API — หยุดวิ่งที่ " + sym + " ผลลัพธ์ก่อนหน้ายังอยู่ครบ ลองใหม่ภายหลัง");
-          renderBulkResults();
-          break;
-        }
-      }
-      renderBulkResults();
-      if (i < symbols.length - 1 && !state.bulkStop) await sleep(DELAY_MS);
-    }
-
-    state.bulkRunning = false;
-    setBulkRunningUI(false);
-    document.getElementById("bulkProgressFill").style.width = "100%";
-    document.getElementById("bulkProgressText").textContent =
-      state.bulkStop ? "หยุดแล้ว — วิเคราะห์ไปแล้ว " + state.bulkResults.length + " ตัว" : "เสร็จสิ้น — วิเคราะห์ทั้งหมด " + state.bulkResults.length + " ตัว";
-  }
-
-  document.getElementById("bulkStartBtn").addEventListener("click", runBulkScan);
-  document.getElementById("bulkStopBtn").addEventListener("click", function () { state.bulkStop = true; });
-
-  // ---------- Team Compare ----------
-  async function fetchOneForCompare(sym) {
-    const stockJson = await tdFetch("/time_series", { symbol: sym, interval: "1day", outputsize: 100 });
-    const parsed = parseDailySeries(stockJson);
-    if (parsed.closes.length < 50) throw new Error("ข้อมูลย้อนหลังไม่พอ");
-    if (!state.spyCache) {
-      try {
-        const spyJson = await tdFetch("/time_series", { symbol: "SPY", interval: "1day", outputsize: 100 });
-        state.spyCache = parseDailySeries(spyJson).closes;
-      } catch (e) { state.spyCache = null; }
-    }
-    const analysis = analyzeStock(parsed.closes, parsed.volumes, state.spyCache, null, parsed.highs, parsed.lows);
-    const return1m = periodReturn(parsed.closes, 21);
-    const return3m = periodReturn(parsed.closes, 63);
-    return Object.assign({ symbol: sym, error: null, return1m: return1m, return3m: return3m }, analysis);
-  }
-
-  function setTeamRunningUI(running) {
-    document.getElementById("teamCompareBtn").disabled = running;
-    document.getElementById("teamCompareBtn").textContent = running ? "กำลังเปรียบเทียบ..." : "เปรียบเทียบ";
-    document.getElementById("teamStopBtn").disabled = !running;
-    document.getElementById("teamProgressWrap").classList.toggle("hidden", !running);
-  }
-
-  async function runTeamCompare() {
-    const teamA = parseBulkSymbols(document.getElementById("teamAInput").value);
-    const teamB = parseBulkSymbols(document.getElementById("teamBInput").value);
-    document.getElementById("teamErrorBox").classList.remove("show");
-    if (teamA.length === 0 || teamB.length === 0) {
-      document.getElementById("teamErrorBox").textContent = "ใส่รายชื่อหุ้นทั้งทีม A และทีม B อย่างน้อยทีมละ 1 ตัว";
-      document.getElementById("teamErrorBox").classList.add("show");
-      return;
-    }
-    if (!state.apiKey) {
-      document.getElementById("teamErrorBox").textContent = "ใส่ Twelve Data API key ก่อน (มุมบนขวา)";
-      document.getElementById("teamErrorBox").classList.add("show");
-      return;
-    }
-    if (teamA.length + teamB.length > 40) {
-      document.getElementById("teamErrorBox").textContent = "รวมสองทีมไม่เกิน 40 ตัว เพื่อไม่ให้เกินโควตา free tier";
-      document.getElementById("teamErrorBox").classList.add("show");
-      return;
-    }
-
-    state.teamResults = { A: [], B: [] };
-    state.teamRunning = true;
-    state.teamStop = false;
-    setTeamRunningUI(true);
-    document.getElementById("teamSummaryWrap").innerHTML = "";
-    document.getElementById("teamResultsPanel").classList.add("hidden");
-
-    const queue = teamA.map(function (s) { return { team: "A", symbol: s }; })
-      .concat(teamB.map(function (s) { return { team: "B", symbol: s }; }));
-    const DELAY_MS = 8000;
-
-    for (let i = 0; i < queue.length; i++) {
-      if (state.teamStop) break;
-      const item = queue[i];
-      const pct = Math.round((i / queue.length) * 100);
-      document.getElementById("teamProgressFill").style.width = pct + "%";
-      document.getElementById("teamProgressText").textContent =
-        "กำลังวิเคราะห์ทีม " + item.team + ": " + item.symbol + " (" + (i + 1) + "/" + queue.length + ")";
-      try {
-        const result = await fetchOneForCompare(item.symbol);
-        state.teamResults[item.team].push(result);
-      } catch (e) {
-        state.teamResults[item.team].push({ symbol: item.symbol, error: e.message || "เกิดข้อผิดพลาด" });
-        if (e.message && e.message.indexOf("เกินโควตา") !== -1) {
-          document.getElementById("teamErrorBox").textContent = "เกินโควตา API — หยุดที่ " + item.symbol + " ผลลัพธ์ก่อนหน้ายังอยู่ครบ";
-          document.getElementById("teamErrorBox").classList.add("show");
-          break;
-        }
-      }
-      renderTeamResults();
-      if (i < queue.length - 1 && !state.teamStop) await sleep(DELAY_MS);
-    }
-
-    state.teamRunning = false;
-    setTeamRunningUI(false);
-    document.getElementById("teamProgressFill").style.width = "100%";
-    document.getElementById("teamProgressText").textContent =
-      state.teamStop ? "หยุดแล้ว" : "เปรียบเทียบเสร็จสิ้น";
-  }
-
-  function teamAvg(list, key) {
-    const valid = list.filter(function (r) { return !r.error && r[key] !== null && r[key] !== undefined; });
-    if (valid.length === 0) return null;
-    return valid.reduce(function (sum, r) { return sum + r[key]; }, 0) / valid.length;
-  }
-
-  function renderTeamResults() {
-    const a = state.teamResults.A, b = state.teamResults.B;
-
-    const avgScoreA = teamAvg(a, "score"), avgScoreB = teamAvg(b, "score");
-    const avg1mA = teamAvg(a, "return1m"), avg1mB = teamAvg(b, "return1m");
-    const avg3mA = teamAvg(a, "return3m"), avg3mB = teamAvg(b, "return3m");
-
-    function winnerRow(label, valA, valB, fmt) {
-      const hasBoth = valA !== null && valB !== null;
-      const aWins = hasBoth && valA > valB;
-      const bWins = hasBoth && valB > valA;
-      return '<div class="breakdown-row"><span>' + label + '</span>' +
-        '<span class="mono" style="' + (aWins ? 'color:var(--bull);font-weight:700;' : '') + '">A: ' + (valA !== null ? fmt(valA) : "—") + '</span>' +
-        '<span class="mono" style="' + (bWins ? 'color:var(--bull);font-weight:700;' : '') + '">B: ' + (valB !== null ? fmt(valB) : "—") + '</span></div>';
-    }
-
-    const summaryHtml = '<div class="panel" style="margin-top:14px;">' +
-      '<h3>สรุปเปรียบเทียบทีม (จากผลลัพธ์ที่วิเคราะห์แล้วเสร็จ)</h3>' +
-      '<div style="display:grid;grid-template-columns:1fr auto auto;gap:4px;font-size:13px;">' +
-      winnerRow("คะแนนเฉลี่ย (0-100)", avgScoreA, avgScoreB, function (v) { return v.toFixed(1); }) +
-      winnerRow("ผลตอบแทน 1 เดือนเฉลี่ย", avg1mA, avg1mB, function (v) { return (v > 0 ? "+" : "") + v.toFixed(1) + "%"; }) +
-      winnerRow("ผลตอบแทน 3 เดือนเฉลี่ย", avg3mA, avg3mB, function (v) { return (v > 0 ? "+" : "") + v.toFixed(1) + "%"; }) +
-      '</div>' +
-      '<div class="disclaimer" style="margin-top:10px;">ตัวเลขนี้คือตลาดที่เกิดขึ้นแล้วเท่านั้น (ราคาปัจจุบันเทียบราคาย้อนหลัง) ไม่ใช่การพยากรณ์อนาคต ทีมที่ตัวเลขดีกว่าอดีตไม่ได้แปลว่าจะทำผลงานดีกว่าอนาคตที่</div>' +
-      '</div>';
-    document.getElementById("teamSummaryWrap").innerHTML = summaryHtml;
-
-    if (a.length === 0 && b.length === 0) {
-      document.getElementById("teamResultsPanel").classList.add("hidden");
-      return;
-    }
-    document.getElementById("teamResultsPanel").classList.remove("hidden");
-
-    function teamTable(label, list) {
-      if (list.length === 0) return '<div class="empty">ทีม ' + label + ': ยังไม่มีผลลัพธ์</div>';
-      let html = '<div style="margin-bottom:16px;"><div style="font-weight:700;margin-bottom:6px;">ทีม ' + label + '</div><div class="table-scroll"><table><thead><tr>' +
-        '<th>สัญลักษณ์</th><th>ราคา</th><th>คะแนน</th><th>สัญญาณ</th><th>1 เดือน</th><th>3 เดือน</th></tr></thead><tbody>';
-      list.forEach(function (r) {
-        if (r.error) {
-          html += '<tr><td class="mono">' + r.symbol + '</td><td colspan="5" style="color:var(--bear);">' + r.error + '</td></tr>';
-          return;
-        }
-        const badgeClass = r.verdict === "ขาขึ้น" ? "up" : r.verdict === "ขาลง" ? "down" : "flat";
-        const sl = scoreLabel(r.score);
-        html += '<tr><td class="mono">' + r.symbol + '</td>' +
-          '<td class="mono">$' + r.price.toFixed(2) + '</td>' +
-          '<td class="mono" style="color:' + sl.color + ';font-weight:700;">' + r.score + '</td>' +
-          '<td><span class="badge ' + badgeClass + '">' + r.verdict + '</span></td>' +
-          '<td class="mono" style="color:' + (r.return1m >= 0 ? "var(--bull)" : "var(--bear)") + ';">' + (r.return1m > 0 ? "+" : "") + r.return1m.toFixed(1) + '%</td>' +
-          '<td class="mono" style="color:' + (r.return3m >= 0 ? "var(--bull)" : "var(--bear)") + ';">' + (r.return3m > 0 ? "+" : "") + r.return3m.toFixed(1) + '%</td></tr>';
-      });
-      html += '</tbody></table></div></div>';
-      return html;
-    }
-
-    document.getElementById("teamResultsContent").innerHTML = teamTable("A", a) + teamTable("B", b);
-  }
-
-  document.getElementById("teamCompareBtn").addEventListener("click", runTeamCompare);
-  document.getElementById("teamStopBtn").addEventListener("click", function () { state.teamStop = true; });
-
-  function sortBulkResults(rows) {
-    if (!state.bulkSortKey) return rows;
-    const key = state.bulkSortKey, dir = state.bulkSortDir;
-    return rows.slice().sort(function (a, b) {
-      if (a.error && b.error) return 0;
-      if (a.error) return 1;
-      if (b.error) return -1;
-      let av, bv;
-      if (key === "symbol") { av = a.symbol; bv = b.symbol; }
-      else if (key === "price") { av = a.price; bv = b.price; }
-      else if (key === "score") { av = a.score; bv = b.score; }
-      else if (key === "verdict") { av = a.score; bv = b.score; }
-      else if (key === "rsi") { av = a.rsi14 == null ? -1 : a.rsi14; bv = b.rsi14 == null ? -1 : b.rsi14; }
-      else if (key === "rel") { av = a.relStrength == null ? -999 : a.relStrength; bv = b.relStrength == null ? -999 : b.relStrength; }
-      else if (key === "risk") { av = a.vol; bv = b.vol; }
-      if (av < bv) return -1 * dir;
-      if (av > bv) return 1 * dir;
-      return 0;
-    });
-  }
-
-  function renderBulkResults() {
-    const el = document.getElementById("bulkResultsContent");
-    if (state.bulkResults.length === 0) {
-      el.innerHTML = '<div class="empty">ยังไม่มีผลลัพธ์ — วางรายชื่อหุ้นแล้วกดเริ่ม Bulk Scan</div>';
-      return;
-    }
-    const rows = sortBulkResults(state.bulkResults);
-    const headers = [
-      { key: "symbol", label: "สัญลักษณ์" },
-      { key: "price", label: "ราคา" },
-      { key: "score", label: "คะแนน" },
-      { key: "verdict", label: "สัญญาณ" },
-      { key: "rsi", label: "RSI(14)" },
-      { key: "rel", label: "RS vs SPY 3m" },
-      { key: "risk", label: "ความผันผวน" },
-    ];
-    let html = '<div class="table-scroll"><table><thead><tr>';
-    headers.forEach(function (h) {
-      const arrow = state.bulkSortKey === h.key ? (state.bulkSortDir === 1 ? " ▲" : " ▼") : "";
-      html += '<th class="sortable" data-sortkey="' + h.key + '">' + h.label + arrow + '</th>';
-    });
-    html += '</tr></thead><tbody>';
-    rows.forEach(function (r) {
-      if (r.error) {
-        html += '<tr data-sym="' + r.symbol + '"><td class="mono">' + r.symbol + '</td><td colspan="6" style="color:var(--bear);">' + r.error + '</td></tr>';
-        return;
-      }
-      const badgeClass = r.verdict === "ขาขึ้น" ? "up" : r.verdict === "ขาลง" ? "down" : "flat";
-      const sl = scoreLabel(r.score);
-      html += '<tr class="bulk-row" data-sym="' + r.symbol + '" style="cursor:pointer;">' +
-        '<td class="mono">' + r.symbol + '</td>' +
-        '<td class="mono">$' + r.price.toFixed(2) + '</td>' +
-        '<td class="mono" style="color:' + sl.color + ';font-weight:700;">' + r.score + '</td>' +
-        '<td><span class="badge ' + badgeClass + '">' + r.verdict + '</span></td>' +
-        '<td class="mono">' + (r.rsi14 !== null ? r.rsi14.toFixed(1) : "—") + '</td>' +
-        '<td class="mono">' + (r.relStrength !== null ? (r.relStrength > 0 ? "+" : "") + r.relStrength.toFixed(1) + "%" : "—") + '</td>' +
-        '<td class="mono">' + r.vol.toFixed(1) + '%</td></tr>';
-    });
-    html += '</tbody></table></div>';
-    el.innerHTML = html;
-
-    el.querySelectorAll('th.sortable').forEach(function (th) {
-      th.addEventListener('click', function () {
-        const key = th.dataset.sortkey;
-        if (state.bulkSortKey === key) state.bulkSortDir *= -1;
-        else { state.bulkSortKey = key; state.bulkSortDir = 1; }
-        renderBulkResults();
-      });
-    });
-    el.querySelectorAll('tr.bulk-row').forEach(function (tr) {
-      tr.addEventListener('click', function () {
-        document.getElementById("symbolInput").value = tr.dataset.sym;
-        document.querySelector('.tab-btn[data-tab="analyze"]').click();
-        runAnalysis(tr.dataset.sym);
-      });
-    });
-  }
-
-  renderTickerStrip();
+  /* ---------- boot ---------- */
+  document.querySelectorAll("#pfSwitch button").forEach(b => b.classList.toggle("active", b.dataset.pf === activePf));
+  setupCloudSync();
+  renderAll();
 })();
 </script>
 </body>
