@@ -69,6 +69,9 @@
   .back-link:hover { background: var(--accent); color: #fff; }
   .tabs { display: flex; gap: 6px; margin-bottom: 18px; flex-wrap: wrap; background: var(--surface-alt); padding: 5px; border-radius: 12px; width: fit-content; }
   .tab-btn { background: transparent; border: none; color: var(--muted); padding: 9px 16px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 700; }
+  .pf-switch { display: inline-flex; gap: 4px; margin-bottom: 12px; background: var(--surface-alt); border: 1px solid var(--border); padding: 4px; border-radius: 999px; flex-wrap: wrap; }
+  .pf-switch button { border: none; background: transparent; color: var(--muted); font-weight: 800; font-size: 12.5px; padding: 7px 15px; border-radius: 999px; cursor: pointer; font-family: inherit; }
+  .pf-switch button.active { background: var(--accent); color: #fff; }
   .tab-btn.active { color: var(--accent); background: var(--surface); box-shadow: var(--shadow); }
   .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; margin-bottom: 16px; box-shadow: var(--shadow); }
   .panel h3 { margin: 0 0 14px 0; font-size: 13px; letter-spacing: 0.4px; color: var(--muted); text-transform: uppercase; font-weight: 700; }
@@ -393,6 +396,13 @@
       <svg id="iconMoon" viewBox="0 0 24 24" width="18" height="18" style="display:none"><path fill="currentColor" d="M20.7 15.5A8.5 8.5 0 0 1 8.5 3.3a.6.6 0 0 0-.77-.75A10 10 0 1 0 21.45 16.3a.6.6 0 0 0-.75-.8z"/></svg>
     </button>
   </div>
+</div>
+
+<div class="pf-switch" id="pfSwitch" title="แยกพอร์ต Forex กับ Futures/Crypto — ทุนและสถิติแยกกัน">
+  <button data-pf="all" class="active">ทั้งหมด</button>
+  <button data-pf="forex">Forex</button>
+  <button data-pf="futures">Futures / Crypto</button>
+  <button data-pf="other" hidden>อื่นๆ</button>
 </div>
 
 <div class="tabs">
@@ -955,6 +965,38 @@
   let trades = loadTrades();
   let capital = loadCapital();
 
+  /* ---------- portfolios: Forex vs Futures/Crypto (separate capital + views) ---------- */
+  const PF_LIST = ["forex", "futures", "other"];
+  const PF_LABEL = { all: "ทั้งหมด", forex: "Forex", futures: "Futures / Crypto", other: "อื่นๆ" };
+  const CAPITALS_KEY = "tj_capitals_v1";
+  const PF_ACTIVE_KEY = "tj_pf_active";
+  const pfKey = (mt) => (mt === "forex" ? "forex" : mt === "other" ? "other" : "futures");
+  let activePf = "all";
+  try { const v = localStorage.getItem(PF_ACTIVE_KEY); if (["all", "forex", "futures", "other"].includes(v)) activePf = v; } catch (e) {}
+  let capitals = { forex: 0, futures: 0, other: 0 };
+  (function loadCapitals() {
+    try {
+      const v = JSON.parse(localStorage.getItem(CAPITALS_KEY) || "null");
+      if (v && typeof v === "object") { capitals = { forex: Number(v.forex) || 0, futures: Number(v.futures) || 0, other: Number(v.other) || 0 }; return; }
+    } catch (e) {}
+    // migrate: old single tj_capital → assign to the market with the most trades
+    if (capital > 0) {
+      const cnt = { forex: 0, futures: 0, other: 0 };
+      trades.forEach(t => { cnt[pfKey(t.marketType)]++; });
+      const top = PF_LIST.slice().sort((a, b) => cnt[b] - cnt[a])[0];
+      capitals[top] = capital;
+      try { localStorage.setItem(CAPITALS_KEY, JSON.stringify(capitals)); } catch (e) {}
+    }
+  })();
+  function pfTrades() { return activePf === "all" ? trades.slice() : trades.filter(t => pfKey(t.marketType) === activePf); }
+  function pfCapital() { return activePf === "all" ? (capitals.forex + capitals.futures + capitals.other) : (capitals[activePf] || 0); }
+  function saveCapitals() {
+    try { localStorage.setItem(CAPITALS_KEY, JSON.stringify(capitals)); } catch (e) {}
+    capital = capitals.forex + capitals.futures + capitals.other;
+    try { localStorage.setItem(CAPITAL_KEY, String(capital)); } catch (e) {} // legacy total for the dashboard
+    pushCloudSync();
+  }
+
   const PLAYBOOKS_KEY = "tj_playbooks_v1";
   function loadPlaybooks() {
     try {
@@ -1079,10 +1121,12 @@
   });
 
   /* ---------- tabs ---------- */
+  let currentTab = "calendar";
   document.querySelectorAll(".tab-btn").forEach(btn => {
     btn.addEventListener("click", () => switchTab(btn.dataset.tab));
   });
   function switchTab(tab) {
+    currentTab = tab;
     document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
     document.getElementById("tab-calendar").classList.toggle("hidden", tab !== "calendar");
     document.getElementById("tab-overview").classList.toggle("hidden", tab !== "overview");
@@ -1094,6 +1138,31 @@
     if (tab === "playbook") renderPlaybooks();
     if (tab === "chart") initChartTab();
   }
+
+  /* ---------- portfolio switch ---------- */
+  function syncPfSwitchUI() {
+    const hasOther = trades.some(t => t.marketType === "other");
+    if (!hasOther && activePf === "other") activePf = "all";
+    document.querySelectorAll("#pfSwitch button").forEach(b => {
+      b.classList.toggle("active", b.dataset.pf === activePf);
+      if (b.dataset.pf === "other") b.hidden = !hasOther;
+    });
+  }
+  function refreshForPortfolio() {
+    renderCalendar();
+    if (currentTab === "overview") renderOverview();
+    else if (currentTab === "log") renderLog();
+    else if (currentTab === "playbook") renderPlaybooks();
+  }
+  document.querySelectorAll("#pfSwitch button").forEach(btn => {
+    btn.addEventListener("click", () => {
+      activePf = btn.dataset.pf;
+      try { localStorage.setItem(PF_ACTIVE_KEY, activePf); } catch (e) {}
+      syncPfSwitchUI();
+      refreshForPortfolio();
+    });
+  });
+  syncPfSwitchUI();
 
   /* ---------- calendar ---------- */
   const today = new Date();
@@ -1111,7 +1180,7 @@
 
   function tradesByDate() {
     const map = {};
-    trades.forEach(t => {
+    pfTrades().forEach(t => {
       if (!map[t.date]) map[t.date] = [];
       map[t.date].push(t);
     });
@@ -1362,7 +1431,7 @@
 
   function openDayModal(key) {
     dayModalDate = key;
-    const dayTrades = trades.filter(t => t.date === key).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    const dayTrades = pfTrades().filter(t => t.date === key).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
     const closedDayTrades = dayTrades.filter(t => !isPending(t));
     const total = closedDayTrades.reduce((s, t) => s + pnlNum(t.pnl), 0);
     const hasClosed = closedDayTrades.length > 0;
@@ -1422,8 +1491,9 @@
 
   /* ---------- overview: stats + charts ---------- */
   function computeStats() {
-    const total = trades.length;
-    const closed = trades.filter(t => !isPending(t));
+    const scope = pfTrades();
+    const total = scope.length;
+    const closed = scope.filter(t => !isPending(t));
     const pendingCount = total - closed.length;
     const wins = closed.filter(t => pnlNum(t.pnl) > 0);
     const losses = closed.filter(t => pnlNum(t.pnl) < 0);
@@ -1457,7 +1527,7 @@
       map[key].totalPnl += pnl;
       if (pnl > 0) map[key].wins++;
     }
-    trades.forEach(t => {
+    pfTrades().forEach(t => {
       if (isPending(t)) return;
       const pnl = pnlNum(t.pnl);
       (t.tags || []).forEach(tag => add(tag, pnl, "positive"));
@@ -1477,7 +1547,7 @@
   }
   function renderEdgeReport() {
     const wrap = document.getElementById("edgeReportWrap");
-    const closed = trades.filter(t => !isPending(t));
+    const closed = pfTrades().filter(t => !isPending(t));
     if (closed.length < 4) { wrap.innerHTML = '<div class="empty">ต้องมีเทรดที่ปิดแล้วอย่างน้อย 4 ไม้</div>'; return; }
 
     const groupTable = (title, keyFn, minN) => {
@@ -1546,7 +1616,7 @@
 
   function renderExitAnalysis() {
     const wrap = document.getElementById("exitAnalysisWrap");
-    const cl = trades.filter(t => !isPending(t) && t.entry != null && t.exit != null && t.sl != null && Math.abs(t.entry - t.sl) > 0);
+    const cl = pfTrades().filter(t => !isPending(t) && t.entry != null && t.exit != null && t.sl != null && Math.abs(t.entry - t.sl) > 0);
     if (cl.length < 4) { wrap.innerHTML = '<div class="empty">ต้องมีเทรดที่ปิดแล้ว + มีราคาเข้า/SL/ออก อย่างน้อย 4 ไม้ (ใส่ TP ด้วยจะละเอียดขึ้น)</div>'; return; }
     const dir = (t) => t.side === "short" ? -1 : 1;
     const realR = (t) => ((t.exit - t.entry) * dir(t)) / Math.abs(t.entry - t.sl);
@@ -1624,7 +1694,7 @@
   }
 
   function computeMaxDrawdown() {
-    const sorted = [...trades].filter(t => !isPending(t)).sort((a, b) => a.date.localeCompare(b.date) || (a.createdAt || 0) - (b.createdAt || 0));
+    const sorted = pfTrades().filter(t => !isPending(t)).sort((a, b) => a.date.localeCompare(b.date) || (a.createdAt || 0) - (b.createdAt || 0));
     let cum = 0, peak = 0, maxDD = 0;
     sorted.forEach(t => {
       cum += pnlNum(t.pnl) || 0;
@@ -1640,7 +1710,7 @@
     const recoveryFactor = maxDD > 0 ? s.totalPnl / maxDD : (s.totalPnl > 0 ? 5 : 0);
     const recoveryScaled = Math.max(0, Math.min(100, (recoveryFactor / 5) * 100));
 
-    const rulesTrades = trades.filter(t => t.followedRules !== undefined && t.followedRules !== null);
+    const rulesTrades = pfTrades().filter(t => t.followedRules !== undefined && t.followedRules !== null);
     const planAdherence = rulesTrades.length ? (rulesTrades.filter(t => t.followedRules).length / rulesTrades.length * 100) : 0;
 
     const byDate = tradesByDate();
@@ -1705,26 +1775,28 @@
   function renderOverview() {
     const s = computeStats();
     const closedCount = s.total - s.pendingCount;
-    const currentEquity = capital + s.totalPnl;
-    const returnPct = capital > 0 ? (s.totalPnl / capital * 100) : null;
+    const cap = pfCapital();
+    const currentEquity = cap + s.totalPnl;
+    const returnPct = cap > 0 ? (s.totalPnl / cap * 100) : null;
     const grid = document.getElementById("statsGrid");
     function metric(label, value, cls) {
       return `<div class="metric"><div class="metric-label">${label}</div><div class="metric-value mono ${cls || ""}">${value}</div></div>`;
     }
-    const equityUp = currentEquity >= capital;
+    const equityUp = currentEquity >= cap;
     const heroGradient = equityUp ? "var(--accent), var(--accent-hover)" : "var(--bear), #b91c1c";
+    const pfSuffix = activePf === "all" ? "" : " · " + PF_LABEL[activePf];
     const equityHeroHtml = `<div class="metric equity-hero" style="background:linear-gradient(135deg, ${heroGradient});">
       <div>
-        <div class="equity-hero-label">ยอดรวมปัจจุบัน (ทุน + กำไร/ขาดทุน)</div>
+        <div class="equity-hero-label">ยอดรวมปัจจุบัน (ทุน + กำไร/ขาดทุน)${pfSuffix}</div>
         <div class="equity-hero-value">${fmtPlain(currentEquity)}</div>
-        <div class="equity-hero-sub">ทุน ${fmtPlain(capital)} ${s.totalPnl >= 0 ? "+" : "−"} ${fmtPlain(Math.abs(s.totalPnl))}</div>
+        <div class="equity-hero-sub">ทุน ${fmtPlain(cap)} ${s.totalPnl >= 0 ? "+" : "−"} ${fmtPlain(Math.abs(s.totalPnl))}</div>
       </div>
       ${returnPct !== null ? `<div class="equity-hero-badge">${returnPct >= 0 ? "+" : ""}${returnPct.toFixed(2)}%</div>` : ""}
     </div>`;
 
     grid.innerHTML = [
       equityHeroHtml,
-      `<div class="metric capital-metric"><div class="metric-label">ทุนเริ่มต้น <button type="button" id="editCapitalBtn" class="metric-edit-btn" title="แก้ไขทุนเริ่มต้น">✎</button></div><div class="metric-value mono">${fmtPlain(capital)}</div></div>`,
+      `<div class="metric capital-metric"><div class="metric-label">ทุนเริ่มต้น${activePf === "all" ? " (รวมทุกพอร์ต)" : pfSuffix} <button type="button" id="editCapitalBtn" class="metric-edit-btn" title="แก้ไขทุนเริ่มต้น">✎</button></div><div class="metric-value mono">${fmtPlain(cap)}</div></div>`,
       metric("กำไร/ขาดทุนรวม", fmtMoney(s.totalPnl), s.totalPnl >= 0 ? "pos" : "neg"),
       metric("ผลตอบแทน (%)", returnPct !== null ? (returnPct >= 0 ? "+" : "") + returnPct.toFixed(2) + "%" : "—", returnPct !== null ? (returnPct >= 0 ? "pos" : "neg") : ""),
       metric("จำนวนเทรดทั้งหมด", s.total),
@@ -1739,11 +1811,15 @@
     ].join("");
 
     document.getElementById("editCapitalBtn").addEventListener("click", () => {
+      if (activePf === "all") {
+        Swal.fire({ icon: "info", title: "ตั้งทุนแยกพอร์ต", text: "เลือกพอร์ต Forex หรือ Futures / Crypto ด้านบนก่อน แล้วค่อยตั้งทุนของพอร์ตนั้น" });
+        return;
+      }
       Swal.fire({
-        title: "ตั้งค่าทุนเริ่มต้น",
+        title: "ตั้งค่าทุนเริ่มต้น — " + PF_LABEL[activePf],
         input: "number",
         inputLabel: "ทุนเริ่มต้น ($)",
-        inputValue: capital,
+        inputValue: capitals[activePf] || 0,
         showCancelButton: true,
         confirmButtonText: "บันทึก",
         cancelButtonText: "ยกเลิก",
@@ -1752,10 +1828,10 @@
         },
       }).then((result) => {
         if (!result.isConfirmed) return;
-        capital = Number(result.value);
-        saveCapital();
+        capitals[activePf] = Number(result.value);
+        saveCapitals();
         renderOverview();
-        successToast("บันทึกทุนเริ่มต้นเรียบร้อย");
+        successToast("บันทึกทุนเริ่มต้น (" + PF_LABEL[activePf] + ") เรียบร้อย");
       });
     });
 
@@ -1768,22 +1844,23 @@
   }
 
   function buildEquityCurveSvg() {
-    const sorted = [...trades].filter(t => !isPending(t)).sort((a, b) => a.date.localeCompare(b.date) || (a.createdAt || 0) - (b.createdAt || 0));
+    const cap = pfCapital();
+    const sorted = pfTrades().filter(t => !isPending(t)).sort((a, b) => a.date.localeCompare(b.date) || (a.createdAt || 0) - (b.createdAt || 0));
     if (!sorted.length) return '<div class="empty">ยังไม่มีเทรดที่ปิดแล้ว</div>';
-    let cum = capital;
+    let cum = cap;
     const points = sorted.map(t => { cum += pnlNum(t.pnl); return cum; });
 
     const w = 900, h = 260, padL = 60, padR = 20, padT = 20, padB = 30;
-    const minV = Math.min(capital, ...points);
-    const maxV = Math.max(capital, ...points);
+    const minV = Math.min(cap, ...points);
+    const maxV = Math.max(cap, ...points);
     const range = (maxV - minV) || 1;
     const xStep = points.length > 1 ? (w - padL - padR) / (points.length - 1) : 0;
     const xAt = i => padL + i * xStep;
     const yAt = v => padT + (h - padT - padB) * (1 - (v - minV) / range);
-    const zeroY = yAt(capital);
+    const zeroY = yAt(cap);
     const pathPts = points.map((v, i) => `${xAt(i).toFixed(1)},${yAt(v).toFixed(1)}`).join(" ");
     const last = points[points.length - 1];
-    const lineColor = last >= capital ? "var(--bull)" : "var(--bear)";
+    const lineColor = last >= cap ? "var(--bull)" : "var(--bear)";
     const maxLabelY = yAt(maxV);
     const minLabelY = yAt(minV);
     const showMaxLabel = Math.abs(maxLabelY - zeroY) > 14;
@@ -1791,7 +1868,7 @@
 
     return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="260" preserveAspectRatio="none">
       <line x1="${padL}" y1="${zeroY.toFixed(1)}" x2="${w - padR}" y2="${zeroY.toFixed(1)}" style="stroke:var(--border)" stroke-dasharray="4 4"/>
-      <text x="${padL - 8}" y="${zeroY.toFixed(1)}" font-size="10" text-anchor="end" dy="4" style="fill:var(--muted)">${fmtPlain(capital)}</text>
+      <text x="${padL - 8}" y="${zeroY.toFixed(1)}" font-size="10" text-anchor="end" dy="4" style="fill:var(--muted)">${fmtPlain(cap)}</text>
       ${showMaxLabel ? `<text x="${padL - 8}" y="${maxLabelY.toFixed(1)}" font-size="10" text-anchor="end" dy="4" style="fill:var(--muted)">${maxV.toFixed(0)}</text>` : ""}
       ${showMinLabel ? `<text x="${padL - 8}" y="${minLabelY.toFixed(1)}" font-size="10" text-anchor="end" dy="4" style="fill:var(--muted)">${minV.toFixed(0)}</text>` : ""}
       <polyline points="${pathPts}" fill="none" style="stroke:${lineColor}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
@@ -1809,7 +1886,7 @@
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       months.push({ y: d.getFullYear(), m: d.getMonth(), total: 0 });
     }
-    trades.forEach(t => {
+    pfTrades().forEach(t => {
       if (isPending(t)) return;
       const [y, m] = t.date.split("-").map(Number);
       const bucket = months.find(mo => mo.y === y && mo.m === (m - 1));
@@ -2163,7 +2240,7 @@
     const dateFrom = document.getElementById("logDateFrom").value;
     const dateTo = document.getElementById("logDateTo").value;
 
-    let list = [...trades];
+    let list = pfTrades();
     if (marketFilter) list = list.filter(t => t.marketType === marketFilter);
     if (dateFrom) list = list.filter(t => t.date >= dateFrom);
     if (dateTo) list = list.filter(t => t.date <= dateTo);
@@ -2500,7 +2577,14 @@
     }
     const DIR = { both: "ทั้งสองทาง", long: "Long", short: "Short" };
     const MKT = { any: "ทุกตลาด", forex: "Forex", futures: "Futures/Perp" };
-    const sorted = playbooks.slice().sort((a, b) => {
+    const pfScoped = (activePf === "forex" || activePf === "futures")
+      ? playbooks.filter(p => !p.market || p.market === "any" || p.market === activePf)
+      : playbooks;
+    if (!pfScoped.length) {
+      wrap.innerHTML = `<div class="empty">ยังไม่มีเซ็ตอัพสำหรับพอร์ต ${PF_LABEL[activePf]}</div>`;
+      return;
+    }
+    const sorted = pfScoped.slice().sort((a, b) => {
       const arc = (a.active === false ? 1 : 0) - (b.active === false ? 1 : 0);
       return arc !== 0 ? arc : (a.name || "").localeCompare(b.name || "");
     });
@@ -2651,7 +2735,7 @@
     document.getElementById("tradeDeleteBtn").classList.toggle("hidden", !t);
 
     document.getElementById("tfDate").value = t ? t.date : (prefillDate || todayKey());
-    tfMarketType.value = t ? t.marketType : "forex";
+    tfMarketType.value = t ? t.marketType : (activePf !== "all" ? activePf : "forex");
     document.getElementById("tfSymbol").value = t ? (t.symbol || "") : "";
     currentSide = t ? t.side : "long";
     updateSideToggle();
@@ -2918,8 +3002,10 @@
     }
     saveTrades();
     closeTradeModal();
+    syncPfSwitchUI();
     renderCalendar();
     renderLog();
+    if (currentTab === "overview") renderOverview();
     successToast(isEdit ? "แก้ไขเทรดเรียบร้อย" : "บันทึกเทรดเรียบร้อย");
   }
 
@@ -3012,7 +3098,7 @@
       app: "ee-suite-backup",
       exportedAt: new Date().toISOString(),
       elliottWave: { chapters: exportChapters },
-      tradeJournal: { trades, capital, checklist, playbooks },
+      tradeJournal: { trades, capital, capitals, checklist, playbooks },
       stockDecide: {
         watchlist: JSON.parse(localStorage.getItem("sd_watchlist") || "[]"),
         log: JSON.parse(localStorage.getItem("sd_log") || "[]"),
@@ -3037,7 +3123,12 @@
       saveTrades();
       counts.trades = imported.length;
     }
-    if (tj && tj.capital != null && !isNaN(Number(tj.capital))) {
+    if (tj && tj.capitals && typeof tj.capitals === "object") {
+      capitals = { forex: Number(tj.capitals.forex) || 0, futures: Number(tj.capitals.futures) || 0, other: Number(tj.capitals.other) || 0 };
+      try { localStorage.setItem(CAPITALS_KEY, JSON.stringify(capitals)); } catch (e) {}
+      capital = capitals.forex + capitals.futures + capitals.other;
+      try { localStorage.setItem(CAPITAL_KEY, String(capital)); } catch (e) {}
+    } else if (tj && tj.capital != null && !isNaN(Number(tj.capital))) {
       capital = Number(tj.capital);
       saveCapital();
     }
@@ -3148,7 +3239,7 @@
     const db = FirebaseSync.getDb();
     const uid = FirebaseSync.getUser().uid;
     db.collection("users").doc(uid).collection("sync").doc("tradeJournal")
-      .set({ trades, capital, checklist, playbooks, updatedAt: Date.now() })
+      .set({ trades, capital, capitals, checklist, playbooks, updatedAt: Date.now() })
       .catch(err => console.error("sync push failed", err));
   }
 
@@ -3164,6 +3255,10 @@
         trades.forEach(t => { map[t.id] = t; }); // local wins if the same id exists on both sides
         trades = Object.values(map);
         if (remote.capital != null && capital === 0) capital = remote.capital;
+        if (remote.capitals && typeof remote.capitals === "object" && (capitals.forex + capitals.futures + capitals.other) === 0) {
+          capitals = { forex: Number(remote.capitals.forex) || 0, futures: Number(remote.capitals.futures) || 0, other: Number(remote.capitals.other) || 0 };
+          try { localStorage.setItem(CAPITALS_KEY, JSON.stringify(capitals)); } catch (e) {}
+        }
         if (Array.isArray(remote.checklist) && remote.checklist.length) {
           checklist = remote.checklist.map(String);
           try { localStorage.setItem(CHECKLIST_LS, JSON.stringify(checklist)); } catch (e) {}
@@ -3179,9 +3274,9 @@
         saveTrades();
         saveCapital();
         syncApplyingRemote = false;
-        await ref.set({ trades, capital, checklist, playbooks, updatedAt: Date.now() });
+        await ref.set({ trades, capital, capitals, checklist, playbooks, updatedAt: Date.now() });
       } else {
-        await ref.set({ trades, capital, checklist, playbooks, updatedAt: Date.now() });
+        await ref.set({ trades, capital, capitals, checklist, playbooks, updatedAt: Date.now() });
       }
     } catch (err) {
       console.error("initial sync failed", err);
@@ -3196,6 +3291,10 @@
       syncApplyingRemote = true;
       trades = data.trades || [];
       if (data.capital != null) capital = data.capital;
+      if (data.capitals && typeof data.capitals === "object") {
+        capitals = { forex: Number(data.capitals.forex) || 0, futures: Number(data.capitals.futures) || 0, other: Number(data.capitals.other) || 0 };
+        try { localStorage.setItem(CAPITALS_KEY, JSON.stringify(capitals)); } catch (e) {}
+      }
       if (Array.isArray(data.checklist) && data.checklist.length) {
         checklist = data.checklist.map(String);
         try { localStorage.setItem(CHECKLIST_LS, JSON.stringify(checklist)); } catch (e) {}
@@ -3207,9 +3306,11 @@
       saveTrades();
       saveCapital();
       syncApplyingRemote = false;
+      if (typeof syncPfSwitchUI === "function") syncPfSwitchUI();
       renderCalendar();
       renderLog();
       if (typeof renderPlaybooks === "function" && !document.getElementById("tab-playbook").classList.contains("hidden")) renderPlaybooks();
+      if (typeof currentTab !== "undefined" && currentTab === "overview") renderOverview();
     }, err => console.error("sync listener error", err));
   }
 
@@ -3990,6 +4091,7 @@
   /* ---------- init ---------- */
   toggleMarketFields();
   updateSideToggle();
+  syncPfSwitchUI();
   setupCloudSync();
   renderCalendar();
 })();
