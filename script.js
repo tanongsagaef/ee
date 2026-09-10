@@ -91,11 +91,14 @@ function applyTheme(theme) {
     iconSun.style.display = "";
     iconMoon.style.display = "none";
   }
-  localStorage.setItem("ewTheme", theme);
+  // shares one light/dark preference with the rest of the ee suite (tj_theme)
+  try { localStorage.setItem("tj_theme", theme); } catch (e) {}
 }
 
-const savedTheme = localStorage.getItem("ewTheme") ||
-  (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+const savedTheme = (function () {
+  try { return localStorage.getItem("tj_theme") || localStorage.getItem("ewTheme"); }
+  catch (e) { return null; }
+})() || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
 applyTheme(savedTheme);
 
 document.getElementById("themeToggle").addEventListener("click", () => {
