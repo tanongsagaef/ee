@@ -789,6 +789,21 @@
         <div class="field"><label class="small">ลิงก์กราฟ Setup</label><input type="text" id="tfChartSetup" placeholder="ลิงก์รูป/TradingView ตอนเข้า"></div>
         <div class="field"><label class="small">ลิงก์กราฟตอนออก</label><input type="text" id="tfChartExit" placeholder="ลิงก์รูป/TradingView ตอนออก"></div>
       </div>
+      <div class="row">
+        <div class="field">
+          <label class="small">ผลเทรด (Win / Loss / เสมอ)</label>
+          <select id="tfOutcome">
+            <option value="">— อิงจากกำไร/ขาดทุน —</option>
+            <option value="win">ชนะ (Win)</option>
+            <option value="loss">แพ้ (Loss)</option>
+            <option value="be">เสมอ (Breakeven)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="small">คะแนนจาก AI</label>
+          <input type="text" id="tfAiScoreView" readonly placeholder="กด 'ให้ AI วิจารณ์เทรดนี้' ด้านล่าง">
+        </div>
+      </div>
     </div>
 
     <div class="row">
@@ -1378,6 +1393,10 @@
 
     const flags = [];
     if (isPending(t)) flags.push("⏳ รอผลเทรด");
+    if (t.outcome === "win") flags.push("ชนะ");
+    else if (t.outcome === "loss") flags.push("แพ้");
+    else if (t.outcome === "be") flags.push("เสมอ");
+    if (t.aiScore != null) flags.push("🤖 " + t.aiScore + "/100" + (t.aiGrade ? " · " + t.aiGrade : ""));
     if (Array.isArray(t.checklistDone) && t.checklistTotal) {
       flags.push("แผน " + t.checklistDone.length + "/" + t.checklistTotal + (t.checklistDone.length === t.checklistTotal ? " ✓" : ""));
     } else if (t.followedRules) {
@@ -1495,14 +1514,17 @@
     const total = scope.length;
     const closed = scope.filter(t => !isPending(t));
     const pendingCount = total - closed.length;
-    const wins = closed.filter(t => pnlNum(t.pnl) > 0);
-    const losses = closed.filter(t => pnlNum(t.pnl) < 0);
+    // win/loss COUNT respects a manual outcome (ชนะ/แพ้/เสมอ); money aggregates stay P/L-based
+    const wins = closed.filter(t => tradeOutcome(t) === "win");
+    const losses = closed.filter(t => tradeOutcome(t) === "loss");
+    const pnlWins = closed.filter(t => pnlNum(t.pnl) > 0);
+    const pnlLosses = closed.filter(t => pnlNum(t.pnl) < 0);
     const totalPnl = closed.reduce((s, t) => s + pnlNum(t.pnl), 0);
     const winRate = closed.length ? (wins.length / closed.length * 100) : 0;
-    const avgWin = wins.length ? wins.reduce((s, t) => s + pnlNum(t.pnl), 0) / wins.length : 0;
-    const avgLoss = losses.length ? losses.reduce((s, t) => s + pnlNum(t.pnl), 0) / losses.length : 0;
-    const grossWin = wins.reduce((s, t) => s + pnlNum(t.pnl), 0);
-    const grossLoss = Math.abs(losses.reduce((s, t) => s + pnlNum(t.pnl), 0));
+    const avgWin = pnlWins.length ? pnlWins.reduce((s, t) => s + pnlNum(t.pnl), 0) / pnlWins.length : 0;
+    const avgLoss = pnlLosses.length ? pnlLosses.reduce((s, t) => s + pnlNum(t.pnl), 0) / pnlLosses.length : 0;
+    const grossWin = pnlWins.reduce((s, t) => s + pnlNum(t.pnl), 0);
+    const grossLoss = Math.abs(pnlLosses.reduce((s, t) => s + pnlNum(t.pnl), 0));
     const profitFactor = grossLoss > 0 ? (grossWin / grossLoss) : (grossWin > 0 ? Infinity : 0);
 
     const byDate = tradesByDate();
@@ -1948,10 +1970,10 @@
     /* ---- futures detail rows (ตามฟอร์ม Futures / Perp) ---- */
     const futL = L.filter(t => t.marketType === "futures");
     const pct = (a, b) => (a == null || b == null || Number(b) === 0) ? "" : (Math.abs(a - b) / Math.abs(b) * 100).toFixed(2);
-    const futHead = ["วันที่เปิด", "วันที่ปิด", "ระยะเวลา", "สัญลักษณ์", "ทิศทาง", "Lev", "Size", "เข้า", "SL", "TP", "ออก", "ออกแบบ", "PNL %", "กำไร/ขาดทุน $", "ค่าธรรมเนียม", "SL %", "TP %", "RRR แผน", "Margin $", "เสี่ยง $", "RPT %", "Setup", "เงื่อนไขหยุด", "เหตุผลเข้า", "แผนออก", "ออกจริง", "เกรด", "ผล"];
+    const futHead = ["วันที่เปิด", "วันที่ปิด", "ระยะเวลา", "สัญลักษณ์", "ทิศทาง", "Lev", "Size", "เข้า", "SL", "TP", "ออก", "ออกแบบ", "PNL %", "กำไร/ขาดทุน $", "ค่าธรรมเนียม", "SL %", "TP %", "RRR แผน", "Margin $", "เสี่ยง $", "RPT %", "Setup", "เงื่อนไขหยุด", "เหตุผลเข้า", "แผนออก", "ออกจริง", "เกรด", "AI", "ผล"];
+    const WL = { win: "W", loss: "L", be: "BE", pending: "" };
     const futRows = futL.map(t => {
       const clean = (s) => (s || "").replace(/\s+/g, " ").trim();
-      const wl = isPending(t) ? "" : (pnlNum(t.pnl) > 0 ? "W" : pnlNum(t.pnl) < 0 ? "L" : "BE");
       return [
         t.date || "", t.dateClose || "", t.duration || "", t.symbol || "", t.side === "long" ? "LONG" : "SHORT",
         t.leverage != null ? t.leverage : "", t.size != null ? t.size : "",
@@ -1960,7 +1982,7 @@
         pct(t.entry, t.sl) === "" ? "" : pct(t.entry, t.sl), pct(t.tp, t.entry) === "" ? "" : pct(t.tp, t.entry),
         t.rrr != null ? t.rrr : "", t.margin != null ? t.margin : "", t.riskUsd != null ? t.riskUsd : "",
         t.riskPct != null ? t.riskPct : "", clean(t.setup), clean(t.stopCond), clean(t.entryReason),
-        clean(t.exitPlan), clean(t.exitExec), t.grade || "", wl,
+        clean(t.exitPlan), clean(t.exitExec), t.grade || "", (t.aiScore != null ? t.aiScore + (t.aiGrade ? "/" + t.aiGrade : "") : ""), WL[tradeOutcome(t)] || "",
       ];
     });
 
@@ -2356,6 +2378,23 @@
   let currentImageBefore = null;
   let currentImageAfter = null;
   let currentGrade = null;
+  let aiScoreVal = null;   // 0-100 score from the last AI review of this trade
+  let aiGradeVal = null;   // A-E grade the AI suggested
+  function renderAiScoreView() {
+    const el = document.getElementById("tfAiScoreView");
+    if (!el) return;
+    el.value = aiScoreVal != null
+      ? `${aiScoreVal}/100${aiGradeVal ? " · เกรด " + aiGradeVal : ""}`
+      : "";
+  }
+
+  // manual outcome wins; otherwise derive from P/L sign
+  function tradeOutcome(t) {
+    if (t.outcome === "win" || t.outcome === "loss" || t.outcome === "be") return t.outcome;
+    if (isPending(t)) return "pending";
+    const n = pnlNum(t.pnl);
+    return n > 0 ? "win" : n < 0 ? "loss" : "be";
+  }
 
   function toggleMarketFields() {
     const type = tfMarketType.value;
@@ -2364,7 +2403,7 @@
     document.getElementById("tfFuturesFields").classList.add("hidden"); // Contracts/Points ถูกแทนด้วย Size ในบล็อกละเอียด
     document.getElementById("tfFuturesDetail").classList.toggle("hidden", !isFut);
     // โหมด Futures: ตัดช่องของฟอร์มเดิมออก เหลือแค่เช็กลิสต์ + บล็อก Futures/Perp + ราคา/PNL/รูปก่อน-หลัง/โน้ต
-    ["tfSessionRow", "tfModelRow", "tfGradeRow", "tfDisciplineRow", "tfTagsRow", "tfTvLinkRow", "tfTvSymbolRow"]
+    ["tfSessionRow", "tfModelRow", "tfDisciplineRow", "tfTagsRow", "tfTvLinkRow", "tfTvSymbolRow"]
       .forEach(id => { const el = document.getElementById(id); if (el) el.classList.toggle("hidden", isFut); });
     if (isFut && typeof updateFuturesDetailCalc === "function") updateFuturesDetailCalc();
     document.getElementById("tfSymbolLabel").textContent =
@@ -2799,6 +2838,10 @@
     document.getElementById("tfExitExec").value = t && t.exitExec ? t.exitExec : "";
     document.getElementById("tfChartSetup").value = t && t.chartSetup ? t.chartSetup : "";
     document.getElementById("tfChartExit").value = t && t.chartExit ? t.chartExit : "";
+    document.getElementById("tfOutcome").value = t && t.outcome ? t.outcome : "";
+    aiScoreVal = t && t.aiScore != null ? t.aiScore : null;
+    aiGradeVal = t && t.aiGrade ? t.aiGrade : null;
+    renderAiScoreView();
 
     toggleMarketFields();
     updateTradeCalc();
@@ -2853,17 +2896,29 @@
       const nearLows = swings.lows.slice(-5).map(l => l.price).join(", ");
       const nearHighs = swings.highs.slice(-5).map(h => h.price).join(", ");
 
+      const g = (id) => (document.getElementById(id) ? document.getElementById(id).value.trim() : "");
+      const isFut = tfMarketType.value === "futures";
       const promptLines = [
         "คุณเป็นโค้ชเทรดมืออาชีพ ช่วยวิจารณ์เทรดนี้แบบกระชับ ภาษาไทย 3-5 ประโยค:",
         "Symbol: " + symbol,
         "ทิศทาง: " + (currentSide === "long" ? "Long/Buy" : "Short/Sell"),
         "ราคาเข้า: " + (entry || "ไม่ระบุ"),
+        document.getElementById("tfSl").value ? "ราคา SL: " + document.getElementById("tfSl").value : "",
+        document.getElementById("tfTp").value ? "ราคาเป้า TP: " + document.getElementById("tfTp").value : "",
         exit ? "ราคาออก: " + exit : "",
         pnl !== "" ? "กำไร/ขาดทุน: " + pnl : "(ยังไม่ปิดเทรด)",
+        isFut && g("tfLeverage") ? "Leverage: " + g("tfLeverage") + "x" : "",
+        isFut && g("tfRrr") ? "RRR ที่วางแผน: " + g("tfRrr") : "",
+        isFut && g("tfSetup") ? "Setup: " + g("tfSetup") : "",
+        isFut && g("tfEntryReason") ? "เหตุผลเข้า: " + g("tfEntryReason") : "",
+        isFut && g("tfExitPlan") ? "แผนการออก: " + g("tfExitPlan") : "",
+        isFut && g("tfExitExec") ? "การออกจริง: " + g("tfExitExec") : "",
         candles.length ? "แนวรับล่าสุดที่ตรวจพบจากราคาปัจจุบัน: " + (nearLows || "ไม่พบ") : "",
         candles.length ? "แนวต้านล่าสุดที่ตรวจพบจากราคาปัจจุบัน: " + (nearHighs || "ไม่พบ") : "",
         candles.length ? "หมายเหตุ: แนวรับ-ต้านข้างต้นคำนวณจากราคาล่าสุด ไม่ใช่ ณ เวลาเข้าเทรดจริง ใช้ประกอบการวิจารณ์เชิงหลักการเท่านั้น" : "",
-        "ให้ตอบครอบคลุม: 1) จุดเข้า/ออกสมเหตุสมผลไหม 2) การจัดการความเสี่ยงเป็นอย่างไร 3) บทเรียนที่ควรจำไปใช้ครั้งหน้า",
+        "ให้ตอบครอบคลุม: 1) จุดเข้า/ออกสมเหตุสมผลไหม 2) การจัดการความเสี่ยงเป็นอย่างไร 3) การทำตามแผน (แผนออก vs ออกจริง) 4) บทเรียนที่ควรจำไปใช้ครั้งหน้า",
+        "แล้วปิดท้ายด้วยการให้คะแนน โดยพิมพ์บรรทัดสุดท้ายในรูปแบบนี้เป๊ะ ๆ ไม่มีอย่างอื่นต่อท้าย: คะแนน: <ตัวเลข 0-100> | เกรด: <A|B|C|D|E>",
+        "เกณฑ์เกรด: A = เทรดตามแผนเป๊ะ ความเสี่ยงคุมดี, C = พอใช้/มีจุดพลาดเล็กน้อย, E = แหกแผน/เสี่ยงเกินตัว (เกรดวัดที่กระบวนการ ไม่ใช่กำไร-ขาดทุน)",
       ].filter(Boolean).join("\n");
 
       async function callReview(model) {
@@ -2898,10 +2953,21 @@
         .filter(p => typeof p.text === "string").map(p => p.text).join("\n").trim();
       if (!text) throw new Error("AI ไม่ได้ตอบข้อความกลับมา");
 
+      // pull the "คะแนน: NN | เกรด: X" line, if any
+      const sm = text.match(/คะแนน\s*[:：]?\s*(\d{1,3})\s*(?:\/\s*100)?\s*[|·]?\s*เกรด\s*[:：]?\s*([A-Ea-e])/);
+      let msg = "เพิ่มคำวิจารณ์ลงช่องโน้ตแล้ว — กด \"บันทึก\" เพื่อเก็บไว้";
+      if (sm) {
+        aiScoreVal = Math.max(0, Math.min(100, parseInt(sm[1], 10)));
+        aiGradeVal = sm[2].toUpperCase();
+        renderAiScoreView();
+        if (!currentGrade) { currentGrade = aiGradeVal; updateGradeToggle(); }
+        msg = `🤖 AI ให้คะแนน ${aiScoreVal}/100 · เกรด ${aiGradeVal}` +
+          (currentGrade === aiGradeVal ? " (ตั้งเกรดให้แล้ว)" : "") + " — กด \"บันทึก\" เพื่อเก็บ";
+      }
       const notesEl = document.getElementById("tfNotes");
       const stamp = "🤖 AI วิจารณ์ (" + todayKey() + "):\n" + text;
       notesEl.value = notesEl.value.trim() ? notesEl.value.trim() + "\n\n" + stamp : stamp;
-      status.textContent = "เพิ่มคำวิจารณ์ลงช่องโน้ตแล้ว — กด \"บันทึก\" เพื่อเก็บไว้";
+      status.textContent = msg;
     } catch (err) {
       status.textContent = "วิจารณ์ไม่สำเร็จ: " + (err.message || err);
     } finally {
@@ -2978,6 +3044,9 @@
       account: document.getElementById("tfAccount").value.trim(),
       model: document.getElementById("tfModel").value.trim(),
       grade: currentGrade,
+      outcome: marketType === "futures" ? (document.getElementById("tfOutcome").value || null) : null,
+      aiScore: aiScoreVal,
+      aiGrade: aiGradeVal,
       playbookId: currentPlaybookId || null,
       followedRules: document.getElementById("tfFollowedRules").checked,
       breakeven: document.getElementById("tfBreakeven").checked,
