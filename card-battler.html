@@ -120,8 +120,8 @@
   }
   .power .pc { position: absolute; top: -6px; left: -6px; width: 22px; height: 22px; border-radius: 50%;
     background: var(--mana); color: #04222f; font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center; border: 2px solid #bfe9ff; }
-  .power:disabled { opacity: .4; filter: grayscale(.6); cursor: default; }
-  .power.usable:not(:disabled) { box-shadow: 0 0 0 4px rgba(124,92,255,.3); }
+  .power.locked { opacity: .4; filter: grayscale(.6); cursor: default; }
+  .power.usable:not(.locked) { box-shadow: 0 0 0 4px rgba(124,92,255,.3); }
   .power.tgt { border-color: var(--gold); box-shadow: 0 0 0 4px rgba(255,204,85,.3); }
 
   /* mana crystals */
@@ -875,10 +875,14 @@
     },
   };
   const HERO_POWERS = {
-    emberHP:  { name: "Ember Blast", emoji: "🔥", cost: 2, target: "any", use: (g, t, side) => dealDamage(t, sd(side, 1)) },
-    musterHP: { name: "Muster", emoji: "🛡️", cost: 2, target: null, use: (g, t, side) => summon(side, "footmanToken", 1) },
-    dreadHP:  { name: "Soul Tap", emoji: "🩸", cost: 2, target: null, use: (g, t, side) => { dealDamage(g.players[side].hero, 2); draw(side, 1); } },
-    knightHP: { name: "Man-at-Arms", emoji: "🛡️", cost: 2, target: null, use: (g, t, side) => summon(side, "squireToken", 1) },
+    emberHP:  { name: "Ember Blast", emoji: "🔥", cost: 2, target: "any", art: "flame", element: "fire",
+                text: "ดาเมจ 1 ให้เป้าใดก็ได้ (บวก Spell Damage ของคุณ)", use: (g, t, side) => dealDamage(t, sd(side, 1)) },
+    musterHP: { name: "Muster", emoji: "🛡️", cost: 2, target: null, art: "banner", element: "holy",
+                text: "เรียก Footman 1/1 <b>Taunt</b> ขึ้นสนาม", use: (g, t, side) => summon(side, "footmanToken", 1) },
+    dreadHP:  { name: "Soul Tap", emoji: "🩸", cost: 2, target: null, art: "chalice", element: "shadow",
+                text: "เสียเลือดฮีโร่คุณ 2 แล้วจั่วการ์ด 1 ใบ", use: (g, t, side) => { dealDamage(g.players[side].hero, 2); draw(side, 1); } },
+    knightHP: { name: "Man-at-Arms", emoji: "🛡️", cost: 2, target: null, art: "sword", element: "holy",
+                text: "เรียก Squire 1/2 <b>Taunt</b> ขึ้นสนาม", use: (g, t, side) => summon(side, "squireToken", 1) },
   };
   function buildDeck(key) {
     const out = [];
@@ -1701,7 +1705,7 @@
         ${h.armor > 0 ? `<span class="armor">${h.armor}</span>` : ""}
         <span class="hp">${h.hp}</span>
       </div>
-      <button class="power ${powerUsable ? "usable" : ""} ${powerTgt ? "tgt" : ""}" data-power="${side}" ${side === "you" && powerUsable ? "" : "disabled"}>
+      <button type="button" class="power ${powerUsable ? "usable" : ""} ${powerTgt ? "tgt" : ""} ${side === "you" && powerUsable ? "" : "locked"}" data-power="${side}">
         <span class="pc">${hp.cost}</span>${hp.emoji}
       </button>`;
   }
@@ -1907,8 +1911,8 @@
     previewEl.style.display = "none";
     previewEl.innerHTML = "";
   }
-  function showCardPreview(m, rect) {
-    previewEl.innerHTML = cardFaceHtml(m, {});
+  function showPreviewHtml(html, rect) {
+    previewEl.innerHTML = html;
     previewEl.style.display = "block";
     const SCALE = 1.65, W = 122 * SCALE, H = 186 * SCALE;
     let x = rect.left + rect.width / 2 - W / 2;
@@ -1919,17 +1923,35 @@
     previewEl.style.left = x + "px";
     previewEl.style.top = y + "px";
   }
+  function showCardPreview(m, rect) { showPreviewHtml(cardFaceHtml(m, {}), rect); }
+  function powerCardHtml(hp) {
+    return `<div class="hcard el-${hp.element || "neutral"}">
+      <div class="mana-gem">${hp.cost}</div>
+      <div class="art stage">${artFace(hp.art)}</div>
+      <div class="ribbon"><span class="rgem"></span><span class="rn">${hp.name}</span></div>
+      <div class="tribe">พลังฮีโร่</div>
+      <div class="txt">${hp.text || ""}</div>
+    </div>`;
+  }
+  function showPowerPreview(hp, rect) { showPreviewHtml(powerCardHtml(hp), rect); }
   function findMinionByIid(iid) {
     return G.players.you.board.find(x => x.iid === iid) || G.players.ai.board.find(x => x.iid === iid);
   }
   $("boardEl").addEventListener("mouseover", (e) => {
+    const powerBtn = e.target.closest(".power");
+    if (powerBtn && !powerBtn.contains(e.relatedTarget)) {
+      const side = powerBtn.dataset.power;
+      const hp = HERO_POWERS[G.players[side].powerId];
+      if (hp) showPowerPreview(hp, powerBtn.getBoundingClientRect());
+      return;
+    }
     const el = e.target.closest(".minion");
     if (!el || el.contains(e.relatedTarget)) return;
     const m = findMinionByIid(+el.dataset.iid);
     if (m) showCardPreview(m, el.getBoundingClientRect());
   });
   $("boardEl").addEventListener("mouseout", (e) => {
-    const el = e.target.closest(".minion");
+    const el = e.target.closest(".minion, .power");
     if (!el || (e.relatedTarget && el.contains(e.relatedTarget))) return;
     hideCardPreview();
   });
