@@ -337,10 +337,10 @@
   .hcard .s-atk.up { background: radial-gradient(circle at 35% 30%, #7ff0c4, #128a58); border-color: #a6f5d8; }
   .hcard .s-hp.up  { background: radial-gradient(circle at 35% 30%, #7ff0c4, #128a58); border-color: #a6f5d8; }
   /* rarity */
-  .hcard.rar-rare      { border-color: #4aa3ff; box-shadow: 0 0 0 1px rgba(74,163,255,.35), var(--shadow); }
+  .hcard.rar-rare      { border-color: #c3c9d6; box-shadow: 0 0 0 1px rgba(195,201,214,.35), var(--shadow); }
   .hcard.rar-epic      { border-color: #b46bff; box-shadow: 0 0 0 1px rgba(180,107,255,.4), var(--shadow); }
   .hcard.rar-legendary { border-color: var(--gold); box-shadow: 0 0 14px rgba(255,204,85,.45), var(--shadow); }
-  .hcard.rar-rare .rgem      { background: #4aa3ff; }
+  .hcard.rar-rare .rgem      { background: #c3c9d6; }
   .hcard.rar-epic .rgem      { background: #b46bff; }
   .hcard.rar-legendary .rgem { background: var(--gold); }
   .hcard.rar-legendary .ribbon::before { content: "♛"; color: var(--gold); font-size: 9px; margin-right: 2px; }
@@ -391,6 +391,69 @@
   }
   .deck-opt:hover { border-color: var(--acc); transform: translateY(-3px); }
   .deck-portrait { width: 78px; flex: none; border-radius: 9px; }
+  .back-btn { position: absolute; top: 16px; left: 16px; }
+
+  /* ---------- main menu / gold ---------- */
+  .gold-pill {
+    display: inline-flex; align-items: center; gap: 6px; margin: 4px auto 14px; padding: 6px 16px;
+    background: var(--surface-alt); border: 1px solid var(--border); border-radius: 999px;
+    font-weight: 800; font-size: 14px; color: var(--gold);
+  }
+  .menu-btns { display: flex; flex-direction: column; gap: 10px; margin-top: 6px; }
+  .pill.big { justify-content: center; padding: 13px 18px; font-size: 14.5px; border-radius: 12px; }
+
+  /* ---------- deck builder / shop ---------- */
+  .builder-modal { max-width: 1080px; position: relative; text-align: left; }
+  .tribe-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .tribe-tabs .pill.on { background: var(--grad); color: #fff; border-color: transparent; }
+  .builder-body { display: grid; grid-template-columns: 1fr 300px; gap: 16px; align-items: start; }
+  .pool-toolbar { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-bottom: 8px; }
+  .pill.on { border-color: var(--acc); color: var(--acc); }
+  .pill.mini { padding: 5px 11px; font-size: 11.5px; }
+  .pool-grid, .shop-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(108px, 1fr)); gap: 10px;
+    max-height: 58vh; overflow-y: auto; padding: 4px; background: var(--surface-alt);
+    border: 1px solid var(--border); border-radius: 12px;
+  }
+  .pool-cell, .shop-cell {
+    position: relative; cursor: pointer; transition: .12s;
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+  }
+  .pool-cell:hover, .shop-cell:hover { transform: translateY(-2px); }
+  .card-shrink { width: 100px; height: 153px; overflow: hidden; position: relative; flex: none; }
+  .card-shrink .hcard { transform: scale(.82); transform-origin: top left; margin: 0; }
+  .pool-badge {
+    position: absolute; top: -4px; right: 6px; z-index: 2; background: var(--acc); color: #fff;
+    font-size: 11px; font-weight: 800; padding: 2px 7px; border-radius: 999px; box-shadow: var(--shadow);
+  }
+  .pool-cell.maxed { opacity: .45; cursor: default; }
+  .shop-price {
+    width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 3px 6px; text-align: center; font-size: 11px; font-weight: 800; color: var(--gold);
+  }
+  .shop-price.owned { color: var(--bull); }
+  .shop-price.cant { color: var(--bear); }
+  .builder-deck { background: var(--surface-alt); border: 1px solid var(--border); border-radius: 12px; padding: 10px; }
+  .deck-count { font-weight: 800; text-align: center; margin-bottom: 8px; font-size: 13px; }
+  .deck-count.full { color: var(--bull); }
+  .deck-list { max-height: 46vh; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+  .deck-row {
+    display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: 8px;
+    background: var(--surface); border: 1px solid var(--border); font-size: 12px;
+  }
+  .deck-row .dr-cost { flex: none; width: 18px; height: 18px; border-radius: 999px; background: var(--mana);
+    color: #04202b; font-weight: 800; font-size: 10.5px; display: flex; align-items: center; justify-content: center; }
+  .deck-row .dr-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .deck-row .dr-x { flex: none; color: var(--muted); font-size: 11px; }
+  .deck-row .dr-rm { flex: none; background: none; border: none; color: var(--bear); font-weight: 800; cursor: pointer; font-size: 14px; }
+  .builder-actions { display: flex; gap: 8px; margin-top: 10px; }
+  .builder-actions .pill { flex: 1; justify-content: center; }
+  .builder-actions .pill[disabled] { opacity: .4; cursor: default; }
+  @media (max-width: 720px) {
+    .builder-body { grid-template-columns: 1fr; }
+    .pool-grid, .shop-grid { max-height: 40vh; }
+    .deck-list { max-height: 30vh; }
+  }
   .deck-portrait .art-ink { inset: 8% 10%; }
   .deck-opt .dmeta { flex: 1; min-width: 0; }
   .deck-opt .dn { font-weight: 800; font-size: 15px; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
@@ -491,12 +554,63 @@
 <div id="cardPreview"></div>
 <div class="turnbanner" id="banner"></div>
 
-<!-- deck select -->
-<div class="veil" id="startVeil">
-  <div class="modal" style="max-width:760px;">
+<!-- main menu -->
+<div class="veil" id="menuVeil">
+  <div class="modal" style="max-width:460px;">
     <h1>Aether Clash</h1>
-    <p>เกมการ์ดต่อสู้ผลัดเทิร์น · เลือกสำรับของคุณ แล้วสู้กับ AI</p>
+    <p>เกมการ์ดต่อสู้ผลัดเทิร์น</p>
+    <div class="gold-pill" id="menuGold">🪙 0</div>
+    <div class="menu-btns">
+      <button class="pill solid big" id="menuPlayBtn">▶ เล่นเกม</button>
+      <button class="pill big" id="menuBuilderBtn">🗂 จัดเด็ค</button>
+      <button class="pill big" id="menuShopBtn">🛒 ร้านค้า</button>
+    </div>
+  </div>
+</div>
+
+<!-- deck select -->
+<div class="veil" id="startVeil" hidden>
+  <div class="modal" style="max-width:760px; position:relative;">
+    <button class="pill back-btn" id="startBack">‹ กลับ</button>
+    <h1>Aether Clash</h1>
+    <p>เลือกสำรับของคุณ แล้วสู้กับ AI</p>
     <div class="deck-pick" id="deckPick"></div>
+  </div>
+</div>
+
+<!-- deck builder -->
+<div class="veil" id="builderVeil" hidden>
+  <div class="modal builder-modal">
+    <button class="pill back-btn" id="builderBack">‹ กลับ</button>
+    <h2 style="text-align:center;">จัดเด็ค</h2>
+    <div class="tribe-tabs" id="builderTabs"></div>
+    <div class="builder-body">
+      <div class="builder-pool">
+        <div class="pool-toolbar">
+          <button class="pill mini" id="poolNeutralToggle">🏳️ เผ่ากลาง (ที่ซื้อแล้ว)</button>
+        </div>
+        <div class="pool-grid" id="poolGrid"></div>
+      </div>
+      <div class="builder-deck">
+        <div class="deck-count" id="deckCount">0/30</div>
+        <div class="deck-list" id="deckList"></div>
+        <div class="builder-actions">
+          <button class="pill" id="deckResetBtn">รีเซ็ตเป็นเด็คพื้นฐาน</button>
+          <button class="pill solid" id="deckSaveBtn" disabled>บันทึกเด็ค</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- shop -->
+<div class="veil" id="shopVeil" hidden>
+  <div class="modal builder-modal">
+    <button class="pill back-btn" id="shopBack">‹ กลับ</button>
+    <h2 style="text-align:center;">ร้านค้า</h2>
+    <div class="gold-pill" id="shopGold" style="display:block; width:fit-content; margin:0 auto 10px;">🪙 0</div>
+    <p style="text-align:center;">การ์ดกลาง (Neutral) ใช้ได้ทุกเผ่า — ระดับกลางแต่ทรงพลัง</p>
+    <div class="shop-grid" id="shopGrid"></div>
   </div>
 </div>
 
@@ -535,7 +649,7 @@
       <div>⚔ <b>Battlecry</b> — ทำงานตอนลง</div>
       <div>💀 <b>Deathrattle</b> — ทำงานตอนตาย</div>
       <div>❖ <b>Choose One</b> — เลือก 1 จาก 2 ผลตอนลง</div>
-      <div>🟡/🔵/🟣/🟠 = Common / Rare / Epic / Legendary</div>
+      <div>⚪/⚙️/🟣/🟡 = Common / Rare (เงิน) / Epic (ม่วง) / Legendary (ทอง)</div>
       <div>เผ่า: 😈 Demon (จ่ายเลือดแลกพลัง) · 🏇 Knight (ยิ่งเยอะยิ่งแรง)</div>
       <div>🐉 Dragon · 🐗 Beast · 🧟 Undead · ✨ Elemental</div>
     </div>
@@ -556,6 +670,7 @@
   <div class="modal">
     <h1 id="overTitle">ชนะ!</h1>
     <p id="overSub"></p>
+    <div class="gold-pill" id="overGold" hidden></div>
     <button class="pill solid" id="overAgain">เล่นอีกครั้ง</button>
   </div>
 </div>
@@ -865,13 +980,13 @@
       name: "Dreadmaw", emoji: "😈", hp: "dreadHP", element: "shadow", heroArt: "demonLord",
       desc: "เผ่าปีศาจ · เงา / ไฟ — จ่ายด้วยเลือดฮีโร่แลกพลัง, Lifesteal, กลืนพวกเดียวกัน · พลังฮีโร่เสียเลือด 2 จั่ว 1",
       list: { voidwalker: 2, bloodImp: 2, flameImp: 2, felstalker: 2, succubus: 2, pitLord: 2, doomguard: 2, dreadInfernal: 1, malthariss: 1, lordOfDread: 1,
-              soulSiphon: 2, drainLife: 2, hellfire: 2, demonfire: 2, saccPact: 1, emberImp: 1, wailingBanshee: 1 },
+              soulSiphon: 2, drainLife: 2, hellfire: 2, demonfire: 2, saccPact: 1, emberImp: 2, wailingBanshee: 2 },
     },
     ironhold: {
       name: "Ironhold", emoji: "🏇", hp: "knightHP", element: "holy", heroArt: "king",
       desc: "เผ่าอัศวิน · ศักดิ์สิทธิ์ — ยิ่งอัศวินเยอะยิ่งแรง (ซินเนอร์จีเผ่า), Aura, Divine Shield, บัฟหมู่ · พลังฮีโร่เรียก Squire",
       list: { recruitK: 2, knightSquire: 2, knightErrant: 2, bannerBearer: 2, cavalier: 2, lionCaptain: 2, paladinChamp: 2, grandMarshal: 1, kingArthys: 1,
-              forHonor: 2, coatOfPlates: 2, shieldwall: 1, rallyRanks: 1, lastStand: 1, kingsguard: 1, silverSquire: 2, oathFootman: 2 },
+              forHonor: 2, coatOfPlates: 2, shieldwall: 2, rallyRanks: 1, lastStand: 2, kingsguard: 1, silverSquire: 2, oathFootman: 2 },
     },
   };
   const HERO_POWERS = {
@@ -884,12 +999,143 @@
     knightHP: { name: "Man-at-Arms", emoji: "🛡️", cost: 2, target: null, art: "sword", element: "holy",
                 text: "เรียก Squire 1/2 <b>Taunt</b> ขึ้นสนาม", use: (g, t, side) => summon(side, "squireToken", 1) },
   };
-  function buildDeck(key) {
+  function buildDeck(key, customIds) {
+    if (Array.isArray(customIds) && customIds.length === 30 && customIds.every(id => CARDS[id])) {
+      return shuffle(customIds.map(id => mk(id)));
+    }
     const out = [];
     Object.entries(DECKS[key].list).forEach(([id, n]) => { for (let i = 0; i < n; i++) out.push(mk(id)); });
     if (out.length !== 30) console.warn("deck", key, "size", out.length);
     return shuffle(out);
   }
+
+  /* ============================ COLLECTION: tribe pools + neutral shop ============================ */
+  // Every tribe's browsable pool is padded to 100 unique cards (mixed common/rare/epic/legendary —
+  // "การ์เงิน/ม่วง/ทอง"). The hand-authored cards above stay as-is (bespoke battlecries/deathrattles);
+  // the remainder are generated filler minions from compact name/stat tables — same CARDS shape,
+  // no new art needed (they fall back through ART_BY_TRIBE/ART_BY_EL like any other card).
+  const TRIBE_POOL_SIZE = 100;
+  const NEUTRAL_POOL_SIZE = 20;
+  const RARITY_CYCLE = ["common", "common", "common", "common", "common", "common", "common", "common",
+    "rare", "rare", "rare", "rare", "rare", "rare", "epic", "epic", "epic", "epic", "legendary", "legendary"];
+  const KW_CYCLE = ["Taunt", "Charge", "Rush", "Divine Shield", "Windfury", "Lifesteal", "Poisonous"];
+  const COST_CYCLE = [2, 3, 2, 4, 1, 3, 5, 2, 3, 4, 2, 6, 3, 2, 4, 7, 2, 3, 5, 8];
+  const NEUTRAL_PRICE = { common: 50, rare: 100, epic: 180, legendary: 350 };
+
+  function fillerStats(cost, rarity, premium) {
+    let budget = cost * 2 + 1 + (premium ? 2 : 0);
+    if (rarity === "rare") budget += 1;
+    if (rarity === "epic") budget += 2;
+    if (rarity === "legendary") budget += 3;
+    const atk = Math.max(1, Math.round(budget * 0.42));
+    const hp = Math.max(1, budget - atk);
+    return { atk, hp };
+  }
+  function legendEffect(n, tokenId, tokenLabel) {
+    switch (n % 6) {
+      case 0: return { text: "<b>Battlecry:</b> จั่วการ์ด 1 ใบ", battlecry: (g, self) => draw(self.side, 1) };
+      case 1: return { text: "<b>Battlecry:</b> ดาเมจ 2 ให้ฮีโร่ศัตรู", battlecry: (g, self) => dealDamage(g.players[other(self.side)].hero, 2) };
+      case 2: return { text: "<b>Battlecry:</b> ฟื้นเลือดฮีโร่คุณ 4", battlecry: (g, self) => healChar(g.players[self.side].hero, 4) };
+      case 3: return { text: "<b>Battlecry:</b> มินเนียนอื่นของคุณ +1/+1", battlecry: (g, self) => g.players[self.side].board.forEach(m => { if (m !== self) buff(m, 1, 1); }) };
+      case 4: return { text: `<b>Battlecry:</b> เรียก ${tokenLabel}`, battlecry: (g, self) => summon(self.side, tokenId, 1) };
+      default: return { text: "<b>Deathrattle:</b> จั่วการ์ด 1 ใบ", deathrattle: (g, self) => draw(self.side, 1) };
+    }
+  }
+  const FILLER_BANKS = {
+    embercaller: {
+      adj: ["Cinder", "Frost", "Arcane", "Ember", "Runed", "Molten", "Glacial", "Sparking", "Wildfire", "Prismatic", "Sooty", "Frozen", "Blazing", "Shimmering", "Charred"],
+      noun: ["Acolyte", "Warden", "Elemental", "Conjurer", "Whelp", "Sentinel", "Adept", "Wisp", "Golem", "Scout", "Mystic", "Drake", "Servant", "Salamander", "Construct"],
+      elements: ["fire", "frost", "arcane"], tribe: null, emoji: ["🔥", "❄️", "✨", "🌪️", "🔮"], token: "treant", tokenLabel: "Treant 2/2",
+    },
+    ironoath: {
+      adj: ["Dawnlit", "Verdant", "Blessed", "Wildwood", "Silver", "Sunforged", "Mossy", "Radiant", "Thistled", "Hallowed", "Bramblewood", "Gilded", "Sacred", "Bloomvale", "Ivory"],
+      noun: ["Chaplain", "Guardian", "Ranger", "Warden", "Cub", "Sentinel", "Templar", "Druid", "Watcher", "Steed", "Herald", "Protector", "Shepherd", "Healer", "Vanguard"],
+      elements: ["holy", "nature"], tribe: null, emoji: ["🌿", "🕊️", "🛡️", "🌸", "🦌"], token: "footmanToken", tokenLabel: "Footman 1/1 Taunt",
+    },
+    dreadmaw: {
+      adj: ["Void", "Fel", "Cursed", "Dread", "Blackened", "Corrupted", "Hollow", "Grim", "Doomed", "Bloodfel", "Charred", "Vile", "Nether", "Rotting", "Fanged"],
+      noun: ["Whelp", "Fiend", "Stalker", "Marauder", "Wraith", "Hound", "Gnasher", "Devourer", "Skulker", "Cultist", "Horror", "Warlock", "Brute", "Spawn", "Reaver"],
+      elements: ["shadow", "fire"], tribe: "Demon", emoji: ["👿", "🦇", "🔥", "💀", "🕷️"], token: "dreadSpawn", tokenLabel: "Dread Spawn 3/3",
+    },
+    ironhold: {
+      adj: ["Iron", "Steel", "Silver", "Gilded", "Oathsworn", "Stalwart", "Banner", "Storm", "Noble", "Vigilant", "Ironclad", "Crested", "Battleworn", "Mounted", "Bronze"],
+      noun: ["Guard", "Recruit", "Sentinel", "Lancer", "Squire", "Vanguard", "Knight", "Herald", "Marshal", "Defender", "Cavalryman", "Warden", "Champion", "Blade", "Sergeant"],
+      elements: ["holy", "neutral"], tribe: "Knight", emoji: ["🛡️", "⚔️", "🏇", "🚩", "🗡️"], token: "squireToken", tokenLabel: "Squire 1/2 Taunt",
+    },
+  };
+  function genTribeFillers(key, need) {
+    const bank = FILLER_BANKS[key];
+    const out = {};
+    for (let n = 0; n < need; n++) {
+      const ai = n % bank.adj.length, ni = Math.floor(n / bank.adj.length) % bank.noun.length;
+      const id = key + "F" + n;
+      const cost = COST_CYCLE[n % COST_CYCLE.length];
+      const rarity = RARITY_CYCLE[n % RARITY_CYCLE.length];
+      const { atk, hp } = fillerStats(cost, rarity, false);
+      const def = {
+        name: `${bank.adj[ai]} ${bank.noun[ni]}`, type: "minion", cost, atk, hp,
+        emoji: bank.emoji[n % bank.emoji.length], element: bank.elements[n % bank.elements.length], rarity,
+      };
+      if (bank.tribe) def.tribe = bank.tribe;
+      if (rarity === "rare") def.keywords = [KW_CYCLE[n % KW_CYCLE.length]];
+      else if (rarity === "epic") def.keywords = [KW_CYCLE[(n + 3) % KW_CYCLE.length]];
+      else if (rarity === "legendary") Object.assign(def, legendEffect(n, bank.token, bank.tokenLabel));
+      out[id] = def;
+    }
+    return out;
+  }
+  const NEUTRAL_BANK = {
+    adj: ["Wandering", "Ancient", "Feral", "Roaming", "Grim", "Stalwart", "Rugged", "Nomad", "Sellsword", "Unbound", "Tireless", "Scarred", "Vagrant", "Hardened", "Lone"],
+    noun: ["Mercenary", "Brute", "Beast", "Wanderer", "Guardian", "Colossus", "Outrider", "Sentinel", "Warrior", "Raider", "Champion", "Titan", "Slayer", "Hunter", "Warlord"],
+    emoji: ["⚔️", "🛡️", "🐺", "🏴", "🗡️", "🎯"],
+  };
+  function genNeutralPool(need) {
+    const out = {};
+    for (let n = 0; n < need; n++) {
+      const ai = n % NEUTRAL_BANK.adj.length, ni = Math.floor(n / NEUTRAL_BANK.adj.length) % NEUTRAL_BANK.noun.length;
+      const id = "neutralF" + n;
+      const cost = COST_CYCLE[n % COST_CYCLE.length];
+      const rarity = RARITY_CYCLE[n % RARITY_CYCLE.length];
+      const { atk, hp } = fillerStats(cost, rarity, true);
+      const def = {
+        name: `${NEUTRAL_BANK.adj[ai]} ${NEUTRAL_BANK.noun[ni]}`, type: "minion", cost, atk, hp,
+        emoji: NEUTRAL_BANK.emoji[n % NEUTRAL_BANK.emoji.length], element: "neutral", rarity,
+      };
+      if (rarity === "rare") def.keywords = [KW_CYCLE[n % KW_CYCLE.length]];
+      else if (rarity === "epic") def.keywords = [KW_CYCLE[(n + 3) % KW_CYCLE.length]];
+      else if (rarity === "legendary") Object.assign(def, legendEffect(n, "treant", "Treant 2/2"));
+      out[id] = def;
+    }
+    return out;
+  }
+  const TRIBE_POOLS = {};
+  Object.keys(DECKS).forEach(key => {
+    const signature = Object.keys(DECKS[key].list);
+    const fillers = genTribeFillers(key, Math.max(0, TRIBE_POOL_SIZE - signature.length));
+    Object.assign(CARDS, fillers);
+    TRIBE_POOLS[key] = signature.concat(Object.keys(fillers));
+  });
+  const neutralFillers = genNeutralPool(NEUTRAL_POOL_SIZE);
+  Object.assign(CARDS, neutralFillers);
+  const NEUTRAL_POOL = Object.keys(neutralFillers);
+
+  /* ---- persisted meta: gold, owned neutral cards, saved custom decks ---- */
+  const META_KEY = "cb_meta_v1";
+  function loadMeta() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(META_KEY) || "null");
+      if (raw && typeof raw === "object") {
+        return {
+          gold: typeof raw.gold === "number" ? raw.gold : 60,
+          neutralOwned: Array.isArray(raw.neutralOwned) ? raw.neutralOwned : [],
+          decks: raw.decks && typeof raw.decks === "object" ? raw.decks : {},
+        };
+      }
+    } catch (e) {}
+    return { gold: 60, neutralOwned: [], decks: {} };
+  }
+  function saveMeta() { try { localStorage.setItem(META_KEY, JSON.stringify(META)); } catch (e) {} }
+  const META = loadMeta();
 
   /* ============================ STATE ============================ */
   let G = null;
@@ -2009,7 +2255,7 @@
     G = {
       turn: 0, active: "you", over: false, result: null, busy: true, log: [],
       players: {
-        you: { hero: newHero("you", youKey), deck: buildDeck(youKey), hand: [], board: [],
+        you: { hero: newHero("you", youKey), deck: buildDeck(youKey, META.decks[youKey]), hand: [], board: [],
                mana: 0, maxMana: 0, fatigue: 0, powerId: DECKS[youKey].hp, powerUsed: false, deckKey: youKey },
         ai:  { hero: newHero("ai", aiKey), deck: buildDeck(aiKey), hand: [], board: [],
                mana: 0, maxMana: 0, fatigue: 0, powerId: DECKS[aiKey].hp, powerUsed: false, deckKey: aiKey },
@@ -2064,16 +2310,147 @@
       await beginTurn(G.firstSide);
     };
   }
+  const WIN_GOLD = 25;
   function finish() {
     render();
     $("overTitle").textContent = G.result === "win" ? "ชนะ! 🏆" : G.result === "lose" ? "แพ้…" : "เสมอ";
     $("overSub").textContent = G.result === "win"
       ? "จัดการฮีโร่ศัตรูได้สำเร็จ"
       : G.result === "lose" ? "ฮีโร่ของคุณล้มลง" : "ทั้งคู่ล้มพร้อมกัน";
+    if (G.result === "win") {
+      META.gold += WIN_GOLD;
+      saveMeta();
+      $("overGold").hidden = false;
+      $("overGold").textContent = `🪙 +${WIN_GOLD} ทอง`;
+    } else {
+      $("overGold").hidden = true;
+    }
     $("overVeil").hidden = false;
   }
 
+  /* ============================ MAIN MENU / DECK BUILDER / SHOP ============================ */
+  function renderMenu() { $("menuGold").textContent = `🪙 ${META.gold}`; }
+  function backToMenu() {
+    $("startVeil").hidden = true; $("builderVeil").hidden = true; $("shopVeil").hidden = true;
+    renderMenu();
+    $("menuVeil").hidden = false;
+  }
+  $("menuPlayBtn").addEventListener("click", () => { $("menuVeil").hidden = true; renderDeckPick(); $("startVeil").hidden = false; });
+  $("menuBuilderBtn").addEventListener("click", () => { $("menuVeil").hidden = true; openBuilder(); });
+  $("menuShopBtn").addEventListener("click", () => { $("menuVeil").hidden = true; openShop(); });
+  $("startBack").addEventListener("click", backToMenu);
+  $("builderBack").addEventListener("click", backToMenu);
+  $("shopBack").addEventListener("click", backToMenu);
+
+  function copyLimit(id) { return CARDS[id].rarity === "legendary" ? 1 : 2; }
+  function countIn(list, id) { return list.filter(x => x === id).length; }
+  function defaultBuilderDeck(key) {
+    const out = [];
+    Object.entries(DECKS[key].list).forEach(([id, n]) => { for (let i = 0; i < n; i++) out.push(id); });
+    return out;
+  }
+  let builderTribe = null, builderDeck = [], builderShowNeutral = false;
+  function openBuilder(tribeKey) {
+    builderTribe = tribeKey || builderTribe || Object.keys(DECKS)[0];
+    const saved = META.decks[builderTribe];
+    builderDeck = (Array.isArray(saved) && saved.length === 30 && saved.every(id => CARDS[id]))
+      ? saved.slice() : defaultBuilderDeck(builderTribe);
+    builderShowNeutral = false;
+    renderBuilderTabs();
+    renderBuilderPool();
+    renderBuilderDeck();
+    $("builderVeil").hidden = false;
+  }
+  function renderBuilderTabs() {
+    $("builderTabs").innerHTML = Object.entries(DECKS).map(([k, d]) =>
+      `<button class="pill ${k === builderTribe ? "on" : ""}" data-tribe="${k}">${d.emoji} ${d.name}</button>`).join("");
+    $("builderTabs").querySelectorAll("[data-tribe]").forEach(b =>
+      b.addEventListener("click", () => { if (b.dataset.tribe !== builderTribe) openBuilder(b.dataset.tribe); }));
+  }
+  function renderBuilderPool() {
+    $("poolNeutralToggle").classList.toggle("on", builderShowNeutral);
+    const ids = builderShowNeutral ? META.neutralOwned : TRIBE_POOLS[builderTribe];
+    $("poolGrid").innerHTML = ids.length ? ids.map(id => {
+      const c = mk(id);
+      const n = countIn(builderDeck, id);
+      const maxed = n >= copyLimit(id) || builderDeck.length >= 30;
+      return `<div class="pool-cell ${maxed ? "maxed" : ""}" data-pool="${id}">
+        ${n ? `<div class="pool-badge">x${n}</div>` : ""}
+        <div class="card-shrink">${cardFaceHtml(c, {})}</div>
+      </div>`;
+    }).join("") : `<p style="color:var(--muted); grid-column:1/-1; text-align:center; padding:20px 0;">ยังไม่มีการ์ดกลางที่ซื้อ — ไปที่ร้านค้าเพื่อซื้อการ์ดกลาง</p>`;
+    $("poolGrid").querySelectorAll("[data-pool]").forEach(el => el.addEventListener("click", () => addToBuilderDeck(el.dataset.pool)));
+  }
+  function addToBuilderDeck(id) {
+    if (builderDeck.length >= 30 || countIn(builderDeck, id) >= copyLimit(id)) return;
+    builderDeck.push(id);
+    renderBuilderPool();
+    renderBuilderDeck();
+  }
+  function removeFromBuilderDeck(id) {
+    const i = builderDeck.indexOf(id);
+    if (i === -1) return;
+    builderDeck.splice(i, 1);
+    renderBuilderPool();
+    renderBuilderDeck();
+  }
+  function renderBuilderDeck() {
+    const counts = {};
+    builderDeck.forEach(id => counts[id] = (counts[id] || 0) + 1);
+    const rows = Object.keys(counts).map(id => mk(id)).sort((a, b) => a.cost - b.cost || a.name.localeCompare(b.name));
+    $("deckList").innerHTML = rows.map(c => `
+      <div class="deck-row">
+        <div class="dr-cost">${c.cost}</div>
+        <div class="dr-name">${c.name}</div>
+        <div class="dr-x">x${counts[c.id]}</div>
+        <button class="dr-rm" data-rm="${c.id}">✕</button>
+      </div>`).join("");
+    $("deckList").querySelectorAll("[data-rm]").forEach(b => b.addEventListener("click", () => removeFromBuilderDeck(b.dataset.rm)));
+    $("deckCount").textContent = `${builderDeck.length}/30`;
+    $("deckCount").classList.toggle("full", builderDeck.length === 30);
+    $("deckSaveBtn").disabled = builderDeck.length !== 30;
+  }
+  $("poolNeutralToggle").addEventListener("click", () => { builderShowNeutral = !builderShowNeutral; renderBuilderPool(); });
+  $("deckResetBtn").addEventListener("click", () => {
+    builderDeck = defaultBuilderDeck(builderTribe);
+    renderBuilderPool(); renderBuilderDeck();
+  });
+  $("deckSaveBtn").addEventListener("click", () => {
+    if (builderDeck.length !== 30) return;
+    META.decks[builderTribe] = builderDeck.slice();
+    saveMeta();
+    const btn = $("deckSaveBtn");
+    btn.textContent = "บันทึกแล้ว ✓";
+    setTimeout(() => { btn.textContent = "บันทึกเด็ค"; }, 1200);
+  });
+
+  function openShop() { renderShop(); $("shopVeil").hidden = false; }
+  function renderShop() {
+    $("shopGold").textContent = `🪙 ${META.gold}`;
+    $("shopGrid").innerHTML = NEUTRAL_POOL.map(id => {
+      const c = mk(id);
+      const owned = META.neutralOwned.includes(id);
+      const price = NEUTRAL_PRICE[c.rarity];
+      const can = !owned && META.gold >= price;
+      return `<div class="shop-cell" data-shop="${id}">
+        <div class="card-shrink">${cardFaceHtml(c, {})}</div>
+        <div class="shop-price ${owned ? "owned" : (can ? "" : "cant")}">${owned ? "มีแล้ว ✓" : `🪙 ${price}`}</div>
+      </div>`;
+    }).join("");
+    $("shopGrid").querySelectorAll("[data-shop]").forEach(el => el.addEventListener("click", () => buyNeutral(el.dataset.shop)));
+  }
+  function buyNeutral(id) {
+    if (META.neutralOwned.includes(id)) return;
+    const price = NEUTRAL_PRICE[CARDS[id].rarity];
+    if (META.gold < price) return;
+    META.gold -= price;
+    META.neutralOwned.push(id);
+    saveMeta();
+    renderShop();
+  }
+
   renderDeckPick();
+  renderMenu();
 })();
 </script>
 </body>
