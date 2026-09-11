@@ -1905,7 +1905,7 @@
     $("hintEl").textContent = hint;
   }
 
-  /* ---- hover preview: mousing over a placed minion shows its full card ---- */
+  /* ---- press & hold preview: holding down on a placed minion or hero power shows its full card ---- */
   const previewEl = $("cardPreview");
   function hideCardPreview() {
     previewEl.style.display = "none";
@@ -1937,24 +1937,22 @@
   function findMinionByIid(iid) {
     return G.players.you.board.find(x => x.iid === iid) || G.players.ai.board.find(x => x.iid === iid);
   }
-  $("boardEl").addEventListener("mouseover", (e) => {
+  $("boardEl").addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
     const powerBtn = e.target.closest(".power");
-    if (powerBtn && !powerBtn.contains(e.relatedTarget)) {
+    if (powerBtn) {
       const side = powerBtn.dataset.power;
       const hp = HERO_POWERS[G.players[side].powerId];
       if (hp) showPowerPreview(hp, powerBtn.getBoundingClientRect());
       return;
     }
     const el = e.target.closest(".minion");
-    if (!el || el.contains(e.relatedTarget)) return;
+    if (!el) return;
     const m = findMinionByIid(+el.dataset.iid);
     if (m) showCardPreview(m, el.getBoundingClientRect());
   });
-  $("boardEl").addEventListener("mouseout", (e) => {
-    const el = e.target.closest(".minion, .power");
-    if (!el || (e.relatedTarget && el.contains(e.relatedTarget))) return;
-    hideCardPreview();
-  });
+  document.addEventListener("pointerup", hideCardPreview);
+  document.addEventListener("pointercancel", hideCardPreview);
 
   /* ============================ INPUT ============================ */
   $("boardEl").addEventListener("click", (e) => {
