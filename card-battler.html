@@ -70,12 +70,8 @@
     background: var(--surface-alt); border: 2px solid #4a4256;
     box-shadow: var(--shadow); transition: .14s;
   }
-  .hero .hero-portrait { position: absolute; inset: 5px; border-radius: 10px; overflow: hidden;
-    background: radial-gradient(130% 105% at 50% -18%, #f3e9d3, #cbb98f); }
-  .hero .hero-portrait svg { width: 100%; height: 100%; display: block; color: #26190d; }
-  .hero .hero-portrait .pw { position: absolute; inset: 0; background: var(--wash, #333); mix-blend-mode: multiply; opacity: .4; }
-  .hero .hero-portrait .pf { position: absolute; inset: 0; border-radius: inherit;
-    box-shadow: inset 0 0 0 1px rgba(52,38,20,.9), inset 0 0 14px 4px rgba(20,10,4,.4); }
+  .hero .hero-portrait { position: absolute; inset: 5px; border-radius: 10px; }
+  .hero .hero-portrait .art-ink { inset: 8% 10%; }
   .hero .hp {
     position: absolute; right: -8px; bottom: -8px; width: 34px; height: 34px; border-radius: 50%;
     background: #c0243a; color: #fff; display: flex; align-items: center; justify-content: center;
@@ -115,32 +111,30 @@
   .mana-num { font-weight: 800; font-size: 13px; color: var(--mana); min-width: 42px; }
 
   /* ---------- element wash — a dark hue multiplied over aged paper = old tinted engraving ---------- */
-  .el-fire    { --wash: #7c2a12; --elc: #d0602c; }
-  .el-frost   { --wash: #123a63; --elc: #4a93cf; }
-  .el-arcane  { --wash: #3a1c66; --elc: #9058e6; }
-  .el-holy    { --wash: #6a4712; --elc: #cf9d3e; }
-  .el-nature  { --wash: #1c4a26; --elc: #43a862; }
-  .el-shadow  { --wash: #2a123f; --elc: #7d5cae; }
-  .el-neutral { --wash: #34302a; --elc: #6f788f; }
+  .el-fire    { --sky: linear-gradient(#1c0704 0%, #6b220f 40%, #ff8144 58%, #b23c15 74%, #180603 100%); --glow: rgba(255,150,70,.5); --ground: #170603; --rim: #ff8f4d; --elc: #d0602c; }
+  .el-frost   { --sky: linear-gradient(#061420 0%, #163a5e 38%, #bfe9ff 58%, #3f8ecf 74%, #051019 100%); --glow: rgba(160,220,255,.45); --ground: #061019; --rim: #8fd3ff; --elc: #4a93cf; }
+  .el-arcane  { --sky: linear-gradient(#0c0620 0%, #2c1560 40%, #c39cff 58%, #6a3fd0 74%, #0a0518 100%); --glow: rgba(180,140,255,.45); --ground: #0a0518; --rim: #b78cff; --elc: #9058e6; }
+  .el-holy    { --sky: linear-gradient(#180f03 0%, #6a4d12 38%, #ffe6a0 58%, #d19a2e 74%, #150e03 100%); --glow: rgba(255,225,150,.48); --ground: #150e03; --rim: #ffdb8a; --elc: #cf9d3e; }
+  .el-nature  { --sky: linear-gradient(#06120a 0%, #1e4d2b 40%, #a6e89a 58%, #2f8c46 74%, #06100b 100%); --glow: rgba(150,230,150,.4); --ground: #06100b; --rim: #9fe89a; --elc: #43a862; }
+  .el-shadow  { --sky: linear-gradient(#080612 0%, #241636 42%, #9a7fce 58%, #35204f 74%, #06050f 100%); --glow: rgba(160,120,210,.4); --ground: #06050f; --rim: #b48fe6; --elc: #7d5cae; }
+  .el-neutral { --sky: linear-gradient(#0c0e15 0%, #333a4f 40%, #c3cbdc 58%, #5a6382 74%, #0a0c12 100%); --glow: rgba(190,200,220,.4); --ground: #0a0c12; --rim: #c7cee0; --elc: #6f788f; }
 
-  /* ---------- engraved-illustration art window (hand .art, board .m-art, portraits) ---------- */
-  .stage {
-    position: relative; overflow: hidden; isolation: isolate;
-    background: radial-gradient(130% 105% at 50% -18%, #f3e9d3 0%, #ddcbaa 55%, #bca684 100%);
-    --paper: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='90' height='90'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='90' height='90' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
-  }
-  .stage .art-paper { position: absolute; inset: 0; mix-blend-mode: multiply; opacity: .5;
-    background-image: var(--paper); background-size: 90px 90px; }
-  .stage .art-ink   { position: absolute; inset: 7% 9%; z-index: 2; color: #26190d;
-    filter: drop-shadow(.6px .9px 0 rgba(255,252,240,.4)); }
+  /* ---------- illustrated art window (hand .art, board .m-art, hero/deck portraits) ----------
+     a painted sky (per element) behind a shaded ink-and-clay figure, with a rim-light glow
+     tinted to match, a darkened foreground band for depth, and a vignette + top light. */
+  .stage { position: relative; overflow: hidden; isolation: isolate; background: var(--sky, #1a1c26); }
+  .stage .art-glow  { position: absolute; inset: -12% -12% 10%; z-index: 1;
+    background: radial-gradient(circle at 50% 42%, var(--glow, #fff4), transparent 62%); }
+  .stage .art-ink   { position: absolute; inset: 6% 8%; z-index: 2;
+    filter: drop-shadow(0 2px 3px rgba(0,0,0,.65)) drop-shadow(0 0 7px var(--rim, transparent)); }
   .stage .art-ink svg { width: 100%; height: 100%; display: block; }
-  .stage .art-wash  { position: absolute; inset: 0; z-index: 3; pointer-events: none;
-    background: var(--wash, #333); mix-blend-mode: multiply; opacity: .44; }
+  .stage .art-ground{ position: absolute; left: 0; right: 0; bottom: 0; height: 36%; z-index: 3;
+    background: linear-gradient(180deg, transparent, var(--ground, #100) 66%);
+    box-shadow: inset 0 8px 10px -8px rgba(0,0,0,.85); }
   .stage .art-frame { position: absolute; inset: 0; z-index: 4; pointer-events: none; border-radius: inherit;
-    box-shadow: inset 0 0 0 1px rgba(52,38,20,.9), inset 0 0 13px 3px rgba(38,22,8,.5),
-      inset 0 0 32px 9px rgba(18,9,3,.34); }
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,.55), inset 0 0 20px 4px rgba(0,0,0,.5), inset 0 0 36px 10px rgba(0,0,0,.3); }
   .stage .art-frame::after { content: ""; position: absolute; inset: 0; border-radius: inherit;
-    background: radial-gradient(120% 88% at 50% 6%, rgba(255,250,235,.26), transparent 46%); }
+    background: radial-gradient(120% 88% at 50% 4%, rgba(255,255,255,.22), transparent 44%); }
 
   /* ---------- board minion ---------- */
   .minion {
@@ -374,12 +368,8 @@
     display: flex; gap: 12px; align-items: stretch;
   }
   .deck-opt:hover { border-color: var(--acc); transform: translateY(-3px); }
-  .deck-portrait { width: 78px; flex: none; border-radius: 9px; overflow: hidden; position: relative;
-    background: radial-gradient(130% 105% at 50% -18%, #f3e9d3, #cbb98f); }
-  .deck-portrait svg { width: 100%; height: 100%; display: block; color: #26190d; }
-  .deck-portrait .pw { position: absolute; inset: 0; background: var(--wash, #333); mix-blend-mode: multiply; opacity: .46; }
-  .deck-portrait .pf { position: absolute; inset: 0;
-    box-shadow: inset 0 0 0 1px rgba(52,38,20,.9), inset 0 0 16px 5px rgba(20,10,4,.42); }
+  .deck-portrait { width: 78px; flex: none; border-radius: 9px; }
+  .deck-portrait .art-ink { inset: 8% 10%; }
   .deck-opt .dmeta { flex: 1; min-width: 0; }
   .deck-opt .dn { font-weight: 800; font-size: 15px; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
   .deck-opt .dd { font-size: 11.5px; color: var(--muted); line-height: 1.5; }
@@ -436,6 +426,15 @@
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <radialGradient id="artClay" cx="38%" cy="30%" r="78%">
+      <stop offset="0%" stop-color="#efe2c8"/>
+      <stop offset="45%" stop-color="#a8916a"/>
+      <stop offset="100%" stop-color="#241a10"/>
+    </radialGradient>
+  </defs>
+</svg>
 <div id="app">
   <div class="topbar">
     <span class="brand">⚔ Aether Clash</span>
@@ -1671,7 +1670,7 @@
       </div>
       <div class="hero el-${h.element || "neutral"} ${isTgt ? "tgt" : ""}" data-hero="${side}" data-ref="hero:${side}">
         <span class="name">${h.name}</span>
-        <div class="hero-portrait">${ART[h.art] || ART.orb}<span class="pw"></span><span class="pf"></span></div>
+        <div class="hero-portrait stage">${artFace(h.art)}</div>
         ${h.armor > 0 ? `<span class="armor">${h.armor}</span>` : ""}
         <span class="hp">${h.hp}</span>
       </div>
@@ -1708,8 +1707,9 @@
   }
   /* ---- card art: hand-inked engraving illustrations (inline SVG, no assets) ---- */
   const _S = (main, hatch) =>
-    `<svg viewBox="0 0 100 100"><g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">${main}</g>` +
-    (hatch ? `<g fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" opacity=".5">${hatch}</g>` : "") + `</svg>`;
+    `<svg viewBox="0 0 100 100">` +
+    `<g fill="url(#artClay)" stroke="#241a10" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round">${main}</g>` +
+    (hatch ? `<g fill="none" stroke="#241a10" stroke-width="1" stroke-linecap="round" opacity=".55">${hatch}</g>` : "") + `</svg>`;
   const ART = {
     demonLord: _S(`<path d="M50 22C40 8 30 6 24 15M50 22C60 8 70 6 76 15"/><path d="M32 26C27 42 33 56 50 60C67 56 73 42 68 26C60 33 40 33 32 26"/><path d="M42 50q8 6 16 0"/><path d="M18 82C28 62 40 68 50 68C60 68 72 62 82 82"/><path d="M30 60l-6 12M70 60l6 12"/>`,
       `<path d="M40 40l6 5M60 40l-6 5"/><path d="M34 46l6 8M66 46l-6 8"/><path d="M46 30l-4-6M54 30l4-6"/>`),
@@ -1780,9 +1780,12 @@
     const sc = c.scene || {};
     return sc.art || ART_BY_ID[c.id] || ART_BY_TRIBE[c.tribe] || ART_BY_EL[c.element || "neutral"] || "orb";
   }
+  function artFace(key) {
+    return `<div class="art-glow"></div><div class="art-ink">${ART[key] || ART.orb}</div>` +
+      `<div class="art-ground"></div><div class="art-frame"></div>`;
+  }
   function artInner(c) {
-    return `<div class="art-paper"></div><div class="art-ink">${ART[artKey(c)] || ART.orb}</div>` +
-      `<div class="art-wash"></div><div class="art-frame"></div>`;
+    return artFace(artKey(c));
   }
   function cardFaceHtml(c, ex) {
     ex = ex || {};
@@ -1909,7 +1912,7 @@
   function renderDeckPick() {
     $("deckPick").innerHTML = Object.entries(DECKS).map(([k, d]) => `
       <button class="deck-opt" data-deck="${k}">
-        <div class="deck-portrait el-${d.element || "neutral"}">${ART[d.heroArt] || ART.orb}<span class="pw"></span><span class="pf"></span></div>
+        <div class="deck-portrait stage el-${d.element || "neutral"}">${artFace(d.heroArt)}</div>
         <div class="dmeta">
           <div class="dn">${d.emoji} ${d.name}</div>
           <div class="dd">${d.desc}</div>
