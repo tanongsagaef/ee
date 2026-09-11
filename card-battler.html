@@ -18,6 +18,9 @@
     --felt: radial-gradient(1200px 600px at 50% 40%, #1c2a3a, #101722 70%, #0a0d14);
     --shadow: 0 2px 8px rgba(0,0,0,.4), 0 18px 44px -16px rgba(0,0,0,.6);
     --shadow-lg: 0 10px 30px -8px rgba(120,80,255,.45);
+    --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='170' height='170'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='170' height='170' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
+    --ridge-top: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 480 130'%3E%3Cpath d='M0 130L0 78 34 52 66 74 96 30 128 60 158 18 188 56 216 38 248 72 276 32 306 64 336 24 366 58 396 40 428 68 458 28 480 52 480 130Z' fill='%23070609'/%3E%3Crect x='204' y='6' width='14' height='50' fill='%23070609'/%3E%3Crect x='199' y='0' width='24' height='9' fill='%23070609'/%3E%3Crect x='356' y='22' width='10' height='38' fill='%23070609'/%3E%3C/svg%3E");
+    --ridge-bot: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 480 100'%3E%3Cpath d='M0 100L0 62 38 44 74 66 112 30 150 58 184 20 214 50 250 34 286 60 318 26 352 54 388 32 420 58 452 36 480 50 480 100Z' fill='%23090607'/%3E%3Crect x='120' y='14' width='9' height='34' fill='%23090607'/%3E%3Crect x='300' y='10' width='9' height='38' fill='%23090607'/%3E%3C/svg%3E");
     --radius: 16px;
   }
   * { box-sizing: border-box; }
@@ -49,20 +52,39 @@
   .pill.solid { background: var(--grad); color: #fff; border-color: transparent; box-shadow: var(--shadow-lg); }
   .pill.solid:hover { color: #fff; filter: brightness(1.06); }
 
-  /* ---------- board ---------- */
+  /* ---------- board: a scorched arena, not a poker table ---------- */
   .board {
-    flex: 1; position: relative; background: var(--felt);
+    flex: 1; position: relative; overflow: hidden;
     display: flex; flex-direction: column; justify-content: center;
     padding: 8px clamp(6px, 2vw, 26px); gap: 5px; min-height: 0;
+    background-image:
+      var(--grain), var(--ridge-top), var(--ridge-bot),
+      radial-gradient(1100px 480px at 50% 0%, rgba(130,70,210,.24), transparent 62%),
+      radial-gradient(1100px 480px at 50% 100%, rgba(230,120,40,.16), transparent 62%),
+      linear-gradient(180deg, #0a0710 0%, #151019 26%, #201a17 50%, #17120d 72%, #090705 100%);
+    background-repeat: repeat, repeat-x, repeat-x, no-repeat, no-repeat, no-repeat;
+    background-position: 0 0, top center, bottom center, center, center, center;
+    background-size: 170px 170px, 480px 130px, 480px 100px, cover, cover, cover;
+    background-blend-mode: overlay, normal, normal, normal, normal, normal;
   }
-  .lane { display: flex; align-items: center; gap: clamp(4px, 1vw, 10px); min-height: 0; }
+  .board::before {
+    content: ""; position: absolute; inset: 0; z-index: 6; pointer-events: none;
+    box-shadow: inset 0 0 80px 8px rgba(0,0,0,.4);
+  }
+  .lane { display: flex; align-items: center; gap: clamp(4px, 1vw, 10px); min-height: 0; position: relative; z-index: 1; }
   .minions-row {
     flex: 0 0 auto; justify-content: center; flex-wrap: nowrap;
     align-self: stretch; min-height: 88px;
   }
   .hero-row { justify-content: center; gap: 26px; }
-  .midline { height: 2px; align-self: stretch; margin: 2px clamp(40px, 20vw, 260px);
-    background: linear-gradient(90deg, transparent, rgba(124,92,255,.5), transparent); border-radius: 2px; }
+  .midline {
+    height: 3px; align-self: stretch; margin: 4px clamp(30px, 17vw, 230px); position: relative; z-index: 1;
+    background: linear-gradient(90deg, transparent, rgba(255,170,90,.2) 14%, #ffcf9a 50%, rgba(255,170,90,.2) 86%, transparent);
+    border-radius: 3px; box-shadow: 0 0 10px 2px rgba(255,150,80,.55), 0 0 24px 7px rgba(170,90,220,.28);
+    animation: riftpulse 3.2s ease-in-out infinite;
+  }
+  @keyframes riftpulse { 0%, 100% { opacity: .72; filter: saturate(.9); } 50% { opacity: 1; filter: saturate(1.15); } }
+  @media (prefers-reduced-motion: reduce) { .midline { animation: none; } }
 
   /* hero */
   .hero {
@@ -381,6 +403,10 @@
 
   /* ---------- fx / misc ---------- */
   #fxlayer { position: fixed; inset: 0; pointer-events: none; z-index: 40; overflow: hidden; }
+  #cardPreview { position: fixed; z-index: 60; pointer-events: none; display: none;
+    filter: drop-shadow(0 14px 28px rgba(0,0,0,.65)); animation: previewIn .12s ease-out; }
+  #cardPreview .hcard { transform: scale(1.65); transform-origin: top left; margin: 0; }
+  @keyframes previewIn { from { opacity: 0; transform: scale(.94); } to { opacity: 1; transform: scale(1); } }
   .float {
     position: absolute; font-weight: 900; font-size: 22px; text-shadow: 0 2px 6px #000;
     animation: floatUp 1s ease forwards;
@@ -398,7 +424,7 @@
   @keyframes banner { 15% { opacity: 1; transform: translate(-50%,-50%) scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%,-50%) scale(1.05); } }
 
   #endturn {
-    position: absolute; right: 16px; bottom: 14px;
+    position: absolute; right: 16px; bottom: 14px; z-index: 7;
     width: 92px; height: 92px; border-radius: 50%; font-weight: 800; font-size: 13px; line-height: 1.2;
     background: radial-gradient(circle at 35% 30%, #3a2f6b, #1a1730); border: 3px solid var(--acc); color: #fff;
     box-shadow: var(--shadow); transition: .14s;
@@ -408,7 +434,7 @@
   @keyframes pulse { 50% { box-shadow: 0 0 0 12px rgba(46,230,168,0); } }
 
   .log {
-    position: absolute; left: 12px; bottom: 14px;
+    position: absolute; left: 12px; bottom: 14px; z-index: 7;
     width: 196px; max-height: 40%; overflow: hidden; font-size: 11px; color: var(--muted);
     background: rgba(10,12,20,.5); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px;
     display: flex; flex-direction: column-reverse; gap: 3px; line-height: 1.35;
@@ -462,6 +488,7 @@
 </div>
 
 <div id="fxlayer"></div>
+<div id="cardPreview"></div>
 <div class="turnbanner" id="banner"></div>
 
 <!-- deck select -->
@@ -1839,6 +1866,7 @@
   }
   function render() {
     if (!G) return;
+    hideCardPreview();
     refreshStats();
     $("enemyHeroRow").innerHTML = heroHtml("ai");
     $("youHeroRow").innerHTML = heroHtml("you");
@@ -1872,6 +1900,39 @@
     else hint = "แตะการ์ดบนมือเพื่อลง · แตะมินเนียนขอบเขียวเพื่อโจมตี";
     $("hintEl").textContent = hint;
   }
+
+  /* ---- hover preview: mousing over a placed minion shows its full card ---- */
+  const previewEl = $("cardPreview");
+  function hideCardPreview() {
+    previewEl.style.display = "none";
+    previewEl.innerHTML = "";
+  }
+  function showCardPreview(m, rect) {
+    previewEl.innerHTML = cardFaceHtml(m, {});
+    previewEl.style.display = "block";
+    const SCALE = 1.65, W = 122 * SCALE, H = 186 * SCALE;
+    let x = rect.left + rect.width / 2 - W / 2;
+    let y = rect.top - H - 16;
+    if (y < 8) y = rect.bottom + 16;
+    x = Math.max(8, Math.min(innerWidth - W - 8, x));
+    y = Math.max(8, Math.min(innerHeight - H - 8, y));
+    previewEl.style.left = x + "px";
+    previewEl.style.top = y + "px";
+  }
+  function findMinionByIid(iid) {
+    return G.players.you.board.find(x => x.iid === iid) || G.players.ai.board.find(x => x.iid === iid);
+  }
+  $("boardEl").addEventListener("mouseover", (e) => {
+    const el = e.target.closest(".minion");
+    if (!el || el.contains(e.relatedTarget)) return;
+    const m = findMinionByIid(+el.dataset.iid);
+    if (m) showCardPreview(m, el.getBoundingClientRect());
+  });
+  $("boardEl").addEventListener("mouseout", (e) => {
+    const el = e.target.closest(".minion");
+    if (!el || (e.relatedTarget && el.contains(e.relatedTarget))) return;
+    hideCardPreview();
+  });
 
   /* ============================ INPUT ============================ */
   $("boardEl").addEventListener("click", (e) => {
