@@ -468,6 +468,7 @@
   <button class="tab-btn" data-tab="log">บันทึกเทรด</button>
   <button class="tab-btn" data-tab="review">ทบทวน</button>
   <button class="tab-btn" data-tab="playbook">Playbook</button>
+  <button class="tab-btn" data-tab="coinwatch">เหรียญน่าสนใจ</button>
   <button class="tab-btn" data-tab="chart">กราฟ + AI</button>
 </div>
 
@@ -744,6 +745,31 @@
       รวมเซ็ตอัพที่คุณเทรด — กฎเข้า / จุดที่ผิดแผน / วิธีทำกำไร + รูปแพทเทิร์นตัวอย่าง ผูกกับไม้ตอนเพิ่มเทรดได้จากช่อง "เซ็ตอัพ / Playbook"
     </p>
     <div id="pbList"></div>
+  </div>
+</div>
+
+<!-- COIN WATCH TAB -->
+<div id="tab-coinwatch" class="hidden">
+  <div class="panel">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+      <h3 style="margin:0;">เหรียญที่น่าสนใจ</h3>
+      <button class="ghost" id="cwRefreshBtn">↻ รีเฟรชราคา</button>
+    </div>
+    <p class="small" style="text-transform:none;letter-spacing:0;font-weight:400;color:var(--muted);margin:-4px 0 14px;">
+      จดเหรียญที่กำลังจับตาพร้อมเหตุผล — ราคาปัจจุบันดึงจาก Binance อัตโนมัติ เทียบ % เปลี่ยนแปลงตั้งแต่วันที่บันทึก
+    </p>
+    <div class="row" style="align-items:flex-end;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
+      <div class="field" style="flex:1;min-width:140px;">
+        <label class="small">สัญลักษณ์เหรียญ</label>
+        <input type="text" id="cwAddSymbol" placeholder="เช่น BTC, SOL, PEPE" autocomplete="off">
+      </div>
+      <div class="field" style="flex:3;min-width:220px;">
+        <label class="small">เหตุผล / สิ่งที่น่าสนใจ</label>
+        <input type="text" id="cwAddNote" placeholder="เช่น เบรกแนวต้านรายวัน, ข่าว listing, แพทเทิร์นสะสม" autocomplete="off">
+      </div>
+      <div class="field"><button class="primary" id="cwAddBtn">+ บันทึก</button></div>
+    </div>
+    <div id="cwList"></div>
   </div>
 </div>
 
@@ -1267,6 +1293,19 @@
   }
   let playbooks = loadPlaybooks();
 
+  const COINWATCH_KEY = "tj_coin_watch_v1";
+  function loadCoinWatch() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(COINWATCH_KEY) || "[]");
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) { return []; }
+  }
+  function saveCoinWatch() {
+    localStorage.setItem(COINWATCH_KEY, JSON.stringify(coinWatch));
+    pushCloudSync();
+  }
+  let coinWatch = loadCoinWatch();
+
   function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
   function pad2(n) { return String(n).padStart(2, "0"); }
   function dateKey(y, m, d) { return `${y}-${pad2(m + 1)}-${pad2(d)}`; }
@@ -1390,11 +1429,13 @@
     document.getElementById("tab-log").classList.toggle("hidden", tab !== "log");
     document.getElementById("tab-review").classList.toggle("hidden", tab !== "review");
     document.getElementById("tab-playbook").classList.toggle("hidden", tab !== "playbook");
+    document.getElementById("tab-coinwatch").classList.toggle("hidden", tab !== "coinwatch");
     document.getElementById("tab-chart").classList.toggle("hidden", tab !== "chart");
     if (tab === "overview") renderOverview();
     if (tab === "log") renderLog();
     if (tab === "review") renderReviewTab();
     if (tab === "playbook") renderPlaybooks();
+    if (tab === "coinwatch") renderCoinWatch();
     if (tab === "chart") initChartTab();
   }
 
@@ -3619,6 +3660,117 @@
     }));
   }
 
+  /* ---------- เหรียญน่าสนใจ (coin watch) ---------- */
+  function cwFmtPrice(n) {
+    if (n == null || !isFinite(n)) return "—";
+    const d = n >= 100 ? 2 : n >= 1 ? 4 : 8;
+    return Number(n).toLocaleString("en-US", { maximumFractionDigits: d, minimumFractionDigits: 0 });
+  }
+  function cwBinancePair(sym) {
+    let s = String(sym).toUpperCase().replace(/[^A-Z0-9]/g, "");
+    s = s.replace(/(USDT|USDC|USD|PERP)$/, "");
+    return s + "USDT";
+  }
+  async function cwFetchPrices(syms) {
+    if (!syms.length) return {};
+    const pairs = syms.map(cwBinancePair);
+    try {
+      const res = await fetch("https://data-api.binance.vision/api/v3/ticker/price?symbols=" + encodeURIComponent(JSON.stringify(pairs)));
+      const arr = await res.json();
+      if (!Array.isArray(arr)) throw new Error("bad");
+      const byPair = {}; arr.forEach(x => { byPair[x.symbol] = parseFloat(x.price); });
+      const out = {};
+      syms.forEach((s, i) => { if (byPair[pairs[i]] != null) out[s] = byPair[pairs[i]]; });
+      if (Object.keys(out).length) return out;
+      throw new Error("empty");
+    } catch (e) {
+      const out = {};
+      for (const s of syms) {
+        try {
+          const inst = cwBinancePair(s).replace(/USDT$/, "-USDT");
+          const r = await fetch("https://www.okx.com/api/v5/market/ticker?instId=" + inst);
+          const j = await r.json();
+          const last = j && j.data && j.data[0] && j.data[0].last;
+          if (last != null) out[s] = parseFloat(last);
+        } catch (_) {}
+      }
+      return out;
+    }
+  }
+  async function refreshCoinWatchPrices(onlySyms) {
+    const syms = [...new Set(onlySyms || coinWatch.map(c => c.symbol))];
+    if (!syms.length) return;
+    const btn = document.getElementById("cwRefreshBtn");
+    if (btn) { btn.disabled = true; btn.dataset.orig = btn.dataset.orig || btn.textContent; btn.textContent = "กำลังโหลด…"; }
+    try {
+      const prices = await cwFetchPrices(syms);
+      const now = Date.now();
+      coinWatch = coinWatch.map(c => {
+        if (prices[c.symbol] == null) return c;
+        const isFirst = c.priceAt == null;
+        return Object.assign({}, c, { priceAt: isFirst ? prices[c.symbol] : c.priceAt, priceNow: prices[c.symbol], priceUpdatedAt: now });
+      });
+      saveCoinWatch();
+      renderCoinWatch();
+    } catch (e) {
+      Swal.fire({ icon: "error", title: "ดึงราคาไม่สำเร็จ", text: String((e && e.message) || e) });
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = btn.dataset.orig; }
+    }
+  }
+  function addCoinWatch(symbol, note) {
+    const sym = symbol.trim().toUpperCase();
+    if (!sym) return;
+    coinWatch.push({ id: uid(), symbol: sym, note: note.trim(), priceAt: null, priceNow: null, priceUpdatedAt: null, createdAt: Date.now() });
+    saveCoinWatch();
+    renderCoinWatch();
+    refreshCoinWatchPrices([sym]);
+  }
+  function deleteCoinWatch(id) {
+    coinWatch = coinWatch.filter(c => c.id !== id);
+    saveCoinWatch();
+    renderCoinWatch();
+  }
+  function renderCoinWatch() {
+    const wrap = document.getElementById("cwList");
+    if (!coinWatch.length) {
+      wrap.innerHTML = `<div class="empty">ยังไม่มีเหรียญที่บันทึกไว้ — ใส่สัญลักษณ์แล้วกด "+ บันทึก"</div>`;
+      return;
+    }
+    const sorted = coinWatch.slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    wrap.innerHTML = sorted.map(c => {
+      const chgPct = (c.priceAt != null && c.priceNow != null && c.priceAt !== 0) ? ((c.priceNow - c.priceAt) / c.priceAt * 100) : null;
+      const chgHtml = chgPct == null
+        ? `<span class="flag-badge">ยังไม่มีราคา</span>`
+        : `<span class="${chgPct >= 0 ? "pos" : "neg"} mono" style="font-weight:800;">${chgPct >= 0 ? "+" : ""}${chgPct.toFixed(2)}%</span>`;
+      return `<div class="pb-card" data-id="${c.id}">
+        <div class="pb-card-head">
+          <div class="pb-card-name">${escapeHtml(c.symbol)}</div>
+          <button type="button" class="trade-card-edit cw-del" data-id="${c.id}" title="ลบ">✕</button>
+        </div>
+        <div class="pb-badges">
+          <span class="flag-badge mono">บันทึกที่ ${cwFmtPrice(c.priceAt)}</span>
+          <span class="flag-badge mono">ปัจจุบัน ${cwFmtPrice(c.priceNow)}</span>
+          ${chgHtml}
+        </div>
+        ${c.note ? `<div class="trade-card-notes">${escapeHtml(c.note)}</div>` : ""}
+        <div class="pb-stat">บันทึกเมื่อ ${new Date(c.createdAt).toLocaleDateString("th-TH")}${c.priceUpdatedAt ? " · อัปเดตราคา " + new Date(c.priceUpdatedAt).toLocaleString("th-TH") : ""}</div>
+      </div>`;
+    }).join("");
+    wrap.querySelectorAll(".cw-del").forEach(b => b.addEventListener("click", () => deleteCoinWatch(b.dataset.id)));
+  }
+  document.getElementById("cwAddBtn").addEventListener("click", () => {
+    const symEl = document.getElementById("cwAddSymbol");
+    const noteEl = document.getElementById("cwAddNote");
+    if (!symEl.value.trim()) { Swal.fire({ icon: "warning", title: "ใส่สัญลักษณ์เหรียญก่อน" }); return; }
+    addCoinWatch(symEl.value, noteEl.value);
+    symEl.value = ""; noteEl.value = "";
+    successToast("บันทึกเหรียญแล้ว");
+  });
+  document.getElementById("cwAddSymbol").addEventListener("keydown", (e) => { if (e.key === "Enter") document.getElementById("cwAddBtn").click(); });
+  document.getElementById("cwAddNote").addEventListener("keydown", (e) => { if (e.key === "Enter") document.getElementById("cwAddBtn").click(); });
+  document.getElementById("cwRefreshBtn").addEventListener("click", () => refreshCoinWatchPrices());
+
   function openPbModal(id) {
     pbEditingId = id || null;
     const pb = pbEditingId ? playbookById(pbEditingId) : null;
@@ -4146,7 +4298,7 @@
       app: "ee-suite-backup",
       exportedAt: new Date().toISOString(),
       elliottWave: { chapters: exportChapters },
-      tradeJournal: { trades, capital, capitals, checklist, playbooks, reviews },
+      tradeJournal: { trades, capital, capitals, checklist, playbooks, reviews, coinWatch },
       stockDecide: {
         watchlist: JSON.parse(localStorage.getItem("sd_watchlist") || "[]"),
         log: JSON.parse(localStorage.getItem("sd_log") || "[]"),
@@ -4193,6 +4345,11 @@
       const existingRvIds = new Set(reviews.map(r => r.id));
       reviews = reviews.concat(tj.reviews.filter(r => !(r.id && existingRvIds.has(r.id))).map(r => ({ ...r, id: r.id || uid() })));
       saveReviews();
+    }
+    if (tj && Array.isArray(tj.coinWatch) && tj.coinWatch.length) {
+      const existingCwIds = new Set(coinWatch.map(c => c.id));
+      coinWatch = coinWatch.concat(tj.coinWatch.filter(c => !(c.id && existingCwIds.has(c.id))).map(c => ({ ...c, id: c.id || uid() })));
+      saveCoinWatch();
     }
 
     // Elliott Wave (remote — merge straight into its IndexedDB)
@@ -4292,7 +4449,7 @@
     const db = FirebaseSync.getDb();
     const uid = FirebaseSync.getUser().uid;
     db.collection("users").doc(uid).collection("sync").doc("tradeJournal")
-      .set({ trades, capital, capitals, checklist, playbooks, reviews, updatedAt: Date.now() })
+      .set({ trades, capital, capitals, checklist, playbooks, reviews, coinWatch, updatedAt: Date.now() })
       .catch(err => console.error("sync push failed", err));
   }
 
@@ -4330,13 +4487,20 @@
           reviews = Object.values(rmap);
           try { localStorage.setItem(REVIEWS_KEY, JSON.stringify(reviews)); } catch (e) {}
         }
+        if (Array.isArray(remote.coinWatch)) {
+          const cmap = {};
+          remote.coinWatch.forEach(c => { if (c && c.id) cmap[c.id] = c; });
+          coinWatch.forEach(c => { if (c && c.id) cmap[c.id] = c; }); // local wins on id clash
+          coinWatch = Object.values(cmap);
+          try { localStorage.setItem(COINWATCH_KEY, JSON.stringify(coinWatch)); } catch (e) {}
+        }
         syncApplyingRemote = true;
         saveTrades();
         saveCapital();
         syncApplyingRemote = false;
-        await ref.set({ trades, capital, capitals, checklist, playbooks, reviews, updatedAt: Date.now() });
+        await ref.set({ trades, capital, capitals, checklist, playbooks, reviews, coinWatch, updatedAt: Date.now() });
       } else {
-        await ref.set({ trades, capital, capitals, checklist, playbooks, reviews, updatedAt: Date.now() });
+        await ref.set({ trades, capital, capitals, checklist, playbooks, reviews, coinWatch, updatedAt: Date.now() });
       }
     } catch (err) {
       console.error("initial sync failed", err);
@@ -4367,6 +4531,10 @@
         reviews = data.reviews;
         try { localStorage.setItem(REVIEWS_KEY, JSON.stringify(reviews)); } catch (e) {}
       }
+      if (Array.isArray(data.coinWatch)) {
+        coinWatch = data.coinWatch;
+        try { localStorage.setItem(COINWATCH_KEY, JSON.stringify(coinWatch)); } catch (e) {}
+      }
       saveTrades();
       saveCapital();
       syncApplyingRemote = false;
@@ -4375,6 +4543,7 @@
       renderLog();
       if (typeof renderPlaybooks === "function" && !document.getElementById("tab-playbook").classList.contains("hidden")) renderPlaybooks();
       if (typeof renderReviewTab === "function" && !document.getElementById("tab-review").classList.contains("hidden")) renderReviewTab();
+      if (typeof renderCoinWatch === "function" && !document.getElementById("tab-coinwatch").classList.contains("hidden")) renderCoinWatch();
       if (typeof currentTab !== "undefined" && currentTab === "overview") renderOverview();
     }, err => console.error("sync listener error", err));
   }
