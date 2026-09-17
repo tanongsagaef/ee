@@ -112,6 +112,21 @@
 
   .side-info { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; color: var(--muted); font-weight: 700; }
   .side-info .deckcnt { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 3px 8px; }
+  .deck-pile { position: relative; width: 30px; height: 42px; flex: none; margin: 0 auto; }
+  .deck-pile .dp-card {
+    position: absolute; inset: 0; border-radius: 6px;
+    background: linear-gradient(160deg, #3a2f6b, #221b3f); border: 1px solid #5a4f8a;
+    box-shadow: 0 2px 4px rgba(0,0,0,.4);
+  }
+  .deck-pile .dp-card:nth-child(1) { transform: rotate(-4deg) translate(-1px, 1px); }
+  .deck-pile .dp-card:nth-child(2) { transform: rotate(2deg) translate(1px, 0); }
+  .deck-pile .dp-card:nth-child(3) { transform: rotate(-1deg); }
+  .deck-pile .dp-count {
+    position: absolute; right: -6px; bottom: -6px; min-width: 16px; height: 16px; padding: 0 3px;
+    border-radius: 999px; background: var(--acc); color: #fff; font-size: 9.5px; font-weight: 800;
+    display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow); z-index: 2;
+  }
+  .deck-pile.empty .dp-card { opacity: .25; }
   .power {
     width: 62px; height: 62px; border-radius: 50%; font-size: 22px;
     background: radial-gradient(circle at 35% 30%, #3a2f6b, #1a1730);
@@ -2130,7 +2145,10 @@
     const powerTgt = SEL && SEL.kind === "power" && side === "you";
     return `
       <div class="side-info">
-        <div class="deckcnt">🂠 ${p.deck.length}</div>
+        <div class="deck-pile ${p.deck.length === 0 ? "empty" : ""}" id="${side}DeckPile">
+          <div class="dp-card"></div><div class="dp-card"></div><div class="dp-card"></div>
+          <div class="dp-count">${p.deck.length}</div>
+        </div>
         ${side === "you" ? manaHtml(p) : `<div class="deckcnt">✋ ${p.hand.length}</div>`}
       </div>
       <div class="hero el-${h.element || "neutral"} ${isTgt ? "tgt" : ""}" data-hero="${side}" data-ref="hero:${side}">
@@ -2389,6 +2407,38 @@
     }));
     $("youHand").innerHTML = handHtml();
     $("enemyHand").innerHTML = Array.from({ length: G.players.ai.hand.length }, () => `<div class="cb"></div>`).join("");
+    // draw animation: cards fly up from that side's deck-pile into the hand, once per card
+    if (!REDUCED) {
+      const flyFrom = (fromRect, el) => {
+        if (!fromRect || !el) return;
+        const to = el.getBoundingClientRect();
+        const dx = fromRect.left + fromRect.width / 2 - (to.left + to.width / 2);
+        const dy = fromRect.top + fromRect.height / 2 - (to.top + to.height / 2);
+        el.animate(
+          [{ transform: `translate(${dx}px, ${dy}px) scale(.35) rotate(-6deg)`, opacity: 0 },
+           { transform: "translate(0, 0) scale(1.06)", opacity: 1, offset: .75 },
+           { transform: "none" }],
+          { duration: 420, easing: "cubic-bezier(.2,1.15,.4,1)" });
+      };
+      const youDp = document.getElementById("youDeckPile");
+      const youDpRect = youDp ? youDp.getBoundingClientRect() : null;
+      const seenHand = G._seenHand || (G._seenHand = new Set());
+      const youHandEls = $("youHand").querySelectorAll(".hcard");
+      G.players.you.hand.forEach((c, i) => {
+        if (seenHand.has(c.iid)) return;
+        seenHand.add(c.iid);
+        flyFrom(youDpRect, youHandEls[i]);
+      });
+      const aiDp = document.getElementById("aiDeckPile");
+      const aiDpRect = aiDp ? aiDp.getBoundingClientRect() : null;
+      const priorAiCount = G._seenAiHandCount || 0;
+      const aiCbEls = $("enemyHand").querySelectorAll(".cb");
+      for (let i = priorAiCount; i < aiCbEls.length; i++) flyFrom(aiDpRect, aiCbEls[i]);
+      G._seenAiHandCount = G.players.ai.hand.length;
+    } else {
+      G._seenHand = new Set(G.players.you.hand.map(c => c.iid));
+      G._seenAiHandCount = G.players.ai.hand.length;
+    }
     $("logEl").innerHTML = G.log.map(l => `<div>${l}</div>`).join("");
     const et = $("endturn");
     et.disabled = G.active !== "you" || G.busy || G.over;
@@ -2478,6 +2528,13 @@
   $("youHand").addEventListener("click", (e) => {
     const h = e.target.closest("[data-hand]");
     if (h) pickHand(+h.dataset.hand);
+  });
+  $("youHand").addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
+    const el = e.target.closest("[data-hand]");
+    if (!el) return;
+    const c = G.players.you.hand[+el.dataset.hand];
+    if (c) showPreviewHtml(cardFaceHtml(c, {}), el.getBoundingClientRect());
   });
   $("endturn").addEventListener("click", endTurn);
   $("howBtn").addEventListener("click", () => $("howVeil").hidden = false);
