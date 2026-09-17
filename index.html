@@ -126,6 +126,10 @@
   .badge.up { background: var(--bull-soft); color: var(--bull); }
   .badge.down { background: var(--bear-soft); color: var(--bear); }
   .badge.neutral { background: var(--accent-soft); color: var(--accent); }
+  .flow-verdict { font-size: 15px; font-weight: 900; padding: 10px 14px; border-radius: 10px; margin-bottom: 10px; }
+  .flow-verdict.ok { background: var(--bull-soft); color: var(--bull); }
+  .flow-verdict.warn { background: rgba(245,158,11,0.14); color: var(--warn); }
+  .flow-verdict.danger { background: var(--bear-soft); color: var(--bear); }
   .grade-stamp { display: inline-flex; width: 22px; height: 22px; align-items: center; justify-content: center;
     border-radius: 8px; font-weight: 900; font-size: 11px; background: var(--surface-alt); border: 1px solid var(--border); }
 
@@ -206,6 +210,11 @@
   <div class="panel">
     <h2>วันนี้ <span class="sub" id="todayDate"></span></h2>
     <div class="tiles" id="todayTiles"></div>
+  </div>
+
+  <div class="panel">
+    <h2>กระแสเงิน BTC vs Altcoin <span class="sub">เปลี่ยนแปลง 24 ชม. (Binance) · หาจังหวะเล่น</span></h2>
+    <div id="flowIndicator"></div>
   </div>
 
   <div class="panel">
@@ -630,6 +639,77 @@
     }
   }
 
+  /* ---------- BTC vs Altcoin money-flow indicator (keyless Binance 24h stats) ---------- */
+  const CF_BTC = "BTCUSDT";
+  const CF_ALTS = ["ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT", "ADAUSDT", "DOGEUSDT", "TRXUSDT",
+    "AVAXUSDT", "LINKUSDT", "DOTUSDT", "LTCUSDT", "BCHUSDT", "NEARUSDT", "ATOMUSDT",
+    "UNIUSDT", "ETCUSDT", "ICPUSDT", "APTUSDT", "ARBUSDT", "OPUSDT"];
+  async function cfFetch24h(symbols) {
+    try {
+      const res = await fetch("https://data-api.binance.vision/api/v3/ticker/24hr?symbols=" + encodeURIComponent(JSON.stringify(symbols)));
+      const arr = await res.json();
+      if (!Array.isArray(arr)) throw new Error("bad response");
+      const out = {};
+      arr.forEach(x => { if (x && x.symbol && x.priceChangePercent != null) out[x.symbol] = parseFloat(x.priceChangePercent); });
+      if (Object.keys(out).length) return out;
+      throw new Error("empty");
+    } catch (e) {
+      // per-symbol fallback — skips any symbol that's delisted/renamed instead of failing the whole batch
+      const out = {};
+      await Promise.all(symbols.map(async (s) => {
+        try {
+          const r = await fetch("https://data-api.binance.vision/api/v3/ticker/24hr?symbol=" + s);
+          const j = await r.json();
+          if (j && j.priceChangePercent != null) out[s] = parseFloat(j.priceChangePercent);
+        } catch (_) {}
+      }));
+      return out;
+    }
+  }
+  async function loadCoinFlow() {
+    const wrap = $("flowIndicator");
+    if (!wrap) return;
+    wrap.innerHTML = `<div class="muted-note">กำลังโหลดข้อมูลตลาด…</div>`;
+    try {
+      const chg = await cfFetch24h([CF_BTC, ...CF_ALTS]);
+      const btcChg = chg[CF_BTC];
+      const altEntries = CF_ALTS.filter(s => chg[s] != null).map(s => ({ sym: s.replace("USDT", ""), chg: chg[s] }));
+      if (btcChg == null || altEntries.length < 6) {
+        wrap.innerHTML = `<div class="muted-note">ดึงข้อมูลตลาดไม่สำเร็จ ลองกด ⟳ รีเฟรชอีกครั้ง</div>`;
+        return;
+      }
+      const avgAlt = altEntries.reduce((s, a) => s + a.chg, 0) / altEntries.length;
+      const sortedByChg = altEntries.slice().sort((a, b) => b.chg - a.chg);
+      const beat = altEntries.filter(a => a.chg > btcChg).length;
+      const pctBeat = beat / altEntries.length * 100;
+      let verdict, cls, tip;
+      if (pctBeat >= 65) {
+        verdict = "🟢 เงินไหลเข้า Altcoin"; cls = "ok";
+        tip = "Altcoin ส่วนใหญ่ (" + Math.round(pctBeat) + "%) วิ่งแรงกว่า BTC ใน 24 ชม. — จังหวะเน้นเล่น Altcoin";
+      } else if (pctBeat <= 35) {
+        verdict = "🔴 เงินไหลเข้า BTC"; cls = "danger";
+        tip = "Altcoin ส่วนใหญ่ (" + Math.round(100 - pctBeat) + "%) อ่อนแรงกว่า BTC ใน 24 ชม. — เงินไหลออกจาก Alt เข้า BTC ระวัง Alt / เน้นเล่น BTC";
+      } else {
+        verdict = "🟡 ผสมผสาน ยังไม่ชัด"; cls = "warn";
+        tip = "Altcoin แรงกว่า/อ่อนกว่า BTC ใกล้เคียงกัน (" + Math.round(pctBeat) + "%) — ยังไม่มีทิศทางเงินไหลชัดเจน รอสัญญาณ";
+      }
+      const top3 = sortedByChg.slice(0, 3), bottom3 = sortedByChg.slice(-3).reverse();
+      const pct = (n) => (n >= 0 ? "+" : "") + n.toFixed(2) + "%";
+      wrap.innerHTML =
+        `<div class="flow-verdict ${cls}">${verdict}</div>` +
+        `<div class="muted-note" style="margin-bottom:12px;">${escapeHtml(tip)}</div>` +
+        `<div class="tiles">
+          <div class="tile"><div class="k">BTC 24h</div><div class="v small ${btcChg >= 0 ? "pos" : "neg"}">${pct(btcChg)}</div></div>
+          <div class="tile"><div class="k">Alt เฉลี่ย 24h</div><div class="v small ${avgAlt >= 0 ? "pos" : "neg"}">${pct(avgAlt)}</div></div>
+          <div class="tile"><div class="k">Alt แรงกว่า BTC</div><div class="v small">${Math.round(pctBeat)}%</div><div class="note">${beat}/${altEntries.length} เหรียญ</div></div>
+        </div>` +
+        `<div class="muted-note" style="margin-top:12px;">แรงสุด: ${top3.map(a => escapeHtml(a.sym) + " " + pct(a.chg)).join(" · ")}</div>` +
+        `<div class="muted-note">อ่อนสุด: ${bottom3.map(a => escapeHtml(a.sym) + " " + pct(a.chg)).join(" · ")}</div>`;
+    } catch (e) {
+      wrap.innerHTML = `<div class="muted-note">ดึงข้อมูลตลาดไม่สำเร็จ: ${escapeHtml(String((e && e.message) || e))}</div>`;
+    }
+  }
+
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   }
@@ -652,7 +732,7 @@
     renderKpi();
   });
 
-  $("refreshBtn").addEventListener("click", () => { loadLocal(); pullCloud(); renderAll(); });
+  $("refreshBtn").addEventListener("click", () => { loadLocal(); pullCloud(); renderAll(); loadCoinFlow(); });
   window.addEventListener("focus", () => { loadLocal(); renderAll(); });
 
   /* ---------- Firebase: pull the 3 sync docs when signed in ---------- */
@@ -724,6 +804,7 @@
   loadLocal();
   renderAll();
   loadEwCount();
+  loadCoinFlow();
   wireSync();
 })();
 </script>
