@@ -768,6 +768,7 @@
         <input type="text" id="cwAddNote" placeholder="เช่น เบรกแนวต้านรายวัน, ข่าว listing, แพทเทิร์นสะสม" autocomplete="off">
       </div>
       <div class="field"><button class="primary" id="cwAddBtn">+ บันทึก</button></div>
+      <div class="field"><button class="ghost hidden" id="cwCancelEditBtn">ยกเลิกแก้ไข</button></div>
     </div>
     <div id="cwList"></div>
   </div>
@@ -3726,10 +3727,48 @@
     renderCoinWatch();
     refreshCoinWatchPrices([sym]);
   }
+  function updateCoinWatch(id, symbol, note) {
+    const sym = symbol.trim().toUpperCase();
+    if (!sym) return;
+    let symbolChanged = false;
+    coinWatch = coinWatch.map(c => {
+      if (c.id !== id) return c;
+      symbolChanged = c.symbol !== sym;
+      return Object.assign({}, c, {
+        symbol: sym,
+        note: note.trim(),
+        priceAt: symbolChanged ? null : c.priceAt,
+        priceNow: symbolChanged ? null : c.priceNow,
+        priceUpdatedAt: symbolChanged ? null : c.priceUpdatedAt,
+      });
+    });
+    saveCoinWatch();
+    renderCoinWatch();
+    if (symbolChanged) refreshCoinWatchPrices([sym]);
+  }
   function deleteCoinWatch(id) {
     coinWatch = coinWatch.filter(c => c.id !== id);
     saveCoinWatch();
     renderCoinWatch();
+    if (cwEditingId === id) cancelCwEdit();
+  }
+  let cwEditingId = null;
+  function openCwEdit(id) {
+    const c = coinWatch.find(x => x.id === id);
+    if (!c) return;
+    cwEditingId = id;
+    document.getElementById("cwAddSymbol").value = c.symbol;
+    document.getElementById("cwAddNote").value = c.note || "";
+    document.getElementById("cwAddBtn").textContent = "บันทึกการแก้ไข";
+    document.getElementById("cwCancelEditBtn").classList.remove("hidden");
+    document.getElementById("cwAddSymbol").focus();
+  }
+  function cancelCwEdit() {
+    cwEditingId = null;
+    document.getElementById("cwAddSymbol").value = "";
+    document.getElementById("cwAddNote").value = "";
+    document.getElementById("cwAddBtn").textContent = "+ บันทึก";
+    document.getElementById("cwCancelEditBtn").classList.add("hidden");
   }
   function renderCoinWatch() {
     const wrap = document.getElementById("cwList");
@@ -3746,6 +3785,7 @@
       return `<div class="pb-card" data-id="${c.id}">
         <div class="pb-card-head">
           <div class="pb-card-name">${escapeHtml(c.symbol)}</div>
+          <button type="button" class="trade-card-edit cw-edit" data-id="${c.id}" title="แก้ไข">✎</button>
           <button type="button" class="trade-card-edit cw-del" data-id="${c.id}" title="ลบ">✕</button>
         </div>
         <div class="pb-badges">
@@ -3757,16 +3797,24 @@
         <div class="pb-stat">บันทึกเมื่อ ${new Date(c.createdAt).toLocaleDateString("th-TH")}${c.priceUpdatedAt ? " · อัปเดตราคา " + new Date(c.priceUpdatedAt).toLocaleString("th-TH") : ""}</div>
       </div>`;
     }).join("");
+    wrap.querySelectorAll(".cw-edit").forEach(b => b.addEventListener("click", () => openCwEdit(b.dataset.id)));
     wrap.querySelectorAll(".cw-del").forEach(b => b.addEventListener("click", () => deleteCoinWatch(b.dataset.id)));
   }
   document.getElementById("cwAddBtn").addEventListener("click", () => {
     const symEl = document.getElementById("cwAddSymbol");
     const noteEl = document.getElementById("cwAddNote");
     if (!symEl.value.trim()) { Swal.fire({ icon: "warning", title: "ใส่สัญลักษณ์เหรียญก่อน" }); return; }
-    addCoinWatch(symEl.value, noteEl.value);
-    symEl.value = ""; noteEl.value = "";
-    successToast("บันทึกเหรียญแล้ว");
+    if (cwEditingId) {
+      updateCoinWatch(cwEditingId, symEl.value, noteEl.value);
+      cancelCwEdit();
+      successToast("แก้ไขเหรียญแล้ว");
+    } else {
+      addCoinWatch(symEl.value, noteEl.value);
+      symEl.value = ""; noteEl.value = "";
+      successToast("บันทึกเหรียญแล้ว");
+    }
   });
+  document.getElementById("cwCancelEditBtn").addEventListener("click", cancelCwEdit);
   document.getElementById("cwAddSymbol").addEventListener("keydown", (e) => { if (e.key === "Enter") document.getElementById("cwAddBtn").click(); });
   document.getElementById("cwAddNote").addEventListener("keydown", (e) => { if (e.key === "Enter") document.getElementById("cwAddBtn").click(); });
   document.getElementById("cwRefreshBtn").addEventListener("click", () => refreshCoinWatchPrices());
