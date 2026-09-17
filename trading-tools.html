@@ -209,6 +209,29 @@
       <div class="result" id="cResult"></div>
     </div>
 
+    <div class="panel">
+      <h2>คำนวณกำไร/ขาดทุน <span class="sub">Futures / Crypto Perp</span></h2>
+      <div class="mini-seg" id="pnlDirSeg" style="margin-bottom:12px;">
+        <button data-d="long" class="active">Long</button>
+        <button data-d="short">Short</button>
+      </div>
+      <div class="grid2">
+        <label class="fld"><span>ราคาเข้า</span><input id="pnlEntry" type="number" step="any" inputmode="decimal"></label>
+        <label class="fld"><span>ราคาออก</span><input id="pnlExit" type="number" step="any" inputmode="decimal"></label>
+        <label class="fld"><span>Margin ที่ใช้ ($)</span><input id="pnlMargin" type="number" step="any" inputmode="decimal" value="100"></label>
+        <label class="fld"><span>Leverage (เท่า)</span><input id="pnlLev" type="number" step="any" inputmode="decimal" value="10"></label>
+      </div>
+      <details class="adv">
+        <summary>⚙ ค่าขั้นสูง (ปกติไม่ต้องแตะ)</summary>
+        <div class="grid2" style="margin-top:8px;">
+          <label class="fld"><span>Taker fee % (ต่อข้าง)</span><input id="pnlFee" type="number" step="any" value="0.05"></label>
+          <label class="fld"><span>Maint. margin rate (mmr)</span><input id="pnlMmr" type="number" step="any" value="0.005"></label>
+        </div>
+        <div class="muted-note" style="margin-top:6px;">ราคาโดนล้างเป็นค่าประมาณแบบ isolated margin ไม่รวม fee ที่จ่ายไปแล้ว</div>
+      </details>
+      <div class="result" id="pnlResult"></div>
+    </div>
+
   </div>
   <div class="col">
 
@@ -447,6 +470,82 @@
   $("cInst").addEventListener("change", () => { onInst(); saveCalc(); });
   ["cBal", "cRisk", "cEntry", "cSl", "cTp", "cPipSize", "cPipVal", "cTickSize", "cTickVal", "cLev", "cMmr", "cFunding", "cFee"].forEach(id => $(id).addEventListener("input", calc));
   ["cBal", "cRisk", "cLev"].forEach(id => $(id).addEventListener("input", saveCalc));
+
+  /* ================= P/L calculator (futures / crypto perp) ================= */
+  let pnlDir = "long";
+  function pnlCalc() {
+    const entry = parseFloat($("pnlEntry").value), exit = parseFloat($("pnlExit").value);
+    const margin = parseFloat($("pnlMargin").value), lev = parseFloat($("pnlLev").value);
+    const feeR = (parseFloat($("pnlFee").value) || 0) / 100;
+    const mmr = parseFloat($("pnlMmr").value) || 0;
+    const R = $("pnlResult");
+    if (!(entry > 0) || !(exit > 0) || !(margin > 0) || !(lev > 0)) {
+      R.innerHTML = `<div class="big"><div class="lbl">กำไร/ขาดทุนสุทธิ</div><div class="num">—</div><div class="sub">กรอก ราคาเข้า · ราคาออก · Margin · Leverage</div></div>`;
+      return;
+    }
+    const dir = pnlDir === "long" ? 1 : -1;
+    const px = (v) => fmt(v, v < 1 ? 6 : v < 100 ? 4 : 2);
+    const notional = margin * lev;
+    const coins = notional / entry;
+    const priceChgPct = (exit - entry) / entry * 100;              // ราคาเปลี่ยนจริง (ไม่คูณทิศทาง)
+    const favorPct = priceChgPct * dir;                            // เป็นบวก = เข้าทางที่ถูก
+    const grossPnl = coins * (exit - entry) * dir;
+    const fee = notional * feeR * 2;                                // เปิด + ปิด
+    const netPnl = grossPnl - fee;
+    const roi = netPnl / margin * 100;
+    const liq = dir === 1 ? entry * (1 - 1 / lev + mmr) : entry * (1 + 1 / lev - mmr);
+    const alreadyLiquidated = dir === 1 ? exit <= liq : exit >= liq;
+
+    const rows = [
+      ["Notional (มูลค่าโพสิชัน)", money(notional)],
+      ["ขนาด (เหรียญ)", fmt(coins, coins < 1 ? 6 : 3)],
+      ["ราคาเปลี่ยน", (priceChgPct >= 0 ? "+" : "") + fmt(priceChgPct, 2) + "%  (" + (favorPct >= 0 ? "เข้าทาง" : "สวนทาง") + " " + fmt(Math.abs(favorPct), 2) + "%)"],
+      ["กำไร/ขาดทุน (ก่อนค่าธรรมเนียม)", (grossPnl >= 0 ? "+" : "−") + money(Math.abs(grossPnl))],
+      ["ค่าธรรมเนียม เปิด+ปิด (ประมาณ)", money(fee)],
+      ["ราคาโดนล้าง (ประมาณ)", px(liq)],
+    ];
+    const flags = [];
+    if (alreadyLiquidated) flags.push(["danger", "⚠ ราคาออกที่ใส่อยู่เลยจุดโดนล้าง (" + px(liq) + ") — ในความเป็นจริงโพสิชันนี้จะโดนล้างก่อนถึงราคานี้"]);
+    else flags.push([netPnl >= 0 ? "ok" : "warn", (netPnl >= 0 ? "กำไรสุทธิ " : "ขาดทุนสุทธิ ") + fmt(Math.abs(roi), 1) + "% ของ margin"]);
+    if (margin > 0 && lev > 0 && favorPct < 0 && Math.abs(favorPct) >= (1 / lev * 100) * 0.8) {
+      flags.push(["warn", "ระยะจากราคาเข้าใกล้จุดโดนล้างแล้ว — ยิ่ง leverage สูง ยิ่งโดนล้างง่าย"]);
+    }
+
+    const bigColor = alreadyLiquidated ? "var(--bear)" : (netPnl >= 0 ? "var(--bull)" : "var(--bear)");
+    const bigNum = alreadyLiquidated ? "โดนล้าง" : (netPnl >= 0 ? "+" : "−") + money(Math.abs(netPnl));
+    R.innerHTML =
+      `<div class="big"><div class="lbl">กำไร/ขาดทุนสุทธิ</div><div class="num" style="color:${bigColor}">${bigNum}</div><div class="sub">${dir === 1 ? "Long" : "Short"} · ROI ${roi >= 0 ? "+" : ""}${fmt(roi, 2)}% ต่อ margin ${money(margin)}</div></div>` +
+      `<table>${rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join("")}</table>` +
+      flags.map(f => `<div class="flag ${f[0]}">${f[1]}</div>`).join("");
+  }
+  const PNL_KEY = "tt_pnl_calc_v1";
+  function savePnlCalc() {
+    try {
+      localStorage.setItem(PNL_KEY, JSON.stringify({
+        dir: pnlDir, margin: $("pnlMargin").value, lev: $("pnlLev").value,
+        fee: $("pnlFee").value, mmr: $("pnlMmr").value,
+      }));
+    } catch (e) {}
+  }
+  (function initPnlCalc() {
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem(PNL_KEY) || "{}") || {}; } catch (e) {}
+    if (saved.dir === "short") pnlDir = "short";
+    [...$("pnlDirSeg").children].forEach(b => b.classList.toggle("active", b.dataset.d === pnlDir));
+    if (saved.margin != null) $("pnlMargin").value = saved.margin;
+    if (saved.lev != null) $("pnlLev").value = saved.lev;
+    if (saved.fee != null) $("pnlFee").value = saved.fee;
+    if (saved.mmr != null) $("pnlMmr").value = saved.mmr;
+  })();
+  $("pnlDirSeg").addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    pnlDir = b.dataset.d;
+    [...$("pnlDirSeg").children].forEach(x => x.classList.toggle("active", x === b));
+    pnlCalc(); savePnlCalc();
+  });
+  ["pnlEntry", "pnlExit", "pnlMargin", "pnlLev", "pnlFee", "pnlMmr"].forEach(id => $(id).addEventListener("input", pnlCalc));
+  ["pnlMargin", "pnlLev", "pnlFee", "pnlMmr"].forEach(id => $(id).addEventListener("input", savePnlCalc));
+  pnlCalc();
 
   /* ================= session clock ================= */
   const SESS = [
