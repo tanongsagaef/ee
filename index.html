@@ -213,7 +213,7 @@
   </div>
 
   <div class="panel">
-    <h2>กระแสเงิน BTC vs Altcoin <span class="sub">เปลี่ยนแปลง 24 ชม. (Binance) · หาจังหวะเล่น</span></h2>
+    <h2>กระแสเงิน BTC vs Altcoin <span class="sub">24 ชม. + 7 วัน (Binance) · หาจังหวะเล่น</span></h2>
     <div id="flowIndicator"></div>
   </div>
 
@@ -666,45 +666,94 @@
       return out;
     }
   }
+  async function cfFetch7d(symbols) {
+    const out = {};
+    await Promise.all(symbols.map(async (s) => {
+      try {
+        const r = await fetch("https://data-api.binance.vision/api/v3/klines?symbol=" + s + "&interval=1d&limit=8");
+        const arr = await r.json();
+        if (Array.isArray(arr) && arr.length >= 2) {
+          const startClose = parseFloat(arr[0][4]);
+          const nowClose = parseFloat(arr[arr.length - 1][4]);
+          if (startClose > 0 && isFinite(nowClose)) out[s] = (nowClose - startClose) / startClose * 100;
+        }
+      } catch (_) {}
+    }));
+    return out;
+  }
+  // % of the alt basket beating BTC over one window → "alt" (money into alt) / "btc" (money into BTC) / "mixed"
+  function cfCategory(pctBeat) { return pctBeat >= 65 ? "alt" : pctBeat <= 35 ? "btc" : "mixed"; }
+
   async function loadCoinFlow() {
     const wrap = $("flowIndicator");
     if (!wrap) return;
     wrap.innerHTML = `<div class="muted-note">กำลังโหลดข้อมูลตลาด…</div>`;
     try {
-      const chg = await cfFetch24h([CF_BTC, ...CF_ALTS]);
-      const btcChg = chg[CF_BTC];
-      const altEntries = CF_ALTS.filter(s => chg[s] != null).map(s => ({ sym: s.replace("USDT", ""), chg: chg[s] }));
-      if (btcChg == null || altEntries.length < 6) {
+      const all = [CF_BTC, ...CF_ALTS];
+      const [chg24, chg7d] = await Promise.all([cfFetch24h(all), cfFetch7d(all)]);
+      const pct = (n) => (n >= 0 ? "+" : "") + n.toFixed(2) + "%";
+
+      function summarize(chg) {
+        const btcChg = chg[CF_BTC];
+        const entries = CF_ALTS.filter(s => chg[s] != null).map(s => ({ sym: s.replace("USDT", ""), chg: chg[s] }));
+        if (btcChg == null || entries.length < 6) return null;
+        const avg = entries.reduce((s, a) => s + a.chg, 0) / entries.length;
+        const beat = entries.filter(a => a.chg > btcChg).length;
+        const pctBeat = beat / entries.length * 100;
+        return { btcChg, entries, avg, beat, pctBeat, cat: cfCategory(pctBeat) };
+      }
+      const s24 = summarize(chg24), s7 = summarize(chg7d);
+      if (!s24 && !s7) {
         wrap.innerHTML = `<div class="muted-note">ดึงข้อมูลตลาดไม่สำเร็จ ลองกด ⟳ รีเฟรชอีกครั้ง</div>`;
         return;
       }
-      const avgAlt = altEntries.reduce((s, a) => s + a.chg, 0) / altEntries.length;
-      const sortedByChg = altEntries.slice().sort((a, b) => b.chg - a.chg);
-      const beat = altEntries.filter(a => a.chg > btcChg).length;
-      const pctBeat = beat / altEntries.length * 100;
+
+      const CAT_LABEL = { alt: "🟢 เงินไหลเข้า Altcoin", btc: "🔴 เงินไหลเข้า BTC", mixed: "🟡 ผสมผสาน ยังไม่ชัด" };
+      const CAT_CLS = { alt: "ok", btc: "danger", mixed: "warn" };
+
+      // combined verdict: agree on both windows → confident; otherwise flag the conflict
       let verdict, cls, tip;
-      if (pctBeat >= 65) {
-        verdict = "🟢 เงินไหลเข้า Altcoin"; cls = "ok";
-        tip = "Altcoin ส่วนใหญ่ (" + Math.round(pctBeat) + "%) วิ่งแรงกว่า BTC ใน 24 ชม. — จังหวะเน้นเล่น Altcoin";
-      } else if (pctBeat <= 35) {
-        verdict = "🔴 เงินไหลเข้า BTC"; cls = "danger";
-        tip = "Altcoin ส่วนใหญ่ (" + Math.round(100 - pctBeat) + "%) อ่อนแรงกว่า BTC ใน 24 ชม. — เงินไหลออกจาก Alt เข้า BTC ระวัง Alt / เน้นเล่น BTC";
+      if (s24 && s7) {
+        if (s24.cat === s7.cat) {
+          verdict = CAT_LABEL[s24.cat]; cls = CAT_CLS[s24.cat];
+          tip = s24.cat === "alt"
+            ? "Alt แรงกว่า BTC ทั้ง 24 ชม. (" + Math.round(s24.pctBeat) + "%) และ 7 วัน (" + Math.round(s7.pctBeat) + "%) — สัญญาณเงินเข้า Alt ชัดเจน เน้นเล่น Altcoin"
+            : s24.cat === "btc"
+              ? "Alt อ่อนกว่า BTC ทั้ง 24 ชม. และ 7 วัน — เงินไหลออกจาก Alt เข้า BTC ต่อเนื่อง ระวัง Alt / เน้น BTC"
+              : "ทั้ง 24 ชม. และ 7 วัน ยังไม่มีฝั่งไหนชนะขาด — ตลาดยังไม่มีทิศทางเงินไหลชัดเจน";
+        } else {
+          verdict = "🟡 สัญญาณขัดแย้ง"; cls = "warn";
+          tip = "24 ชม. บอก " + CAT_LABEL[s24.cat].replace(/^\S+\s/, "") + " แต่ 7 วันบอก " + CAT_LABEL[s7.cat].replace(/^\S+\s/, "") + " — อาจเป็นการดีดตัวระยะสั้น รอให้สัญญาณไปทางเดียวกันก่อน";
+        }
       } else {
-        verdict = "🟡 ผสมผสาน ยังไม่ชัด"; cls = "warn";
-        tip = "Altcoin แรงกว่า/อ่อนกว่า BTC ใกล้เคียงกัน (" + Math.round(pctBeat) + "%) — ยังไม่มีทิศทางเงินไหลชัดเจน รอสัญญาณ";
+        const s = s24 || s7;
+        verdict = CAT_LABEL[s.cat]; cls = CAT_CLS[s.cat];
+        tip = "อ่านได้เฉพาะกรอบ " + (s24 ? "24 ชม." : "7 วัน") + " (อีกกรอบดึงข้อมูลไม่สำเร็จ)";
       }
-      const top3 = sortedByChg.slice(0, 3), bottom3 = sortedByChg.slice(-3).reverse();
-      const pct = (n) => (n >= 0 ? "+" : "") + n.toFixed(2) + "%";
+
+      const windowBlock = (label, s) => {
+        if (!s) return `<div class="tile"><div class="k">${label}</div><div class="v small">—</div><div class="note">ดึงไม่สำเร็จ</div></div>`;
+        return `<div class="tile"><div class="k">${label}</div>
+          <div class="v small ${s.pctBeat >= 65 ? "pos" : s.pctBeat <= 35 ? "neg" : ""}">${Math.round(s.pctBeat)}%</div>
+          <div class="note">Alt แรงกว่า BTC (${s.beat}/${s.entries.length}) · BTC ${pct(s.btcChg)} · Alt เฉลี่ย ${pct(s.avg)}</div>
+        </div>`;
+      };
+
+      let extraLines = "";
+      const forExtras = s24 || s7;
+      if (forExtras) {
+        const sorted = forExtras.entries.slice().sort((a, b) => b.chg - a.chg);
+        const top3 = sorted.slice(0, 3), bottom3 = sorted.slice(-3).reverse();
+        extraLines =
+          `<div class="muted-note" style="margin-top:12px;">แรงสุด (${s24 ? "24 ชม." : "7 วัน"}): ${top3.map(a => escapeHtml(a.sym) + " " + pct(a.chg)).join(" · ")}</div>` +
+          `<div class="muted-note">อ่อนสุด (${s24 ? "24 ชม." : "7 วัน"}): ${bottom3.map(a => escapeHtml(a.sym) + " " + pct(a.chg)).join(" · ")}</div>`;
+      }
+
       wrap.innerHTML =
         `<div class="flow-verdict ${cls}">${verdict}</div>` +
         `<div class="muted-note" style="margin-bottom:12px;">${escapeHtml(tip)}</div>` +
-        `<div class="tiles">
-          <div class="tile"><div class="k">BTC 24h</div><div class="v small ${btcChg >= 0 ? "pos" : "neg"}">${pct(btcChg)}</div></div>
-          <div class="tile"><div class="k">Alt เฉลี่ย 24h</div><div class="v small ${avgAlt >= 0 ? "pos" : "neg"}">${pct(avgAlt)}</div></div>
-          <div class="tile"><div class="k">Alt แรงกว่า BTC</div><div class="v small">${Math.round(pctBeat)}%</div><div class="note">${beat}/${altEntries.length} เหรียญ</div></div>
-        </div>` +
-        `<div class="muted-note" style="margin-top:12px;">แรงสุด: ${top3.map(a => escapeHtml(a.sym) + " " + pct(a.chg)).join(" · ")}</div>` +
-        `<div class="muted-note">อ่อนสุด: ${bottom3.map(a => escapeHtml(a.sym) + " " + pct(a.chg)).join(" · ")}</div>`;
+        `<div class="tiles">${windowBlock("24 ชม.", s24)}${windowBlock("7 วัน", s7)}</div>` +
+        extraLines;
     } catch (e) {
       wrap.innerHTML = `<div class="muted-note">ดึงข้อมูลตลาดไม่สำเร็จ: ${escapeHtml(String((e && e.message) || e))}</div>`;
     }
