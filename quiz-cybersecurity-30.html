@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>แนวข้อสอบความมั่นคงปลอดภัยไซเบอร์ 30 ข้อ</title>
+<style>
+  :root {
+    --bg: #f4f6fa;
+    --card-bg: #ffffff;
+    --text: #1f2430;
+    --muted: #667085;
+    --primary: #2d5cf6;
+    --correct: #1a9d5a;
+    --incorrect: #e5484d;
+    --border: #e3e7ee;
+    --header-bg: #1c2333;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Sarabun", "TH Sarabun New", "Segoe UI", Tahoma, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding-bottom: 60px;
+  }
+  header {
+    background: var(--header-bg);
+    color: #fff;
+    padding: 22px 20px;
+    text-align: center;
+  }
+  header .back-row { text-align: left; max-width: 800px; margin: 0 auto 12px; }
+  header .back-link {
+    display: inline-flex; align-items: center; gap: 6px;
+    color: #b9c0d4; text-decoration: none; font-size: 0.85rem;
+    border: 1px solid rgba(255,255,255,0.25); border-radius: 999px; padding: 6px 13px;
+  }
+  header .back-link:hover { color: #fff; border-color: #fff; }
+  header h1 { margin: 0 0 6px; font-size: 1.4rem; }
+  header p { margin: 0; color: #b9c0d4; font-size: 0.92rem; }
+
+  .container { max-width: 800px; margin: 0 auto; padding: 20px; }
+
+  .toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+  .toolbar button {
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    cursor: pointer;
+  }
+  .toolbar button.secondary {
+    background: #fff;
+    color: var(--primary);
+    border: 1px solid var(--primary);
+  }
+  #score-box {
+    font-weight: 600;
+    color: var(--muted);
+  }
+  #score-box span { color: var(--primary); font-size: 1.1rem; }
+
+  .question-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+  }
+  .q-number {
+    display: inline-block;
+    background: var(--primary);
+    color: #fff;
+    font-weight: 600;
+    font-size: 0.8rem;
+    padding: 2px 10px;
+    border-radius: 999px;
+    margin-bottom: 8px;
+  }
+  .q-tag {
+    display: inline-block;
+    background: #eef1fb;
+    color: var(--primary);
+    font-weight: 600;
+    font-size: 0.72rem;
+    padding: 2px 8px;
+    border-radius: 999px;
+    margin-bottom: 8px;
+    margin-left: 6px;
+  }
+  .q-prompt { font-size: 1.02rem; font-weight: 600; margin: 0 0 12px; }
+
+  .options { display: flex; flex-direction: column; gap: 8px; }
+  .option {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .option:hover { background: #f0f3fc; }
+  .option input { margin-top: 3px; }
+  .option.correct { border-color: var(--correct); background: #eafaf1; }
+  .option.incorrect { border-color: var(--incorrect); background: #fdeeee; }
+  .option.disabled { pointer-events: none; }
+
+  .explanation {
+    display: none;
+    margin-top: 12px;
+    padding: 10px 14px;
+    background: #f4f6fa;
+    border-left: 4px solid var(--primary);
+    border-radius: 6px;
+    font-size: 0.92rem;
+    color: var(--muted);
+  }
+  .explanation.show { display: block; }
+  .explanation b { color: var(--text); }
+
+  .verdict {
+    display: none;
+    font-weight: 700;
+    margin-top: 10px;
+    font-size: 0.95rem;
+  }
+  .verdict.correct-v { color: var(--correct); display: block; }
+  .verdict.incorrect-v { color: var(--incorrect); display: block; }
+
+  footer {
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.85rem;
+    padding: 20px;
+  }
+
+  #result-summary {
+    display: none;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  #result-summary.show { display: block; }
+  #result-summary .big-score { font-size: 2.2rem; font-weight: 700; color: var(--primary); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="back-row"><a class="back-link" href="quiz.html">‹ กลับหน้าแบบทดสอบ</a></div>
+  <h1>แนวข้อสอบ: ความรู้เกี่ยวกับความมั่นคงปลอดภัยไซเบอร์</h1>
+  <p>30 ข้อ พร้อมเฉลย — มัลแวร์, การโจมตีทางไซเบอร์, การเข้ารหัส, และกฎหมายที่เกี่ยวข้อง (พ.ร.บ.คอมพิวเตอร์/ไซเบอร์/PDPA)</p>
+</header>
+
+<div class="container">
+  <div class="toolbar">
+    <div id="score-box">ตอบแล้ว <span id="answered-count">0</span>/30</div>
+    <div>
+      <button class="secondary" onclick="resetQuiz()">เริ่มใหม่</button>
+      <button onclick="checkAll()">ตรวจทั้งหมด</button>
+    </div>
+  </div>
+
+  <div id="result-summary">
+    <div>คะแนนของคุณ</div>
+    <div class="big-score"><span id="final-score">0</span> / 30</div>
+  </div>
+
+  <div id="quiz-root"></div>
+</div>
+
+<footer>สร้างขึ้นเพื่อการฝึกทบทวนเท่านั้น ไม่ใช่ข้อสอบจริงของศาลยุติธรรม</footer>
+
+<script>
+const questions = [
+  {tag:"CIA Triad", q:"หลักการ CIA Triad ในความมั่นคงปลอดภัยสารสนเทศ ย่อมาจากอะไร", options:["Computer, Internet, Application","Confidentiality, Integrity, Availability","Control, Identity, Authorization","Cyber, Information, Access"], correct:1, explain:"CIA Triad คือหลักการพื้นฐาน 3 ประการของความมั่นคงปลอดภัยสารสนเทศ ได้แก่ Confidentiality (การรักษาความลับ), Integrity (ความถูกต้องครบถ้วน) และ Availability (ความพร้อมใช้งาน)"},
+  {tag:"CIA Triad", q:"หากข้อมูลถูกแก้ไขโดยผู้ไม่มีสิทธิ์โดยที่เจ้าของข้อมูลไม่รู้ตัว ถือเป็นการละเมิดหลักการใดใน CIA Triad", options:["Confidentiality","Integrity","Availability","Authentication"], correct:1, explain:"Integrity คือความถูกต้องครบถ้วนของข้อมูล การที่ข้อมูลถูกแก้ไขโดยไม่ได้รับอนุญาตถือเป็นการละเมิดหลักการ Integrity โดยตรง"},
+  {tag:"CIA Triad", q:"การโจมตีแบบ DDoS ที่ทำให้เซิร์ฟเวอร์ล่มจนผู้ใช้งานทั่วไปเข้าใช้บริการไม่ได้ ถือเป็นการโจมตีต่อหลักการใดใน CIA Triad", options:["Confidentiality","Integrity","Availability","Non-repudiation"], correct:2, explain:"Availability คือความพร้อมใช้งานของระบบ การโจมตีแบบ DDoS ทำให้ระบบไม่สามารถให้บริการได้ตามปกติ จึงเป็นการโจมตีที่มุ่งทำลาย Availability"},
+  {tag:"Malware", q:"ไวรัสคอมพิวเตอร์ (Virus) มีลักษณะการทำงานอย่างไร", options:["แพร่กระจายตัวเองผ่านเครือข่ายได้โดยไม่ต้องมีไฟล์พา","ต้องแนบตัวไปกับไฟล์หรือโปรแกรม (host) และต้องถูกเปิด/รันจึงจะแพร่กระจายได้","เข้ารหัสไฟล์แล้วเรียกค่าไถ่","เป็นโปรแกรมที่ถูกต้องตามกฎหมายเสมอ"], correct:1, explain:"Virus ต้องอาศัยไฟล์หรือโปรแกรมอื่นเป็นตัวพา (host) และจะแพร่กระจายได้ก็ต่อเมื่อไฟล์ที่ติดไวรัสถูกเปิดหรือรันโดยผู้ใช้ ต่างจาก Worm ที่แพร่กระจายตัวเองได้โดยอัตโนมัติ"},
+  {tag:"Malware", q:"หนอนคอมพิวเตอร์ (Worm) ต่างจากไวรัส (Virus) อย่างไร", options:["Worm ไม่มีอันตรายใด ๆ ต่อระบบ","Worm สามารถแพร่กระจายตัวเองผ่านเครือข่ายได้โดยอัตโนมัติ ไม่ต้องอาศัยไฟล์อื่นเป็นตัวพาเหมือน Virus","Worm ทำงานได้เฉพาะบนโทรศัพท์มือถือเท่านั้น","Worm และ Virus เป็นสิ่งเดียวกันทุกประการ"], correct:1, explain:"Worm สามารถแพร่กระจายตัวเองผ่านเครือข่ายไปยังเครื่องอื่นได้โดยอัตโนมัติ โดยไม่จำเป็นต้องอาศัยไฟล์หรือโปรแกรมอื่นเป็นตัวพา (host) เหมือนอย่าง Virus จึงแพร่กระจายได้รวดเร็วกว่า"},
+  {tag:"Malware", q:"ม้าโทรจัน (Trojan Horse) มีลักษณะการหลอกลวงอย่างไร", options:["แฝงตัวมาในรูปแบบโปรแกรมที่ดูเหมือนปกติหรือมีประโยชน์ หลอกให้ผู้ใช้ติดตั้งเอง","แพร่กระจายตัวเองผ่านเครือข่ายโดยอัตโนมัติ","เข้ารหัสไฟล์ทั้งหมดในเครื่องทันทีที่ติดตั้ง","เป็นโปรแกรมป้องกันไวรัสอย่างหนึ่ง"], correct:0, explain:"Trojan Horse ได้ชื่อมาจากตำนานม้าไม้เมืองทรอย คือมัลแวร์ที่แฝงตัวมาในรูปแบบโปรแกรมที่ดูปกติหรือมีประโยชน์ (เช่น เกม, โปรแกรมฟรี) เพื่อหลอกล่อให้ผู้ใช้ดาวน์โหลดและติดตั้งเอง"},
+  {tag:"Malware", q:"Ransomware มีพฤติกรรมหลักคือข้อใด", options:["ขโมยรหัสผ่านแล้วส่งออกไปยังผู้โจมตีเงียบ ๆ","เข้ารหัสไฟล์ของเหยื่อจนเปิดใช้งานไม่ได้ แล้วเรียกร้องค่าไถ่เพื่อแลกกับการปลดล็อก","แสดงโฆษณาก่อกวนบนหน้าจอ","ทำสำเนาไฟล์สำรองให้ผู้ใช้อัตโนมัติ"], correct:1, explain:"Ransomware คือมัลแวร์ที่เข้ารหัส (encrypt) ไฟล์ในเครื่องของเหยื่อทำให้เปิดใช้งานไม่ได้ แล้วเรียกร้องเงินค่าไถ่ (ransom) เพื่อแลกกับกุญแจถอดรหัสไฟล์กลับคืน การมี Backup ที่ดีเป็นมาตรการป้องกันความเสียหายที่สำคัญที่สุด"},
+  {tag:"Malware", q:"Spyware มีพฤติกรรมหลักคือข้อใด", options:["แสดงหน้าต่างโฆษณาก่อกวนเท่านั้น","แอบดักจับข้อมูลหรือพฤติกรรมการใช้งานของผู้ใช้โดยที่เจ้าตัวไม่รู้ตัว","ทำให้คอมพิวเตอร์ทำงานเร็วขึ้น","เป็นโปรแกรมสำรองข้อมูลอัตโนมัติ"], correct:1, explain:"Spyware คือมัลแวร์ที่แอบสอดแนม เก็บรวบรวมข้อมูลส่วนตัวหรือพฤติกรรมการใช้งานของผู้ใช้ เช่น การพิมพ์คีย์บอร์ด (keylogging) แล้วส่งข้อมูลนั้นออกไปให้ผู้ไม่หวังดีโดยเจ้าของเครื่องไม่รู้ตัว"},
+  {tag:"Phishing", q:"Phishing คือการโจมตีในลักษณะใด", options:["การเจาะระบบผ่านช่องโหว่ของซอฟต์แวร์โดยตรง","การหลอกลวงผ่านอีเมลหรือข้อความปลอมให้เหยื่อเปิดเผยข้อมูลสำคัญหรือคลิกลิงก์อันตราย","การโจมตีให้เซิร์ฟเวอร์ล่มด้วยคำขอจำนวนมาก","การดักฟังสัญญาณ Wi-Fi"], correct:1, explain:"Phishing คือการหลอกลวงผ่านอีเมล ข้อความ หรือเว็บไซต์ปลอมที่ทำให้ดูน่าเชื่อถือ เพื่อหลอกให้เหยื่อเปิดเผยข้อมูลสำคัญ เช่น รหัสผ่าน เลขบัตรเครดิต หรือคลิกลิงก์/เปิดไฟล์แนบที่เป็นอันตราย"},
+  {tag:"Social Engineering", q:"Social Engineering (วิศวกรรมสังคม) หมายถึงอะไร", options:["การใช้ช่องโหว่ทางเทคนิคของซอฟต์แวร์ในการเจาะระบบ","การหลอกลวงโดยอาศัยจิตวิทยาและความไว้วางใจของมนุษย์ เพื่อให้เหยื่อเปิดเผยข้อมูลหรือทำสิ่งที่เป็นอันตรายโดยไม่รู้ตัว","การออกแบบเครือข่ายสังคมออนไลน์","การเข้ารหัสข้อมูลบนโซเชียลมีเดีย"], correct:1, explain:"Social Engineering คือเทคนิคการหลอกลวงที่อาศัยจิตวิทยาและความไว้วางใจของมนุษย์ (ไม่ใช่ช่องโหว่ทางเทคนิค) เพื่อให้เหยื่อเปิดเผยข้อมูลสำคัญหรือกระทำการที่เป็นประโยชน์ต่อผู้โจมตี เช่น Phishing เป็นรูปแบบหนึ่งของ Social Engineering"},
+  {tag:"Firewall", q:"Firewall มีหน้าที่หลักในการรักษาความปลอดภัยไซเบอร์คือข้อใด", options:["เข้ารหัสไฟล์ทั้งหมดในเครื่อง","กรองและควบคุมการรับส่งข้อมูลเข้า-ออกเครือข่ายตามนโยบายความปลอดภัยที่กำหนด","สำรองข้อมูลอัตโนมัติ","เพิ่มความเร็วอินเทอร์เน็ต"], correct:1, explain:"Firewall ทำหน้าที่เป็นด่านกรองตรวจสอบและควบคุมการรับส่งข้อมูลเข้า-ออกระหว่างเครือข่ายภายในกับภายนอก ตามกฎ (policy) ที่กำหนดไว้ เพื่อป้องกันการเข้าถึงที่ไม่ได้รับอนุญาต"},
+  {tag:"Encryption", q:"การเข้ารหัสแบบ Symmetric Encryption มีลักษณะอย่างไร", options:["ใช้กุญแจ (key) เดียวกันทั้งการเข้ารหัสและการถอดรหัส","ใช้กุญแจคนละดอกระหว่างเข้ารหัสและถอดรหัสเสมอ","ไม่ต้องใช้กุญแจใด ๆ เลย","ใช้ได้เฉพาะกับไฟล์ภาพเท่านั้น"], correct:0, explain:"Symmetric Encryption ใช้กุญแจ (key) เดียวกันทั้งฝั่งเข้ารหัสและถอดรหัส มีความเร็วในการประมวลผลสูง แต่ต้องมีวิธีแลกเปลี่ยนกุญแจอย่างปลอดภัยระหว่างสองฝ่าย"},
+  {tag:"Encryption", q:"การเข้ารหัสแบบ Asymmetric Encryption ใช้กุญแจกี่ดอก และมีลักษณะอย่างไร", options:["1 ดอก ใช้ร่วมกันทั้งสองฝ่าย","2 ดอก คือ Public Key และ Private Key โดยใช้กุญแจคนละดอกในการเข้ารหัสและถอดรหัส","3 ดอกขึ้นไป","ไม่ต้องใช้กุญแจใด ๆ เลย"], correct:1, explain:"Asymmetric Encryption ใช้กุญแจคู่ (key pair) คือ Public Key (เผยแพร่ได้) และ Private Key (เก็บเป็นความลับ) โดยข้อมูลที่เข้ารหัสด้วยกุญแจหนึ่งจะถอดรหัสได้ด้วยกุญแจอีกดอกเท่านั้น เหมาะสำหรับการแลกเปลี่ยนข้อมูลผ่านเครือข่ายสาธารณะอย่างปลอดภัย"},
+  {tag:"Authentication", q:"Multi-Factor Authentication (MFA) หมายถึงอะไร", options:["การใช้รหัสผ่านที่ยาวมากเพียงอย่างเดียว","การยืนยันตัวตนด้วยปัจจัยมากกว่า 1 อย่าง เช่น รหัสผ่านร่วมกับรหัส OTP หรือลายนิ้วมือ","การเปลี่ยนรหัสผ่านทุกวัน","การใช้ Firewall หลายตัวพร้อมกัน"], correct:1, explain:"MFA คือการยืนยันตัวตนโดยใช้หลักฐานมากกว่า 1 ปัจจัย จาก 3 กลุ่ม ได้แก่ สิ่งที่รู้ (เช่น รหัสผ่าน), สิ่งที่มี (เช่น OTP หรือ token), และสิ่งที่เป็น (เช่น ลายนิ้วมือ/ใบหน้า) ทำให้ปลอดภัยกว่าการใช้รหัสผ่านเพียงอย่างเดียว"},
+  {tag:"Authentication", q:"การยืนยันตัวตนด้วยลายนิ้วมือหรือการสแกนใบหน้า จัดอยู่ในปัจจัยกลุ่มใดของการยืนยันตัวตน", options:["สิ่งที่รู้ (Something you know)","สิ่งที่มี (Something you have)","สิ่งที่เป็น (Something you are) หรือ Biometric","ไม่จัดอยู่ในกลุ่มใดเลย"], correct:2, explain:"ลายนิ้วมือและการสแกนใบหน้าเป็นการยืนยันตัวตนแบบ Biometric ซึ่งจัดอยู่ในกลุ่ม 'สิ่งที่เป็น' (Something you are) คือใช้ลักษณะทางกายภาพเฉพาะตัวของบุคคลในการยืนยัน"},
+  {tag:"DoS/DDoS", q:"การโจมตีแบบ DDoS (Distributed Denial of Service) มีลักษณะการทำงานอย่างไร", options:["การเข้ารหัสไฟล์เพื่อเรียกค่าไถ่","การส่งคำขอ (request) จำนวนมหาศาลจากหลายเครื่องพร้อมกันเพื่อทำให้เซิร์ฟเวอร์เป้าหมายทำงานหนักจนล่มหรือใช้งานไม่ได้","การขโมยข้อมูลบัตรเครดิตผ่านอีเมล","การติดตั้งโปรแกรมสอดแนม"], correct:1, explain:"DDoS คือการโจมตีที่ผู้โจมตีใช้เครื่องจำนวนมาก (มักเป็น botnet) ส่งคำขอเข้าสู่เซิร์ฟเวอร์เป้าหมายพร้อมกันในปริมาณมหาศาล จนทรัพยากรของเซิร์ฟเวอร์ไม่เพียงพอ ทำให้ผู้ใช้งานปกติไม่สามารถเข้าใช้บริการได้ (โจมตีต่อ Availability)"},
+  {tag:"Man-in-the-Middle", q:"การโจมตีแบบ Man-in-the-Middle (MITM) คือลักษณะใด", options:["ผู้โจมตีแทรกตัวอยู่กลางการสื่อสารระหว่างสองฝ่าย เพื่อดักฟังหรือแก้ไขข้อมูลโดยที่ทั้งสองฝ่ายไม่รู้ตัว","การส่งอีเมลปลอมหลอกลวง","การเข้ารหัสไฟล์เรียกค่าไถ่","การเดารหัสผ่านด้วยการสุ่ม"], correct:0, explain:"Man-in-the-Middle คือการที่ผู้โจมตีแทรกตัวอยู่กึ่งกลางระหว่างการสื่อสารของสองฝ่าย (เช่น ผู้ใช้กับเว็บไซต์) เพื่อดักฟัง อ่าน หรือแก้ไขข้อมูลที่รับส่งกัน โดยทั้งสองฝ่ายไม่รู้ตัวว่ามีบุคคลที่สามแทรกอยู่"},
+  {tag:"SQL Injection", q:"SQL Injection คือการโจมตีในลักษณะใด", options:["การแทรกคำสั่ง SQL อันตรายผ่านช่องกรอกข้อมูลของเว็บแอปพลิเคชัน เพื่อเข้าถึงหรือแก้ไขฐานข้อมูลโดยไม่ได้รับอนุญาต","การส่งอีเมลจำนวนมากเพื่อก่อกวน","การขโมยสาย LAN ในองค์กร","การติดตั้งโปรแกรมป้องกันไวรัสปลอม"], correct:0, explain:"SQL Injection คือการโจมตีที่ผู้ไม่หวังดีแทรกคำสั่ง SQL ที่เป็นอันตรายเข้าไปในช่องกรอกข้อมูล (input field) ของเว็บแอปพลิเคชันที่ไม่มีการตรวจสอบข้อมูลนำเข้าอย่างเหมาะสม เพื่อเข้าถึง แก้ไข หรือลบข้อมูลในฐานข้อมูลโดยไม่ได้รับอนุญาต"},
+  {tag:"Brute Force", q:"Brute Force Attack คือการโจมตีในลักษณะใด", options:["การเดา/สุ่มรหัสผ่านซ้ำ ๆ หลายครั้งจนกว่าจะพบรหัสผ่านที่ถูกต้อง","การหลอกลวงผ่านอีเมลปลอม","การเข้ารหัสข้อมูลเพื่อเรียกค่าไถ่","การส่งคำขอจำนวนมากเพื่อให้เซิร์ฟเวอร์ล่ม"], correct:0, explain:"Brute Force Attack คือวิธีการโจมตีที่พยายามเดาหรือสุ่มรหัสผ่าน (หรือกุญแจเข้ารหัส) ซ้ำ ๆ ทีละความเป็นไปได้ จนกว่าจะพบค่าที่ถูกต้อง การตั้งรหัสผ่านที่ยาวและซับซ้อน รวมถึงการจำกัดจำนวนครั้งที่ล็อกอินผิด ช่วยป้องกันการโจมตีประเภทนี้ได้"},
+  {tag:"Zero-day", q:"Zero-day Vulnerability หมายถึงอะไร", options:["ช่องโหว่ที่ถูกค้นพบและแก้ไขเรียบร้อยแล้วมานานกว่า 1 ปี","ช่องโหว่ของซอฟต์แวร์ที่ยังไม่มีแพตช์ (patch) แก้ไข ผู้พัฒนายังไม่ทราบหรือเพิ่งทราบ ทำให้มีความเสี่ยงสูงหากถูกใช้โจมตี","ชื่อของโปรแกรมป้องกันไวรัสชนิดหนึ่ง","วันที่ซอฟต์แวร์หมดอายุการใช้งาน"], correct:1, explain:"Zero-day Vulnerability คือช่องโหว่ด้านความปลอดภัยที่ยังไม่ถูกค้นพบหรือเพิ่งถูกค้นพบโดยผู้พัฒนาซอฟต์แวร์ ทำให้ยังไม่มีแพตช์แก้ไข หากผู้ไม่หวังดีค้นพบและใช้ประโยชน์จากช่องโหว่นี้ก่อน (zero-day exploit) จะมีความเสี่ยงสูงมากเพราะไม่มีการป้องกันล่วงหน้า"},
+  {tag:"Patch/Update", q:"เหตุใดการอัปเดตซอฟต์แวร์ (Patch/Update) จึงมีความสำคัญต่อความปลอดภัยไซเบอร์", options:["เพื่อเปลี่ยนสีหน้าจอโปรแกรมเท่านั้น","เพื่อปิดช่องโหว่ด้านความปลอดภัยที่ถูกค้นพบ ลดความเสี่ยงจากการถูกโจมตีผ่านช่องโหว่เดิม","ไม่มีความสำคัญใด ๆ ต่อความปลอดภัย","เพื่อเพิ่มขนาดไฟล์โปรแกรมเท่านั้น"], correct:1, explain:"การอัปเดต (patch) ซอฟต์แวร์มักมีการแก้ไขช่องโหว่ด้านความปลอดภัยที่ถูกค้นพบ การไม่อัปเดตทำให้ระบบยังคงมีช่องโหว่เดิมที่ผู้ไม่หวังดีอาจใช้ประโยชน์โจมตีได้ จึงควรอัปเดตซอฟต์แวร์และระบบปฏิบัติการอย่างสม่ำเสมอ"},
+  {tag:"VPN", q:"VPN (Virtual Private Network) ช่วยเพิ่มความปลอดภัยไซเบอร์อย่างไร", options:["เพิ่มความเร็วอินเทอร์เน็ตเท่านั้น","เข้ารหัสข้อมูลที่รับส่งผ่านเครือข่ายสาธารณะ ทำให้ผู้ไม่หวังดีดักอ่านข้อมูลได้ยากขึ้น","ลบไวรัสในเครื่องอัตโนมัติ","ป้องกันไฟฟ้าดับ"], correct:1, explain:"VPN สร้างช่องทางสื่อสาร (tunnel) ที่เข้ารหัสข้อมูลระหว่างอุปกรณ์กับปลายทาง แม้จะใช้งานผ่านเครือข่ายสาธารณะที่ไม่ปลอดภัย (เช่น Wi-Fi สาธารณะ) ก็ทำให้ผู้ไม่หวังดีดักอ่านข้อมูลได้ยากขึ้น"},
+  {tag:"Backup", q:"หลัก 3-2-1 ในการสำรองข้อมูล (Backup) หมายถึงอะไร", options:["สำรองข้อมูล 3 ครั้งต่อวัน","สำเนาข้อมูล 3 ชุด เก็บในสื่อ 2 ชนิดที่ต่างกัน และ 1 ชุดเก็บไว้นอกสถานที่","ใช้รหัสผ่าน 3 ชุด 2 ตัวอักษร 1 ตัวเลข","สำรองข้อมูลเฉพาะไฟล์ที่มีขนาดน้อยกว่า 321 MB"], correct:1, explain:"หลัก 3-2-1 Backup คือแนวปฏิบัติที่แนะนำให้มีสำเนาข้อมูลอย่างน้อย 3 ชุด เก็บบนสื่อบันทึกข้อมูลอย่างน้อย 2 ชนิดที่แตกต่างกัน (เช่น ฮาร์ดดิสก์และคลาวด์) และมีอย่างน้อย 1 ชุดเก็บไว้นอกสถานที่ (offsite) เพื่อป้องกันความเสียหายจากภัยพิบัติหรือ Ransomware"},
+  {tag:"กฎหมาย", q:"พ.ร.บ.ว่าด้วยการกระทำความผิดเกี่ยวกับคอมพิวเตอร์ พ.ศ. 2550 มีวัตถุประสงค์หลักเพื่ออะไร", options:["คุ้มครองข้อมูลส่วนบุคคลโดยเฉพาะ","กำหนดความผิดและบทลงโทษสำหรับการกระทำผิดที่เกี่ยวข้องกับคอมพิวเตอร์ เช่น การเข้าถึงระบบ/ข้อมูลโดยไม่ชอบ การปลอมแปลงข้อมูล","วางกรอบมาตรฐานเครือข่ายไซเบอร์ระดับชาติเท่านั้น","กำหนดหลักสูตรการศึกษาด้าน IT"], correct:1, explain:"พ.ร.บ.ว่าด้วยการกระทำความผิดเกี่ยวกับคอมพิวเตอร์ พ.ศ. 2550 (แก้ไขเพิ่มเติม พ.ศ. 2560) กำหนดฐานความผิดและบทลงโทษสำหรับการกระทำผิดที่เกี่ยวข้องกับคอมพิวเตอร์ เช่น การเข้าถึงระบบคอมพิวเตอร์/ข้อมูลคอมพิวเตอร์โดยไม่ชอบ การปลอมแปลงหรือทำให้ข้อมูลเสียหาย และการส่งข้อมูลก่อกวน (สแปม)"},
+  {tag:"กฎหมาย", q:"พ.ร.บ.การรักษาความมั่นคงปลอดภัยไซเบอร์ พ.ศ. 2562 มีวัตถุประสงค์หลักคือข้อใด", options:["คุ้มครองลิขสิทธิ์ซอฟต์แวร์","วางกรอบการป้องกัน รับมือ และลดความเสี่ยงจากภัยคุกคามทางไซเบอร์ในระดับประเทศ โดยเฉพาะโครงสร้างพื้นฐานสำคัญ","กำหนดภาษีธุรกิจอิเล็กทรอนิกส์","ควบคุมการขายสินค้าออนไลน์"], correct:1, explain:"พ.ร.บ.การรักษาความมั่นคงปลอดภัยไซเบอร์ พ.ศ. 2562 มีวัตถุประสงค์เพื่อวางกรอบมาตรการป้องกัน รับมือ และลดความเสี่ยงจากภัยคุกคามทางไซเบอร์ในระดับประเทศ โดยเฉพาะหน่วยงานโครงสร้างพื้นฐานสำคัญทางสารสนเทศ (Critical Information Infrastructure)"},
+  {tag:"PDPA", q:"PDPA (พ.ร.บ.คุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562) มีวัตถุประสงค์หลักคือข้อใด", options:["ป้องกันไวรัสคอมพิวเตอร์","คุ้มครองข้อมูลส่วนบุคคลของบุคคลธรรมดา กำหนดหลักเกณฑ์การเก็บ ใช้ และเปิดเผยข้อมูลส่วนบุคคลให้ถูกต้องตามกฎหมาย","กำหนดมาตรฐานความเร็วอินเทอร์เน็ต","ควบคุมราคาสินค้าออนไลน์"], correct:1, explain:"PDPA (Personal Data Protection Act) มีวัตถุประสงค์เพื่อคุ้มครองข้อมูลส่วนบุคคลของบุคคลธรรมดา กำหนดหลักเกณฑ์และมาตรการเกี่ยวกับการเก็บรวบรวม ใช้ และเปิดเผยข้อมูลส่วนบุคคล ให้เจ้าของข้อมูลมีสิทธิควบคุมข้อมูลของตนเอง"},
+  {tag:"PDPA", q:"ใน PDPA บทบาทของ 'Data Controller' (ผู้ควบคุมข้อมูลส่วนบุคคล) หมายถึงใคร", options:["เจ้าของข้อมูลส่วนบุคคลเอง","บุคคลหรือนิติบุคคลซึ่งมีอำนาจหน้าที่ตัดสินใจเกี่ยวกับการเก็บรวบรวม ใช้ หรือเปิดเผยข้อมูลส่วนบุคคล","หน่วยงานที่ทำหน้าที่ประมวลผลข้อมูลตามคำสั่งของผู้อื่นเท่านั้น","โปรแกรมป้องกันไวรัสที่ใช้ในองค์กร"], correct:1, explain:"Data Controller (ผู้ควบคุมข้อมูลส่วนบุคคล) คือบุคคลหรือนิติบุคคลที่มีอำนาจหน้าที่ตัดสินใจเกี่ยวกับการเก็บรวบรวม ใช้ หรือเปิดเผยข้อมูลส่วนบุคคล ซึ่งแตกต่างจาก Data Processor ที่เป็นผู้ประมวลผลข้อมูลตามคำสั่งของ Data Controller เท่านั้น"},
+  {tag:"PDPA", q:"PDPA เริ่มมีผลบังคับใช้อย่างเต็มรูปแบบเมื่อใด", options:["27 พฤษภาคม 2563","1 มิถุนายน 2565","1 มกราคม 2560","ยังไม่มีผลบังคับใช้"], correct:1, explain:"PDPA ประกาศใช้เมื่อวันที่ 27 พฤษภาคม 2562 แต่มีการเลื่อนบังคับใช้บทบัญญัติสำคัญหลายครั้ง จนมีผลบังคับใช้อย่างเต็มรูปแบบเมื่อวันที่ 1 มิถุนายน 2565"},
+  {tag:"Digital Signature", q:"ลายมือชื่อดิจิทัล (Digital Signature) มีประโยชน์หลักคือข้อใด", options:["เพิ่มความเร็วในการส่งไฟล์","ยืนยันตัวตนผู้ส่งและรับรองว่าข้อมูล/เอกสารไม่ถูกแก้ไขระหว่างทาง","ลบไวรัสในไฟล์เอกสาร","บีบอัดขนาดไฟล์ให้เล็กลง"], correct:1, explain:"Digital Signature ใช้เทคโนโลยีการเข้ารหัส (มักเป็น Asymmetric Encryption) เพื่อยืนยันตัวตนของผู้ส่งเอกสารหรือข้อมูล และรับรองความถูกต้องครบถ้วน (Integrity) ว่าเอกสารนั้นไม่ถูกแก้ไขเปลี่ยนแปลงระหว่างการส่ง"},
+  {tag:"Password Policy", q:"ข้อใดคือแนวปฏิบัติที่ดีในการตั้งรหัสผ่านเพื่อความปลอดภัย", options:["ใช้รหัสผ่านเดียวกันกับทุกบัญชีเพื่อให้จำง่าย","ตั้งรหัสผ่านให้ยาว ซับซ้อน ผสมตัวอักษร ตัวเลข และสัญลักษณ์ และไม่ใช้ซ้ำกันในหลายระบบ","ใช้วันเดือนปีเกิดของตัวเองเป็นรหัสผ่านเสมอเพื่อจำง่าย","เขียนรหัสผ่านติดไว้ที่หน้าจอคอมพิวเตอร์"], correct:1, explain:"รหัสผ่านที่ปลอดภัยควรมีความยาวเพียงพอ ผสมผสานตัวอักษรพิมพ์เล็ก-ใหญ่ ตัวเลข และสัญลักษณ์ เพื่อป้องกันการถูกเดาหรือ Brute Force ได้ง่าย และไม่ควรใช้รหัสผ่านเดียวกันซ้ำในหลายระบบ เพราะหากระบบหนึ่งรั่วไหล ระบบอื่นจะเสี่ยงตามไปด้วย"}
+];
+
+const userAnswers = new Array(questions.length).fill(null);
+const answeredLocked = new Array(questions.length).fill(false);
+
+const root = document.getElementById('quiz-root');
+
+function render() {
+  root.innerHTML = '';
+  questions.forEach((item, qi) => {
+    const card = document.createElement('div');
+    card.className = 'question-card';
+
+    const num = document.createElement('div');
+    num.className = 'q-number';
+    num.textContent = 'ข้อ ' + (qi + 1) + ' / ' + questions.length;
+    card.appendChild(num);
+
+    if (item.tag) {
+      const tag = document.createElement('span');
+      tag.className = 'q-tag';
+      tag.textContent = item.tag;
+      card.appendChild(tag);
+    }
+
+    const prompt = document.createElement('p');
+    prompt.className = 'q-prompt';
+    prompt.textContent = item.q;
+    card.appendChild(prompt);
+
+    const optWrap = document.createElement('div');
+    optWrap.className = 'options';
+
+    item.options.forEach((optText, oi) => {
+      const label = document.createElement('label');
+      label.className = 'option';
+      label.id = 'opt-' + qi + '-' + oi;
+
+      const input = document.createElement('input');
+      input.type = 'radio';
+      input.name = 'q' + qi;
+      input.value = oi;
+      input.onchange = () => selectAnswer(qi, oi);
+
+      const span = document.createElement('span');
+      span.textContent = optText;
+
+      label.appendChild(input);
+      label.appendChild(span);
+      optWrap.appendChild(label);
+    });
+
+    card.appendChild(optWrap);
+
+    const verdict = document.createElement('div');
+    verdict.className = 'verdict';
+    verdict.id = 'verdict-' + qi;
+    card.appendChild(verdict);
+
+    const explain = document.createElement('div');
+    explain.className = 'explanation';
+    explain.id = 'explain-' + qi;
+    explain.innerHTML = '<b>เฉลย: </b>' + item.options[item.correct] + '<br>' + item.explain;
+    card.appendChild(explain);
+
+    root.appendChild(card);
+  });
+  updateScoreBox();
+}
+
+function selectAnswer(qi, oi) {
+  if (answeredLocked[qi]) return;
+  userAnswers[qi] = oi;
+  lockQuestion(qi);
+}
+
+function lockQuestion(qi) {
+  answeredLocked[qi] = true;
+  const item = questions[qi];
+  const chosen = userAnswers[qi];
+
+  item.options.forEach((_, oi) => {
+    const label = document.getElementById('opt-' + qi + '-' + oi);
+    label.classList.add('disabled');
+    if (oi === item.correct) label.classList.add('correct');
+    if (oi === chosen && chosen !== item.correct) label.classList.add('incorrect');
+  });
+
+  const verdict = document.getElementById('verdict-' + qi);
+  if (chosen === item.correct) {
+    verdict.textContent = '✓ ถูกต้อง';
+    verdict.className = 'verdict correct-v';
+  } else {
+    verdict.textContent = '✗ ยังไม่ถูก';
+    verdict.className = 'verdict incorrect-v';
+  }
+
+  document.getElementById('explain-' + qi).classList.add('show');
+  updateScoreBox();
+}
+
+function checkAll() {
+  questions.forEach((_, qi) => {
+    if (!answeredLocked[qi]) {
+      const checked = document.querySelector('input[name="q' + qi + '"]:checked');
+      if (checked) {
+        userAnswers[qi] = parseInt(checked.value);
+      }
+      lockQuestion(qi);
+    }
+  });
+  showSummary();
+}
+
+function updateScoreBox() {
+  const answeredCount = answeredLocked.filter(Boolean).length;
+  document.getElementById('answered-count').textContent = answeredCount;
+}
+
+function showSummary() {
+  let score = 0;
+  questions.forEach((item, qi) => {
+    if (userAnswers[qi] === item.correct) score++;
+  });
+  document.getElementById('final-score').textContent = score;
+  document.getElementById('result-summary').classList.add('show');
+  document.getElementById('result-summary').scrollIntoView({behavior: 'smooth'});
+  saveQuizScore(score, questions.length);
+}
+
+/* ---------- ส่งคะแนนกลับไปให้หน้า quiz.html แสดงสรุป ----------
+   ไฟล์ควิซทุกไฟล์ในระบบนี้เรียกฟังก์ชันนี้เหมือนกัน — id จะดึงจากชื่อไฟล์ตัวเองอัตโนมัติ
+   (ต้องตรงกับ id ที่ประกาศไว้ใน QUIZ_SETS ของ quiz.html ซึ่งปกติจะตรงกันเองเพราะใช้ชื่อไฟล์เดียวกัน) */
+function saveQuizScore(score, total) {
+  try {
+    const id = location.pathname.split('/').pop().replace(/\.html$/, '');
+    const key = 'quiz_scores_v1';
+    const all = JSON.parse(localStorage.getItem(key) || '{}');
+    const prev = all[id] || {};
+    all[id] = {
+      score, total,
+      at: Date.now(),
+      best: Math.max(score, prev.best || 0),
+      bestTotal: total,
+      attempts: (prev.attempts || 0) + 1,
+    };
+    localStorage.setItem(key, JSON.stringify(all));
+  } catch (e) {}
+}
+
+function resetQuiz() {
+  userAnswers.fill(null);
+  answeredLocked.fill(false);
+  document.getElementById('result-summary').classList.remove('show');
+  render();
+  window.scrollTo({top: 0, behavior: 'smooth'});
+}
+
+render();
+</script>
+
+</body>
+</html>
