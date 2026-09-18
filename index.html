@@ -195,6 +195,7 @@
     <a class="navlink" href="elliott-wave.html">〜 Elliott Wave</a>
     <a class="navlink" href="elliott-wave-analyzer.html">📐 EW Analyzer</a>
     <a class="navlink" href="trading-tools.html">🧮 เครื่องมือเทรด</a>
+    <a class="navlink" href="quiz.html">📝 แบบทดสอบ</a>
     <a class="navlink" href="card-battler.html">⚔ Aether Clash</a>
     <button class="navlink plain" id="syncBtn" title="ซิงค์ข้ามอุปกรณ์ด้วย Google">☁ ซิงค์</button>
     <img id="syncAvatar" hidden style="width:26px;height:26px;border-radius:50%;">
@@ -291,6 +292,11 @@
         <div class="t">🧮 เครื่องมือเทรด</div>
         <div class="d">คิดขนาดโพสิชัน (Forex / Futures) · นาฬิกา session · ข่าวแรง</div>
         <div class="c">Position size · Session clock</div>
+      </a>
+      <a class="app-card" href="quiz.html">
+        <div class="t">📝 แบบทดสอบ</div>
+        <div class="d">รวมแบบทดสอบหลายหลักสูตร แยกจากหน้าทบทวน Elliott Wave</div>
+        <div class="c" id="cntQuiz">—</div>
       </a>
       <a class="app-card" href="card-battler.html">
         <div class="t">⚔ Aether Clash</div>
@@ -629,6 +635,12 @@
         : (sd.watchlist.length + " รายการติดตาม · ยังไม่มีของในพอร์ต");
     })();
     $("cntEw").textContent = ewCount == null ? "…" : ewCount + " บทเรียน";
+    (function () {
+      const scores = readLS("quiz_scores_v1", {}) || {};
+      const ids = Object.keys(scores);
+      const attempts = ids.reduce((s, id) => s + (scores[id].attempts || 0), 0);
+      $("cntQuiz").textContent = attempts ? ids.length + " หลักสูตรที่เคยทำ · " + attempts + " ครั้ง" : "ยังไม่เคยทำ";
+    })();
     const ewaSum = readLS("ewa_summary_v1", null);
     if (ewaSum && typeof ewaSum.total === "number") {
       const acc = ewaSum.verified ? Math.round(ewaSum.correct / ewaSum.verified * 100) : null;
