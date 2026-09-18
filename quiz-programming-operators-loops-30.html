@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>แนวข้อสอบการเขียนโปรแกรม: Operator เงื่อนไข และ Loop 33 ข้อ</title>
+<style>
+  :root {
+    --bg: #f4f6fa;
+    --card-bg: #ffffff;
+    --text: #1f2430;
+    --muted: #667085;
+    --primary: #2d5cf6;
+    --correct: #1a9d5a;
+    --incorrect: #e5484d;
+    --border: #e3e7ee;
+    --header-bg: #1c2333;
+    --code-bg: #1e2536;
+    --code-text: #d6deeb;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Sarabun", "TH Sarabun New", "Segoe UI", Tahoma, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding-bottom: 60px;
+  }
+  header {
+    background: var(--header-bg);
+    color: #fff;
+    padding: 22px 20px;
+    text-align: center;
+  }
+  header .back-row { text-align: left; max-width: 820px; margin: 0 auto 12px; }
+  header .back-link {
+    display: inline-flex; align-items: center; gap: 6px;
+    color: #b9c0d4; text-decoration: none; font-size: 0.85rem;
+    border: 1px solid rgba(255,255,255,0.25); border-radius: 999px; padding: 6px 13px;
+  }
+  header .back-link:hover { color: #fff; border-color: #fff; }
+  header h1 { margin: 0 0 6px; font-size: 1.4rem; }
+  header p { margin: 0; color: #b9c0d4; font-size: 0.92rem; }
+
+  .container { max-width: 820px; margin: 0 auto; padding: 20px; }
+
+  .toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+  .toolbar button {
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    cursor: pointer;
+  }
+  .toolbar button.secondary {
+    background: #fff;
+    color: var(--primary);
+    border: 1px solid var(--primary);
+  }
+  #score-box {
+    font-weight: 600;
+    color: var(--muted);
+  }
+  #score-box span { color: var(--primary); font-size: 1.1rem; }
+
+  .question-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+  }
+  .q-number {
+    display: inline-block;
+    background: var(--primary);
+    color: #fff;
+    font-weight: 600;
+    font-size: 0.8rem;
+    padding: 2px 10px;
+    border-radius: 999px;
+    margin-bottom: 8px;
+  }
+  .q-tag {
+    display: inline-block;
+    background: #eef1fb;
+    color: var(--primary);
+    font-weight: 600;
+    font-size: 0.72rem;
+    padding: 2px 8px;
+    border-radius: 999px;
+    margin-bottom: 8px;
+    margin-left: 6px;
+  }
+  .q-prompt { font-size: 1.02rem; font-weight: 600; margin: 0 0 10px; white-space: pre-wrap; }
+
+  .code-block {
+    background: var(--code-bg);
+    color: var(--code-text);
+    font-family: "Consolas", "Courier New", monospace;
+    font-size: 0.88rem;
+    padding: 12px 14px;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    white-space: pre;
+    overflow-x: auto;
+    line-height: 1.5;
+  }
+
+  .options { display: flex; flex-direction: column; gap: 8px; }
+  .option {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    font-family: "Consolas", "Courier New", monospace, "Sarabun";
+    font-size: 0.94rem;
+  }
+  .option:hover { background: #f0f3fc; }
+  .option input { margin-top: 3px; font-family: "Sarabun"; }
+  .option span { font-family: inherit; }
+  .option.correct { border-color: var(--correct); background: #eafaf1; }
+  .option.incorrect { border-color: var(--incorrect); background: #fdeeee; }
+  .option.disabled { pointer-events: none; }
+
+  .explanation {
+    display: none;
+    margin-top: 12px;
+    padding: 10px 14px;
+    background: #f4f6fa;
+    border-left: 4px solid var(--primary);
+    border-radius: 6px;
+    font-size: 0.92rem;
+    color: var(--muted);
+    white-space: pre-wrap;
+  }
+  .explanation.show { display: block; }
+  .explanation b { color: var(--text); }
+
+  .verdict {
+    display: none;
+    font-weight: 700;
+    margin-top: 10px;
+    font-size: 0.95rem;
+  }
+  .verdict.correct-v { color: var(--correct); display: block; }
+  .verdict.incorrect-v { color: var(--incorrect); display: block; }
+
+  footer {
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.85rem;
+    padding: 20px;
+  }
+
+  #result-summary {
+    display: none;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  #result-summary.show { display: block; }
+  #result-summary .big-score { font-size: 2.2rem; font-weight: 700; color: var(--primary); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="back-row"><a class="back-link" href="quiz.html">‹ กลับหน้าแบบทดสอบ</a></div>
+  <h1>แนวข้อสอบ: การเขียนชุดคำสั่ง/โปรแกรมคอมพิวเตอร์</h1>
+  <p>33 ข้อ พร้อมเฉลย — Operator (+, ++), เงื่อนไข (if/else/switch), และ Loop ทุกประเภท (for/while/do-while)</p>
+</header>
+
+<div class="container">
+  <div class="toolbar">
+    <div id="score-box">ตอบแล้ว <span id="answered-count">0</span>/33</div>
+    <div>
+      <button class="secondary" onclick="resetQuiz()">เริ่มใหม่</button>
+      <button onclick="checkAll()">ตรวจทั้งหมด</button>
+    </div>
+  </div>
+
+  <div id="result-summary">
+    <div>คะแนนของคุณ</div>
+    <div class="big-score"><span id="final-score">0</span> / 33</div>
+  </div>
+
+  <div id="quiz-root"></div>
+</div>
+
+<footer>สร้างขึ้นเพื่อการฝึกทบทวนเท่านั้น ไม่ใช่ข้อสอบจริงของศาลยุติธรรม</footer>
+
+<script>
+const questions = [
+  {tag:"Operator", q:"ผลลัพธ์ของ 7 % 2 คือเท่าใด", code:null, options:["3","3.5","1","0"], correct:2, explain:"% คือตัวดำเนินการมอดุโล (หารเอาเศษ) 7 หาร 2 ได้ 3 เศษ 1 ดังนั้น 7 % 2 = 1"},
+  {tag:"Operator", q:"ผลลัพธ์ของ 10 / 3 เมื่อ 10 และ 3 เป็นจำนวนเต็ม (int) คือเท่าใด", code:null, options:["3.33","3","4","3.0"], correct:1, explain:"เมื่อหารจำนวนเต็มด้วยจำนวนเต็ม ผลลัพธ์จะถูกปัดเศษทศนิยมทิ้ง (integer division) จึงได้ 3 ไม่ใช่ 3.33"},
+  {tag:"Increment", q:"ให้ไล่ผลลัพธ์ของโค้ดต่อไปนี้ ค่า i หลังทำงานเสร็จคือเท่าใด", code:"int i = 5;\ni++;", options:["4","5","6","7"], correct:2, explain:"i++ คือการเพิ่มค่า i ขึ้นทีละ 1 เมื่อ i เริ่มต้นที่ 5 หลังทำงาน i จะกลายเป็น 6"},
+  {tag:"Increment", q:"Prefix (++i) และ Postfix (i++) ต่างกันอย่างไร", code:null, options:["ไม่มีความแตกต่างกันเลย","Prefix เพิ่มค่าก่อนแล้วจึงนำไปใช้ ส่วน Postfix นำค่าเดิมไปใช้ก่อนแล้วจึงเพิ่มค่าทีหลัง","Prefix ใช้ได้เฉพาะกับ float เท่านั้น","Postfix เพิ่มค่าทีละ 2 เสมอ"], correct:1, explain:"++i (prefix) จะเพิ่มค่าตัวแปรก่อน แล้วจึงนำค่าที่เพิ่มแล้วไปใช้งาน ส่วน i++ (postfix) จะนำค่าเดิมไปใช้งานก่อน แล้วจึงเพิ่มค่าทีหลัง — ความต่างจะเห็นผลเมื่อใช้ร่วมกับคำสั่งอื่นในบรรทัดเดียวกัน"},
+  {tag:"Increment", q:"โค้ดต่อไปนี้จะแสดงผลอะไรทางหน้าจอ", code:"int i = 5;\nprint(i++);", options:["4","5","6","error"], correct:1, explain:"i++ เป็น postfix จึงนำค่าเดิมของ i (คือ 5) ไปแสดงผลก่อน แล้วจึงเพิ่มค่า i เป็น 6 ภายหลัง ดังนั้นหน้าจอจะแสดง 5"},
+  {tag:"Increment", q:"โค้ดต่อไปนี้จะแสดงผลอะไรทางหน้าจอ", code:"int i = 5;\nprint(++i);", options:["4","5","6","7"], correct:2, explain:"++i เป็น prefix จึงเพิ่มค่า i เป็น 6 ก่อน แล้วจึงนำค่าที่เพิ่มแล้วไปแสดงผล ดังนั้นหน้าจอจะแสดง 6"},
+  {tag:"Increment", q:"โค้ดต่อไปนี้จะแสดงผลค่า a และ b เป็นอะไรตามลำดับ", code:"int a = 3;\nint b = a++;", options:["a=3, b=3","a=4, b=4","a=4, b=3","a=3, b=4"], correct:2, explain:"a++ เป็น postfix จึงนำค่าเดิมของ a (คือ 3) ไปกำหนดให้ b ก่อน แล้วจึงเพิ่มค่า a เป็น 4 ภายหลัง ผลลัพธ์คือ a=4, b=3"},
+  {tag:"Assignment", q:"คำสั่ง x += 5 มีความหมายเทียบเท่ากับข้อใด", code:null, options:["x = 5","x = x + 5","x == 5","x = x - 5"], correct:1, explain:"+= เป็น compound assignment operator ซึ่ง x += 5 เทียบเท่ากับ x = x + 5 คือนำค่าเดิมของ x บวกกับ 5 แล้วกำหนดค่ากลับไปที่ x"},
+  {tag:"Comparison", q:"ข้อใดคือตัวดำเนินการเปรียบเทียบ ไม่ใช่ตัวดำเนินการกำหนดค่า", code:null, options:["=","+=","==","++"], correct:2, explain:"== คือตัวดำเนินการเปรียบเทียบว่าค่าเท่ากันหรือไม่ (ให้ผลเป็น true/false) ส่วน = คือการกำหนดค่าให้ตัวแปร ห้ามสับสนสองตัวนี้"},
+  {tag:"Logical", q:"เงื่อนไข (5 > 3) && (2 > 4) จะให้ผลลัพธ์เป็นอะไร", code:null, options:["true","false","error","0"], correct:1, explain:"&& (AND) จะให้ผลเป็น true ก็ต่อเมื่อทั้งสองเงื่อนไขเป็นจริงพร้อมกัน ในที่นี้ (5>3) เป็นจริง แต่ (2>4) เป็นเท็จ ดังนั้นผลรวมคือ false"},
+  {tag:"Logical", q:"เงื่อนไข (5 > 3) || (2 > 4) จะให้ผลลัพธ์เป็นอะไร", code:null, options:["true","false","error","1 และ 0"], correct:0, explain:"|| (OR) จะให้ผลเป็น true ถ้ามีอย่างน้อยหนึ่งเงื่อนไขเป็นจริง ในที่นี้ (5>3) เป็นจริงอยู่แล้ว แม้ (2>4) จะเท็จ ผลรวมก็ยังเป็น true"},
+  {tag:"if-else", q:"ในโครงสร้าง if...else if...else ถ้ามีหลายเงื่อนไขเป็นจริงพร้อมกัน โปรแกรมจะทำงานอย่างไร", code:null, options:["ทำงานทุกบล็อกที่เงื่อนไขเป็นจริง","ทำงานเฉพาะบล็อกสุดท้ายที่เป็นจริง","ตรวจสอบจากบนลงล่าง พบเงื่อนไขแรกที่จริงจะทำบล็อกนั้นแล้วข้ามที่เหลือทันที","เกิด error เสมอ"], correct:2, explain:"โครงสร้าง if...else if จะตรวจสอบเงื่อนไขตามลำดับจากบนลงล่าง เมื่อพบเงื่อนไขแรกที่เป็นจริง จะทำงานเฉพาะบล็อกนั้นแล้วข้ามเงื่อนไขที่เหลือทั้งหมดทันที แม้เงื่อนไขถัดไปจะเป็นจริงด้วยก็ตาม"},
+  {tag:"if-else", q:"ไล่ผลลัพธ์: ตัวแปร score = 75 โค้ดต่อไปนี้จะพิมพ์อะไร", code:"if (score >= 80) {\n  print(\"A\");\n} else if (score >= 70) {\n  print(\"B\");\n} else {\n  print(\"C\");\n}", options:["A","B","C","ไม่พิมพ์อะไรเลย"], correct:1, explain:"score=75 เงื่อนไขแรก (score>=80) เป็นเท็จ จึงข้ามไปตรวจเงื่อนไขถัดไป (score>=70) ซึ่งเป็นจริง (75>=70) จึงพิมพ์ \"B\" แล้วข้าม else ที่เหลือ"},
+  {tag:"switch", q:"คำสั่ง break ใน switch...case มีความสำคัญอย่างไร", code:null, options:["ไม่มีผลใด ๆ ต่อการทำงาน","ป้องกันไม่ให้โปรแกรม 'ไหลต่อ' (fall-through) ไปทำ case ถัดไปโดยไม่ได้ตรวจเงื่อนไข","ทำให้โปรแกรมค้าง","ใช้แทน return เท่านั้น"], correct:1, explain:"หากไม่มี break ท้าย case โปรแกรมจะไหลต่อไปทำงานใน case ถัดไปโดยอัตโนมัติ (เรียกว่า fall-through) โดยไม่ตรวจเงื่อนไขของ case นั้นอีก จึงต้องใส่ break เพื่อหยุดการทำงานเมื่อจบ case ที่ตรงกัน"},
+  {tag:"switch", q:"ไล่ผลลัพธ์: ตัวแปร day = 2 โค้ดต่อไปนี้ (ไม่มี break) จะพิมพ์อะไร", code:"switch (day) {\n  case 1: print(\"Mon\");\n  case 2: print(\"Tue\");\n  case 3: print(\"Wed\");\n  default: print(\"Other\");\n}", options:["Tue เท่านั้น","Tue Wed Other (ไหลต่อเพราะไม่มี break)","Mon Tue Wed Other ทั้งหมด","ไม่พิมพ์อะไรเลย"], correct:1, explain:"เมื่อ day=2 โปรแกรมกระโดดไป case 2 พิมพ์ \"Tue\" แต่เนื่องจากไม่มี break จึงไหลต่อไปทำ case 3 พิมพ์ \"Wed\" และ default พิมพ์ \"Other\" ต่อไปเรื่อย ๆ โดยไม่ตรวจเงื่อนไขอีก"},
+  {tag:"Ternary", q:"Ternary operator (condition ? A : B) มีการทำงานอย่างไร", code:null, options:["เป็นการเขียน if-else แบบย่อในบรรทัดเดียว ถ้า condition จริงได้ค่า A ถ้าเท็จได้ค่า B","เป็นการเขียน loop แบบย่อ","ใช้แทน switch-case ไม่ได้เลย","ทำงานเหมือน && เสมอ"], correct:0, explain:"Ternary operator คือรูปแบบย่อของ if-else ในนิพจน์เดียว โดยประเมินเงื่อนไข (condition) หากเป็นจริงจะได้ค่า A หากเป็นเท็จจะได้ค่า B เช่น max = (a > b) ? a : b"},
+  {tag:"for loop", q:"โครงสร้างของ for loop ประกอบด้วยส่วนใดบ้างตามลำดับ", code:null, options:["เงื่อนไข; กำหนดค่าเริ่มต้น; เปลี่ยนค่า","กำหนดค่าเริ่มต้น; เงื่อนไข; เปลี่ยนค่า","เปลี่ยนค่า; เงื่อนไข; กำหนดค่าเริ่มต้น","กำหนดค่าเริ่มต้น; เปลี่ยนค่า; เงื่อนไข"], correct:1, explain:"for loop มีโครงสร้าง for (กำหนดค่าเริ่มต้น; เงื่อนไข; เปลี่ยนค่า) การทำงาน: กำหนดค่าเริ่มต้นครั้งเดียว จากนั้นตรวจเงื่อนไขก่อนทุกรอบ ถ้าจริงจึงทำงานแล้วเปลี่ยนค่าตัวแปรก่อนวนกลับไปตรวจเงื่อนไขใหม่"},
+  {tag:"for loop", q:"ไล่ผลลัพธ์: for loop ต่อไปนี้จะพิมพ์ตัวเลขอะไรบ้างตามลำดับ", code:"for (int i = 0; i < 5; i++) {\n  print(i);\n}", options:["1 2 3 4 5","0 1 2 3 4","0 1 2 3 4 5","1 2 3 4"], correct:1, explain:"i เริ่มที่ 0 และวนขณะที่ i < 5 (คือ i = 0,1,2,3,4 รวม 5 รอบ) เมื่อ i=5 เงื่อนไขเป็นเท็จจึงหยุด ผลลัพธ์คือพิมพ์ 0 1 2 3 4"},
+  {tag:"for loop", q:"ไล่ผลลัพธ์: for loop นับถอยหลังต่อไปนี้จะพิมพ์ตัวเลขอะไรบ้าง", code:"for (int i = 5; i > 0; i--) {\n  print(i);\n}", options:["5 4 3 2 1","5 4 3 2 1 0","1 2 3 4 5","4 3 2 1"], correct:0, explain:"i เริ่มที่ 5 และวนขณะที่ i > 0 โดยลดค่าลงทีละ 1 ทุกรอบ (i--) จึงพิมพ์ 5 4 3 2 1 แล้วหยุดเมื่อ i=0 เพราะเงื่อนไข i>0 เป็นเท็จ"},
+  {tag:"while loop", q:"while loop ตรวจสอบเงื่อนไขเมื่อใด และมีพฤติกรรมอย่างไรถ้าเงื่อนไขเป็นเท็จตั้งแต่แรก", code:null, options:["ตรวจก่อนเข้าลูปทุกครั้ง ถ้าเท็จตั้งแต่แรกจะไม่เข้าลูปเลยแม้แต่ครั้งเดียว","ตรวจหลังทำงานในลูปเสมอ","ทำงานอย่างน้อย 1 ครั้งเสมอไม่ว่าเงื่อนไขจะเป็นอย่างไร","ไม่มีการตรวจเงื่อนไขเลย"], correct:0, explain:"while loop เป็นแบบ pre-test คือตรวจเงื่อนไขก่อนเข้าทำงานในลูปทุกครั้ง หากเงื่อนไขเป็นเท็จตั้งแต่ตอนเริ่มต้น โปรแกรมจะไม่เข้าไปทำงานในลูปเลยแม้แต่ครั้งเดียว"},
+  {tag:"while loop", q:"ไล่ผลลัพธ์: while loop ต่อไปนี้จะพิมพ์อะไรบ้าง", code:"int i = 0;\nwhile (i < 3) {\n  print(i);\n  i++;\n}", options:["0 1 2","0 1 2 3","1 2 3","ไม่พิมพ์อะไรเลย"], correct:0, explain:"i เริ่มที่ 0 ตรวจเงื่อนไข i<3 เป็นจริง จึงพิมพ์ 0 แล้วเพิ่ม i เป็น 1 วนซ้ำจนกระทั่ง i=3 เงื่อนไขเป็นเท็จจึงหยุด ผลลัพธ์คือพิมพ์ 0 1 2"},
+  {tag:"do-while loop", q:"do...while loop มีพฤติกรรมพิเศษต่างจาก while loop อย่างไร", code:null, options:["ตรวจเงื่อนไขก่อนทำงานเหมือน while ทุกประการ","ทำงานในลูปอย่างน้อย 1 ครั้งเสมอ แม้เงื่อนไขจะเป็นเท็จตั้งแต่แรกก็ตาม เพราะตรวจเงื่อนไขหลังทำงาน","ไม่มีการตรวจเงื่อนไขเลย","ต้องมี break เสมอจึงจะทำงานได้"], correct:1, explain:"do...while เป็นแบบ post-test คือทำงานในลูปก่อน 1 รอบเสมอ แล้วจึงไปตรวจเงื่อนไขที่ท้ายลูป ดังนั้นแม้เงื่อนไขจะเป็นเท็จตั้งแต่แรก ลูปก็ยังทำงานไปแล้วอย่างน้อย 1 ครั้ง ต่างจาก while ที่อาจไม่ทำงานเลย"},
+  {tag:"do-while loop", q:"ไล่ผลลัพธ์: do...while loop ต่อไปนี้จะพิมพ์อะไร", code:"int i = 10;\ndo {\n  print(i);\n} while (i < 5);", options:["ไม่พิมพ์อะไรเลย เพราะ i < 5 เป็นเท็จตั้งแต่แรก","พิมพ์ 10 เพียงครั้งเดียว แล้วหยุด เพราะทำงานก่อนตรวจเงื่อนไข","พิมพ์ 10 9 8 7 6 5","เกิด error"], correct:1, explain:"do...while ทำงานในบล็อกก่อนเสมอ (พิมพ์ 10) แล้วจึงไปตรวจเงื่อนไข i<5 ซึ่งเป็นเท็จ (10 ไม่น้อยกว่า 5) จึงหยุดทำงานทันทีหลังพิมพ์ครั้งเดียว"},
+  {tag:"Loop comparison", q:"ข้อใดสรุปความแตกต่างหลักระหว่าง while และ do...while ได้ถูกต้องที่สุด", code:null, options:["ทั้งสองแบบทำงานเหมือนกันทุกกรณีไม่มีข้อแตกต่าง","while อาจไม่ทำงานเลยถ้าเงื่อนไขเท็จตั้งแต่แรก ส่วน do...while ทำงานอย่างน้อย 1 ครั้งเสมอ","while ใช้ได้กับตัวเลขเท่านั้น","do...while เร็วกว่า while เสมอ"], correct:1, explain:"ความแตกต่างหลักคือจุดที่ตรวจเงื่อนไข: while ตรวจก่อนทำงาน (pre-test) จึงอาจไม่ทำงานเลย ส่วน do...while ตรวจหลังทำงาน (post-test) จึงรับประกันว่าทำงานอย่างน้อย 1 ครั้งเสมอ"},
+  {tag:"Nested loop", q:"ในลูปซ้อนลูป (Nested Loop) ลูปวงในและวงนอกทำงานสัมพันธ์กันอย่างไร", code:null, options:["ลูปวงนอกทำงานครบทุกรอบก่อน แล้วลูปวงในจึงเริ่มทำงาน","ลูปวงในจะทำงานจนครบทุกรอบก่อน แล้วลูปวงนอกจึงขยับไปรอบถัดไป","ทั้งสองลูปทำงานพร้อมกันเสมอ","ลูปวงในทำงานเพียงครั้งเดียวเท่านั้นไม่ว่าลูปวงนอกจะวนกี่รอบ"], correct:1, explain:"ในลูปซ้อนลูป ทุกครั้งที่ลูปวงนอกขยับไป 1 รอบ ลูปวงในจะเริ่มทำงานใหม่และวนจนครบทุกรอบของมันก่อน จากนั้นลูปวงนอกจึงจะขยับไปรอบถัดไป"},
+  {tag:"Nested loop", q:"ไล่ผลลัพธ์: โค้ดลูปซ้อนลูปต่อไปนี้จะพิมพ์กี่บรรทัด และแต่ละบรรทัดมีกี่ตัวอักษร", code:"for (int i = 0; i < 2; i++) {\n  for (int j = 0; j < 3; j++) {\n    print(\"*\");\n  }\n  print(\"\\n\");\n}", options:["2 บรรทัด บรรทัดละ 3 ดาว","3 บรรทัด บรรทัดละ 2 ดาว","1 บรรทัด 6 ดาว","2 บรรทัด บรรทัดละ 2 ดาว"], correct:0, explain:"ลูปวงนอก (i) วน 2 รอบ ทุกรอบของ i ลูปวงใน (j) จะวน 3 รอบพิมพ์ดาว 3 ตัว แล้วขึ้นบรรทัดใหม่ ผลลัพธ์คือ 2 บรรทัด บรรทัดละ 3 ดาว (*** ขึ้นบรรทัดใหม่ *** ขึ้นบรรทัดใหม่)"},
+  {tag:"break", q:"คำสั่ง break เมื่อใช้ภายใน loop มีผลอย่างไร", code:null, options:["ข้ามไปทำรอบถัดไปทันทีโดยไม่ออกจากลูป","หยุดและออกจากลูปทั้งหมดทันที ไม่สนใจรอบที่เหลือ","ทำให้ลูปวนซ้ำไม่รู้จบ","ไม่มีผลใด ๆ ต่อการทำงานของลูป"], correct:1, explain:"break จะสั่งให้โปรแกรมออกจากลูปที่กำลังทำงานอยู่ทันที โดยไม่สนใจว่าเงื่อนไขของลูปยังเป็นจริงอยู่หรือไม่ และไม่ทำรอบที่เหลืออีกต่อไป"},
+  {tag:"break", q:"ไล่ผลลัพธ์: for loop ต่อไปนี้จะพิมพ์ตัวเลขอะไรบ้าง", code:"for (int i = 0; i < 10; i++) {\n  if (i == 3) {\n    break;\n  }\n  print(i);\n}", options:["0 1 2","0 1 2 3","0 1 2 3 4 5 6 7 8 9","3"], correct:0, explain:"ลูปพิมพ์ 0, 1, 2 ตามปกติ เมื่อ i=3 เงื่อนไข if (i==3) เป็นจริง จึงเจอ break และออกจากลูปทันทีโดยไม่พิมพ์ 3 และไม่ทำรอบที่เหลือ ผลลัพธ์คือ 0 1 2"},
+  {tag:"continue", q:"คำสั่ง continue เมื่อใช้ภายใน loop มีผลอย่างไร", code:null, options:["หยุดและออกจากลูปทั้งหมดทันที","ข้ามคำสั่งที่เหลือในรอบปัจจุบัน แล้วกระโดดไปเริ่มรอบถัดไปทันที โดยไม่ออกจากลูป","ทำให้โปรแกรม error","ทำงานเหมือน break ทุกประการ"], correct:1, explain:"continue จะข้ามคำสั่งที่เหลืออยู่ในรอบ (iteration) ปัจจุบันของลูป แล้วกระโดดไปเริ่มการทำงานของรอบถัดไปทันที โดยลูปยังคงทำงานต่อไป ไม่ได้ออกจากลูปเหมือน break"},
+  {tag:"continue", q:"ไล่ผลลัพธ์: for loop ต่อไปนี้จะพิมพ์ตัวเลขอะไรบ้าง", code:"for (int i = 0; i < 5; i++) {\n  if (i == 2) {\n    continue;\n  }\n  print(i);\n}", options:["0 1 2 3 4","0 1 3 4","0 1 2 3","2"], correct:1, explain:"ลูปพิมพ์ 0, 1 ตามปกติ เมื่อ i=2 เงื่อนไข if (i==2) เป็นจริง จึงเจอ continue ทำให้ข้ามคำสั่ง print(i) ของรอบนี้ไป (ไม่พิมพ์ 2) แล้ววนต่อไปที่ i=3 และ i=4 ตามปกติ ผลลัพธ์คือ 0 1 3 4"},
+  {tag:"Infinite loop", q:"โค้ดต่อไปนี้จะเกิดปัญหาอะไร", code:"int i = 0;\nwhile (i < 5) {\n  print(i);\n}", options:["ทำงานปกติ พิมพ์ 0 1 2 3 4 แล้วจบ","เกิด Infinite Loop (ลูปไม่รู้จบ) เพราะไม่มีการเปลี่ยนค่า i ภายในลูป เงื่อนไข i<5 จึงเป็นจริงตลอดไป","เกิด error ทันทีตั้งแต่เริ่มโปรแกรม","พิมพ์เพียงครั้งเดียวแล้วหยุด"], correct:1, explain:"ภายในลูปไม่มีคำสั่งเปลี่ยนค่า i (เช่น i++) เลย ค่า i จึงคงที่เป็น 0 ตลอดไป ทำให้เงื่อนไข i<5 เป็นจริงเสมอไม่มีวันเป็นเท็จ โปรแกรมจะวนซ้ำไม่รู้จบ (Infinite Loop) ซึ่งเป็นข้อผิดพลาดที่ต้องระวังเมื่อเขียนลูป"},
+  {tag:"Loop sum", q:"ไล่ผลลัพธ์: ตัวแปร sum หลังโค้ดต่อไปนี้ทำงานเสร็จ จะมีค่าเท่าใด", code:"int sum = 0;\nfor (int i = 1; i <= 5; i++) {\n  sum += i;\n}", options:["10","15","20","5"], correct:1, explain:"โค้ดนี้สะสมค่า sum โดยบวก i เข้าไปทีละรอบ: 1+2+3+4+5 = 15 (i วนตั้งแต่ 1 ถึง 5 เพราะเงื่อนไขคือ i<=5) ดังนั้น sum สุดท้ายคือ 15"},
+  {tag:"Loop choice", q:"ควรเลือกใช้ for loop เมื่อใดจึงจะเหมาะสมที่สุด", code:null, options:["เมื่อไม่ทราบจำนวนรอบที่แน่นอนและขึ้นอยู่กับเงื่อนไขภายนอก","เมื่อทราบจำนวนรอบที่ต้องการวนซ้ำอย่างชัดเจนตั้งแต่ต้น","เมื่อไม่ต้องการใช้ตัวแปรนับเลย","for loop ใช้ได้เฉพาะกับการพิมพ์ข้อความเท่านั้น"], correct:1, explain:"for loop เหมาะกับกรณีที่ทราบจำนวนรอบการวนซ้ำที่แน่นอนตั้งแต่ต้น เนื่องจากมีการกำหนดค่าเริ่มต้น เงื่อนไข และการเปลี่ยนค่าไว้ในบรรทัดเดียวกันอย่างชัดเจน ส่วน while เหมาะกับกรณีที่ไม่ทราบจำนวนรอบแน่นอนและขึ้นกับเงื่อนไขที่อาจเปลี่ยนแปลงระหว่างทาง"}
+];
+
+const userAnswers = new Array(questions.length).fill(null);
+const answeredLocked = new Array(questions.length).fill(false);
+
+const root = document.getElementById('quiz-root');
+
+function render() {
+  root.innerHTML = '';
+  questions.forEach((item, qi) => {
+    const card = document.createElement('div');
+    card.className = 'question-card';
+
+    const num = document.createElement('div');
+    num.className = 'q-number';
+    num.textContent = 'ข้อ ' + (qi + 1) + ' / ' + questions.length;
+    card.appendChild(num);
+
+    if (item.tag) {
+      const tag = document.createElement('span');
+      tag.className = 'q-tag';
+      tag.textContent = item.tag;
+      card.appendChild(tag);
+    }
+
+    const prompt = document.createElement('p');
+    prompt.className = 'q-prompt';
+    prompt.textContent = item.q;
+    card.appendChild(prompt);
+
+    if (item.code) {
+      const codeBlock = document.createElement('div');
+      codeBlock.className = 'code-block';
+      codeBlock.textContent = item.code;
+      card.appendChild(codeBlock);
+    }
+
+    const optWrap = document.createElement('div');
+    optWrap.className = 'options';
+
+    item.options.forEach((optText, oi) => {
+      const label = document.createElement('label');
+      label.className = 'option';
+      label.id = 'opt-' + qi + '-' + oi;
+
+      const input = document.createElement('input');
+      input.type = 'radio';
+      input.name = 'q' + qi;
+      input.value = oi;
+      input.onchange = () => selectAnswer(qi, oi);
+
+      const span = document.createElement('span');
+      span.textContent = optText;
+
+      label.appendChild(input);
+      label.appendChild(span);
+      optWrap.appendChild(label);
+    });
+
+    card.appendChild(optWrap);
+
+    const verdict = document.createElement('div');
+    verdict.className = 'verdict';
+    verdict.id = 'verdict-' + qi;
+    card.appendChild(verdict);
+
+    const explain = document.createElement('div');
+    explain.className = 'explanation';
+    explain.id = 'explain-' + qi;
+    explain.innerHTML = '<b>เฉลย: </b>' + item.options[item.correct] + '\n\n' + item.explain;
+    card.appendChild(explain);
+
+    root.appendChild(card);
+  });
+  updateScoreBox();
+}
+
+function selectAnswer(qi, oi) {
+  if (answeredLocked[qi]) return;
+  userAnswers[qi] = oi;
+  lockQuestion(qi);
+}
+
+function lockQuestion(qi) {
+  answeredLocked[qi] = true;
+  const item = questions[qi];
+  const chosen = userAnswers[qi];
+
+  item.options.forEach((_, oi) => {
+    const label = document.getElementById('opt-' + qi + '-' + oi);
+    label.classList.add('disabled');
+    if (oi === item.correct) label.classList.add('correct');
+    if (oi === chosen && chosen !== item.correct) label.classList.add('incorrect');
+  });
+
+  const verdict = document.getElementById('verdict-' + qi);
+  if (chosen === item.correct) {
+    verdict.textContent = '✓ ถูกต้อง';
+    verdict.className = 'verdict correct-v';
+  } else {
+    verdict.textContent = '✗ ยังไม่ถูก';
+    verdict.className = 'verdict incorrect-v';
+  }
+
+  document.getElementById('explain-' + qi).classList.add('show');
+  updateScoreBox();
+}
+
+function checkAll() {
+  questions.forEach((_, qi) => {
+    if (!answeredLocked[qi]) {
+      const checked = document.querySelector('input[name="q' + qi + '"]:checked');
+      if (checked) {
+        userAnswers[qi] = parseInt(checked.value);
+      }
+      lockQuestion(qi);
+    }
+  });
+  showSummary();
+}
+
+function updateScoreBox() {
+  const answeredCount = answeredLocked.filter(Boolean).length;
+  document.getElementById('answered-count').textContent = answeredCount;
+}
+
+function showSummary() {
+  let score = 0;
+  questions.forEach((item, qi) => {
+    if (userAnswers[qi] === item.correct) score++;
+  });
+  document.getElementById('final-score').textContent = score;
+  document.getElementById('result-summary').classList.add('show');
+  document.getElementById('result-summary').scrollIntoView({behavior: 'smooth'});
+  saveQuizScore(score, questions.length);
+}
+
+/* ---------- ส่งคะแนนกลับไปให้หน้า quiz.html แสดงสรุป ----------
+   ไฟล์ควิซทุกไฟล์ในระบบนี้เรียกฟังก์ชันนี้เหมือนกัน — id จะดึงจากชื่อไฟล์ตัวเองอัตโนมัติ
+   (ต้องตรงกับ id ที่ประกาศไว้ใน QUIZ_SETS ของ quiz.html ซึ่งปกติจะตรงกันเองเพราะใช้ชื่อไฟล์เดียวกัน) */
+function saveQuizScore(score, total) {
+  try {
+    const id = location.pathname.split('/').pop().replace(/\.html$/, '');
+    const key = 'quiz_scores_v1';
+    const all = JSON.parse(localStorage.getItem(key) || '{}');
+    const prev = all[id] || {};
+    all[id] = {
+      score, total,
+      at: Date.now(),
+      best: Math.max(score, prev.best || 0),
+      bestTotal: total,
+      attempts: (prev.attempts || 0) + 1,
+    };
+    localStorage.setItem(key, JSON.stringify(all));
+  } catch (e) {}
+}
+
+function resetQuiz() {
+  userAnswers.fill(null);
+  answeredLocked.fill(false);
+  document.getElementById('result-summary').classList.remove('show');
+  render();
+  window.scrollTo({top: 0, behavior: 'smooth'});
+}
+
+render();
+</script>
+
+</body>
+</html>
