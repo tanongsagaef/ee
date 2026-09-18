@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>แนวข้อสอบความรู้เกี่ยวกับคอมพิวเตอร์ทั่วไปและอุปกรณ์ 32 ข้อ</title>
+<style>
+  :root {
+    --bg: #f4f6fa;
+    --card-bg: #ffffff;
+    --text: #1f2430;
+    --muted: #667085;
+    --primary: #2d5cf6;
+    --correct: #1a9d5a;
+    --incorrect: #e5484d;
+    --border: #e3e7ee;
+    --header-bg: #1c2333;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Sarabun", "TH Sarabun New", "Segoe UI", Tahoma, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding-bottom: 60px;
+  }
+  header {
+    background: var(--header-bg);
+    color: #fff;
+    padding: 22px 20px;
+    text-align: center;
+  }
+  header .back-row { text-align: left; max-width: 800px; margin: 0 auto 12px; }
+  header .back-link {
+    display: inline-flex; align-items: center; gap: 6px;
+    color: #b9c0d4; text-decoration: none; font-size: 0.85rem;
+    border: 1px solid rgba(255,255,255,0.25); border-radius: 999px; padding: 6px 13px;
+  }
+  header .back-link:hover { color: #fff; border-color: #fff; }
+  header h1 { margin: 0 0 6px; font-size: 1.45rem; }
+  header p { margin: 0; color: #b9c0d4; font-size: 0.92rem; }
+
+  .container { max-width: 800px; margin: 0 auto; padding: 20px; }
+
+  .toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+  .toolbar button {
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    cursor: pointer;
+  }
+  .toolbar button.secondary {
+    background: #fff;
+    color: var(--primary);
+    border: 1px solid var(--primary);
+  }
+  #score-box {
+    font-weight: 600;
+    color: var(--muted);
+  }
+  #score-box span { color: var(--primary); font-size: 1.1rem; }
+
+  .question-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+  }
+  .q-number {
+    display: inline-block;
+    background: var(--primary);
+    color: #fff;
+    font-weight: 600;
+    font-size: 0.8rem;
+    padding: 2px 10px;
+    border-radius: 999px;
+    margin-bottom: 8px;
+  }
+  .q-tag {
+    display: inline-block;
+    background: #eef1fb;
+    color: var(--primary);
+    font-weight: 600;
+    font-size: 0.72rem;
+    padding: 2px 8px;
+    border-radius: 999px;
+    margin-bottom: 8px;
+    margin-left: 6px;
+  }
+  .q-prompt { font-size: 1.02rem; font-weight: 600; margin: 0 0 12px; }
+
+  .options { display: flex; flex-direction: column; gap: 8px; }
+  .option {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .option:hover { background: #f0f3fc; }
+  .option input { margin-top: 3px; }
+  .option.correct { border-color: var(--correct); background: #eafaf1; }
+  .option.incorrect { border-color: var(--incorrect); background: #fdeeee; }
+  .option.disabled { pointer-events: none; }
+
+  .explanation {
+    display: none;
+    margin-top: 12px;
+    padding: 10px 14px;
+    background: #f4f6fa;
+    border-left: 4px solid var(--primary);
+    border-radius: 6px;
+    font-size: 0.92rem;
+    color: var(--muted);
+  }
+  .explanation.show { display: block; }
+  .explanation b { color: var(--text); }
+
+  .verdict {
+    display: none;
+    font-weight: 700;
+    margin-top: 10px;
+    font-size: 0.95rem;
+  }
+  .verdict.correct-v { color: var(--correct); display: block; }
+  .verdict.incorrect-v { color: var(--incorrect); display: block; }
+
+  footer {
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.85rem;
+    padding: 20px;
+  }
+
+  #result-summary {
+    display: none;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  #result-summary.show { display: block; }
+  #result-summary .big-score { font-size: 2.2rem; font-weight: 700; color: var(--primary); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="back-row"><a class="back-link" href="quiz.html">‹ กลับหน้าแบบทดสอบ</a></div>
+  <h1>แนวข้อสอบ: ความรู้เกี่ยวกับคอมพิวเตอร์ทั่วไปและอุปกรณ์</h1>
+  <p>32 ข้อ พร้อมเฉลย — องค์ประกอบระบบคอมพิวเตอร์, ฮาร์ดแวร์, หน่วยความจำ, อุปกรณ์นำเข้า/แสดงผล, ซอฟต์แวร์</p>
+</header>
+
+<div class="container">
+  <div class="toolbar">
+    <div id="score-box">ตอบแล้ว <span id="answered-count">0</span>/32</div>
+    <div>
+      <button class="secondary" onclick="resetQuiz()">เริ่มใหม่</button>
+      <button onclick="checkAll()">ตรวจทั้งหมด</button>
+    </div>
+  </div>
+
+  <div id="result-summary">
+    <div>คะแนนของคุณ</div>
+    <div class="big-score"><span id="final-score">0</span> / 32</div>
+  </div>
+
+  <div id="quiz-root"></div>
+</div>
+
+<footer>สร้างขึ้นเพื่อการฝึกทบทวนเท่านั้น ไม่ใช่ข้อสอบจริงของศาลยุติธรรม</footer>
+
+<script>
+const questions = [
+  {tag:"พื้นฐาน", q:"คอมพิวเตอร์ตามความหมายพื้นฐานหมายถึงข้อใด", options:["เครื่องคำนวณอัตโนมัติที่ทำงานตามคำสั่งของโปรแกรม","เครื่องใช้สำนักงานทั่วไป","อุปกรณ์สื่อสารไร้สาย","แผงวงจรไฟฟ้าอย่างหนึ่ง"], correct:0, explain:"คอมพิวเตอร์คือเครื่องคำนวณอิเล็กทรอนิกส์ที่ทำงานโดยอัตโนมัติตามชุดคำสั่ง (โปรแกรม) ที่มนุษย์กำหนดไว้ รับข้อมูลเข้า-ประมวลผล-แสดงผลลัพธ์"},
+  {tag:"องค์ประกอบ", q:"องค์ประกอบของระบบคอมพิวเตอร์ที่สมบูรณ์มีทั้งหมดกี่ส่วน อะไรบ้าง", options:["3 ส่วน คือ Hardware, Software, Data","4 ส่วน คือ Hardware, Software, Peopleware, Internet","5 ส่วน คือ Hardware, Software, Peopleware, Data, Procedure","2 ส่วน คือ Hardware และ Software เท่านั้น"], correct:2, explain:"องค์ประกอบของระบบคอมพิวเตอร์มี 5 ส่วน ได้แก่ Hardware (ฮาร์ดแวร์), Software (ซอฟต์แวร์), Peopleware (บุคลากร), Data (ข้อมูล) และ Procedure (ขั้นตอนวิธีปฏิบัติงาน)"},
+  {tag:"องค์ประกอบ", q:"ฮาร์ดแวร์ (Hardware) หมายถึงข้อใด", options:["ชุดคำสั่งที่สั่งให้คอมพิวเตอร์ทำงาน","อุปกรณ์ต่าง ๆ ที่ประกอบขึ้นเป็นเครื่องคอมพิวเตอร์ มีลักษณะจับต้องได้","ข้อมูลที่ป้อนเข้าเครื่อง","บุคลากรที่ใช้งานคอมพิวเตอร์"], correct:1, explain:"Hardware คือส่วนประกอบทางกายภาพของคอมพิวเตอร์ที่สามารถมองเห็นและสัมผัสได้ เช่น จอภาพ คีย์บอร์ด เมาส์ ซีพียู"},
+  {tag:"องค์ประกอบ", q:"ซอฟต์แวร์ (Software) หมายถึงข้อใด", options:["อุปกรณ์อิเล็กทรอนิกส์ที่จับต้องได้","ชุดคำสั่งหรือโปรแกรมที่สั่งให้คอมพิวเตอร์ทำงานตามต้องการ","สายไฟและวงจรภายในเครื่อง","ผู้ใช้งานระบบคอมพิวเตอร์"], correct:1, explain:"Software คือชุดคำสั่ง (โปรแกรม) ที่เขียนขึ้นเพื่อสั่งให้ฮาร์ดแวร์ทำงานตามที่ต้องการ ไม่มีรูปร่างจับต้องไม่ได้เหมือนฮาร์ดแวร์"},
+  {tag:"ฮาร์ดแวร์", q:"ฮาร์ดแวร์แบ่งตามหน้าที่การทำงานออกเป็นกี่กลุ่มหลัก อะไรบ้าง", options:["2 กลุ่ม คือ Input และ Output เท่านั้น","3 กลุ่ม คือ Input, Process, Output","4 กลุ่ม คือ Input, Processing, Output, Storage","5 กลุ่ม รวมถึง Network Device"], correct:2, explain:"ฮาร์ดแวร์แบ่งตามหน้าที่เป็น 4 กลุ่มหลัก คือ อุปกรณ์รับข้อมูลเข้า (Input), อุปกรณ์ประมวลผล (Processing), อุปกรณ์แสดงผล (Output) และอุปกรณ์เก็บข้อมูล (Storage)"},
+  {tag:"ฮาร์ดแวร์", q:"อุปกรณ์ใดต่อไปนี้จัดเป็น Input Device (อุปกรณ์รับข้อมูลเข้า) ทั้งหมด", options:["จอภาพ, เครื่องพิมพ์, ลำโพง","คีย์บอร์ด, เมาส์, สแกนเนอร์","Hard Disk, RAM, ROM","CPU, Motherboard, Power Supply"], correct:1, explain:"Input Device คืออุปกรณ์ที่ใช้รับข้อมูลหรือคำสั่งจากผู้ใช้เข้าสู่เครื่องคอมพิวเตอร์ เช่น คีย์บอร์ด เมาส์ สแกนเนอร์ ไมโครโฟน กล้องเว็บแคม"},
+  {tag:"ฮาร์ดแวร์", q:"อุปกรณ์ใดต่อไปนี้จัดเป็น Output Device (อุปกรณ์แสดงผล) ทั้งหมด", options:["คีย์บอร์ด, เมาส์, จอยสติ๊ก","จอภาพ (Monitor), เครื่องพิมพ์ (Printer), ลำโพง (Speaker)","แฟลชไดรฟ์, ฮาร์ดดิสก์","สแกนเนอร์, ไมโครโฟน"], correct:1, explain:"Output Device คืออุปกรณ์ที่แสดงผลลัพธ์การประมวลผลออกมาให้ผู้ใช้เห็นหรือได้ยิน เช่น จอภาพแสดงภาพ เครื่องพิมพ์พิมพ์เอกสาร ลำโพงส่งเสียง"},
+  {tag:"CPU", q:"CPU (หน่วยประมวลผลกลาง) ประกอบด้วยส่วนหลักใดบ้าง", options:["RAM และ ROM","ALU (หน่วยคำนวณและตรรกะ) และ CU (หน่วยควบคุม)","Hard Disk และ SSD","Monitor และ Keyboard"], correct:1, explain:"CPU ประกอบด้วย 2 ส่วนหลัก คือ ALU (Arithmetic and Logic Unit) ทำหน้าที่คำนวณเลขคณิตและเปรียบเทียบเชิงตรรกะ และ CU (Control Unit) ทำหน้าที่ควบคุมการทำงานของอุปกรณ์ทั้งระบบ"},
+  {tag:"CPU", q:"หน่วยที่ใช้วัดความเร็วในการประมวลผลของ CPU คือหน่วยใด", options:["Byte","GHz (กิกะเฮิรตซ์)","GB (กิกะไบต์)","dpi"], correct:1, explain:"ความเร็วของ CPU วัดเป็น Hertz (Hz) โดยทั่วไปแสดงเป็น GHz (กิกะเฮิรตซ์) ซึ่งบ่งบอกจำนวนรอบการทำงาน (clock cycle) ต่อวินาที ยิ่งค่าสูงยิ่งประมวลผลได้เร็ว"},
+  {tag:"หน่วยความจำ", q:"RAM (Random Access Memory) มีคุณสมบัติสำคัญคือข้อใด", options:["เก็บข้อมูลถาวรแม้ปิดเครื่อง","เก็บข้อมูลชั่วคราวระหว่างเปิดเครื่อง ข้อมูลจะหายไปเมื่อปิดเครื่อง (volatile)","ใช้เก็บโปรแกรม BIOS เท่านั้น","ไม่สามารถเขียนข้อมูลใหม่ทับได้"], correct:1, explain:"RAM เป็นหน่วยความจำชั่วคราว (volatile memory) ใช้เก็บข้อมูลและโปรแกรมที่กำลังทำงานอยู่ขณะเปิดเครื่อง เมื่อปิดเครื่องหรือไฟดับ ข้อมูลใน RAM จะหายไปทั้งหมด"},
+  {tag:"หน่วยความจำ", q:"ROM (Read Only Memory) แตกต่างจาก RAM อย่างไร", options:["ROM เก็บข้อมูลได้มากกว่า RAM เสมอ","ROM เก็บข้อมูล/คำสั่งพื้นฐานแบบถาวร ข้อมูลไม่หายแม้ปิดเครื่อง (non-volatile) ต่างจาก RAM ที่ข้อมูลหายเมื่อปิดเครื่อง","ROM และ RAM ทำงานเหมือนกันทุกประการ","ROM ใช้สำหรับประมวลผลกราฟิกเท่านั้น"], correct:1, explain:"ROM เป็นหน่วยความจำแบบถาวร (non-volatile) เก็บข้อมูลหรือคำสั่งพื้นฐานของระบบ เช่น BIOS ซึ่งข้อมูลจะไม่สูญหายแม้ปิดเครื่อง ต่างจาก RAM ที่เป็นหน่วยความจำชั่วคราว"},
+  {tag:"หน่วยความจำ", q:"หน่วยความจำสำรอง (Secondary Storage) ต่อไปนี้ข้อใดที่มีความเร็วในการอ่าน-เขียนข้อมูลสูงกว่าเพราะไม่มีจานหมุน", options:["HDD (Hard Disk Drive)","SSD (Solid State Drive)","แผ่น CD","แผ่น DVD"], correct:1, explain:"SSD (Solid State Drive) ใช้ชิปหน่วยความจำแบบแฟลชในการเก็บข้อมูล ไม่มีจานหมุนและหัวอ่านแบบกลไกเหมือน HDD จึงมีความเร็วในการอ่าน-เขียนข้อมูลสูงกว่าและทนทานกว่า"},
+  {tag:"หน่วยวัด", q:"เรียงลำดับหน่วยวัดข้อมูลจากเล็กไปใหญ่ได้ถูกต้องตามข้อใด", options:["Byte → Bit → KB → MB","Bit → Byte → KB → MB → GB → TB","KB → Bit → Byte → MB","GB → MB → KB → Byte → Bit"], correct:1, explain:"หน่วยวัดข้อมูลเรียงจากเล็กไปใหญ่คือ Bit (หน่วยเล็กสุด) → Byte (8 bit) → KB (Kilobyte) → MB (Megabyte) → GB (Gigabyte) → TB (Terabyte) โดยแต่ละขั้นมีค่าประมาณ 1024 เท่าของขั้นก่อนหน้า"},
+  {tag:"หน่วยวัด", q:"1 Byte เท่ากับกี่ Bit", options:["4 Bit","8 Bit","16 Bit","1024 Bit"], correct:1, explain:"1 Byte เท่ากับ 8 Bit ซึ่งเป็นหน่วยพื้นฐานที่ใช้แทนอักขระ 1 ตัวในระบบคอมพิวเตอร์"},
+  {tag:"เมนบอร์ด", q:"เมนบอร์ด (Motherboard) มีหน้าที่หลักคือข้อใด", options:["แสดงผลภาพบนจอ","เป็นแผงวงจรหลักที่เชื่อมต่ออุปกรณ์ทุกชิ้นในเครื่องคอมพิวเตอร์เข้าด้วยกัน","เก็บข้อมูลถาวรของผู้ใช้","แปลงไฟฟ้ากระแสสลับเป็นกระแสตรงเท่านั้น"], correct:1, explain:"Motherboard คือแผงวงจรหลักของคอมพิวเตอร์ ทำหน้าที่เป็นศูนย์กลางเชื่อมต่อ CPU, RAM, การ์ดต่าง ๆ และอุปกรณ์อื่นเข้าด้วยกันให้สามารถสื่อสารและทำงานร่วมกันได้"},
+  {tag:"ซอฟต์แวร์", q:"ซอฟต์แวร์แบ่งออกเป็น 2 ประเภทหลักคือข้อใด", options:["System Software และ Application Software","Hardware Software และ Data Software","Input Software และ Output Software","Free Software เท่านั้น"], correct:0, explain:"ซอฟต์แวร์แบ่งเป็น 2 ประเภทหลัก คือ System Software (ซอฟต์แวร์ระบบ เช่น ระบบปฏิบัติการ) ทำหน้าที่ควบคุมฮาร์ดแวร์ และ Application Software (ซอฟต์แวร์ประยุกต์) ใช้งานเฉพาะด้าน เช่น Word, Excel"},
+  {tag:"ซอฟต์แวร์", q:"ระบบปฏิบัติการ (Operating System) มีหน้าที่หลักคือข้อใด", options:["ใช้พิมพ์เอกสารเท่านั้น","ควบคุมและจัดการการทำงานของฮาร์ดแวร์ทั้งหมด และเป็นสื่อกลางระหว่างผู้ใช้กับเครื่องคอมพิวเตอร์","ใช้ตัดต่อวิดีโอเท่านั้น","เป็นอุปกรณ์จัดเก็บข้อมูลสำรอง"], correct:1, explain:"ระบบปฏิบัติการ (OS) เช่น Windows, macOS, Linux ทำหน้าที่ควบคุมและจัดการทรัพยากรฮาร์ดแวร์ทั้งหมดของเครื่อง และเป็นตัวกลางเชื่อมระหว่างผู้ใช้กับฮาร์ดแวร์และซอฟต์แวร์อื่น ๆ"},
+  {tag:"BIOS", q:"BIOS (Basic Input Output System) มีหน้าที่คือข้อใด", options:["ใช้แก้ไขเอกสาร Word","ตรวจสอบและเริ่มต้นอุปกรณ์ฮาร์ดแวร์ก่อนที่ระบบปฏิบัติการจะเริ่มทำงาน","เป็นโปรแกรมป้องกันไวรัสเท่านั้น","ใช้เชื่อมต่ออินเทอร์เน็ตไร้สาย"], correct:1, explain:"BIOS เป็นโปรแกรมพื้นฐานที่ฝังอยู่ในชิปบนเมนบอร์ด (firmware) ทำหน้าที่ตรวจสอบและเริ่มต้นการทำงานของฮาร์ดแวร์ต่าง ๆ ก่อนที่จะโหลดระบบปฏิบัติการขึ้นมาทำงาน"},
+  {tag:"อุปกรณ์จัดเก็บ", q:"อุปกรณ์ใดต่อไปนี้ใช้บันทึกข้อมูลแบบพกพาโดยใช้เทคโนโลยีหน่วยความจำแฟลช (Flash Memory)", options:["Hard Disk Drive","Flash Drive (USB Drive)","จอภาพ CRT","เครื่องพิมพ์เลเซอร์"], correct:1, explain:"Flash Drive หรือ USB Drive เป็นอุปกรณ์จัดเก็บข้อมูลแบบพกพาที่ใช้เทคโนโลยีหน่วยความจำแฟลช (Flash Memory) ไม่มีชิ้นส่วนกลไกเคลื่อนที่ ขนาดเล็กพกพาสะดวก"},
+  {tag:"อุปกรณ์นำเข้า", q:"อุปกรณ์ใดใช้แปลงเอกสารกระดาษให้เป็นไฟล์ภาพดิจิทัล", options:["Printer (เครื่องพิมพ์)", "Scanner (เครื่องสแกน)", "Speaker (ลำโพง)", "Monitor (จอภาพ)"], correct:1, explain:"Scanner เป็นอุปกรณ์นำเข้าข้อมูล (Input Device) ที่ใช้สแกนเอกสารหรือรูปภาพจากกระดาษให้กลายเป็นไฟล์ภาพดิจิทัลในคอมพิวเตอร์"},
+  {tag:"หน่วยประมวลผล", q:"หน่วยความจำแคช (Cache Memory) มีจุดประสงค์หลักคือข้อใด", options:["เก็บข้อมูลถาวรแทน Hard Disk", "เป็นหน่วยความจำความเร็วสูงที่อยู่ใกล้ CPU ใช้เก็บข้อมูล/คำสั่งที่ใช้บ่อยเพื่อเพิ่มความเร็วการประมวลผล", "ใช้แสดงผลภาพกราฟิก", "ใช้เชื่อมต่อเครือข่ายอินเทอร์เน็ต"], correct:1, explain:"Cache Memory เป็นหน่วยความจำความเร็วสูงขนาดเล็กที่อยู่ใกล้ CPU มากกว่า RAM ใช้เก็บข้อมูลหรือคำสั่งที่ถูกเรียกใช้บ่อย เพื่อลดเวลาในการเข้าถึงข้อมูลและเพิ่มความเร็วโดยรวมของระบบ"},
+  {tag:"พอร์ตเชื่อมต่อ", q:"พอร์ต HDMI มักใช้สำหรับการเชื่อมต่อประเภทใด", options:["เชื่อมต่อคีย์บอร์ดและเมาส์เท่านั้น","ส่งสัญญาณภาพและเสียงคุณภาพสูงจากคอมพิวเตอร์ไปยังจอภาพหรือทีวี","เชื่อมต่อเครือข่ายอินเทอร์เน็ตแบบใช้สาย","ชาร์จแบตเตอรี่โทรศัพท์มือถือเท่านั้น"], correct:1, explain:"HDMI (High-Definition Multimedia Interface) เป็นพอร์ตที่ใช้ส่งสัญญาณภาพและเสียงคุณภาพสูงในสัญญาณเดียว นิยมใช้เชื่อมต่อคอมพิวเตอร์เข้ากับจอภาพหรือโทรทัศน์"},
+  {tag:"ประเภทคอมพิวเตอร์", q:"คอมพิวเตอร์ประเภทใดมีขนาดใหญ่ที่สุดและมีความสามารถในการประมวลผลสูงสุด นิยมใช้ในงานวิจัยวิทยาศาสตร์และพยากรณ์อากาศ", options:["Microcomputer (PC)","Laptop","Supercomputer","Tablet"], correct:2, explain:"Supercomputer เป็นคอมพิวเตอร์ที่มีสมรรถนะการประมวลผลสูงที่สุด ใช้สำหรับงานคำนวณซับซ้อนขนาดใหญ่ เช่น การพยากรณ์อากาศ การวิจัยทางวิทยาศาสตร์ และการจำลองสถานการณ์ที่ซับซ้อน"},
+  {tag:"ประเภทคอมพิวเตอร์", q:"เซิร์ฟเวอร์ (Server) คือคอมพิวเตอร์ประเภทใด", options:["คอมพิวเตอร์ส่วนบุคคลที่ใช้งานทั่วไปในบ้าน","เครื่องคอมพิวเตอร์ที่ให้บริการข้อมูลหรือทรัพยากรแก่เครื่องลูกข่าย (Client) อื่น ๆ ในเครือข่าย","อุปกรณ์รับข้อมูลเข้าชนิดหนึ่ง","อุปกรณ์แสดงผลชนิดหนึ่ง"], correct:1, explain:"Server คือคอมพิวเตอร์ที่ทำหน้าที่ให้บริการ (serve) ข้อมูลหรือทรัพยากรต่าง ๆ แก่เครื่องคอมพิวเตอร์ลูกข่าย (Client) ที่ร้องขอผ่านเครือข่าย เช่น File Server, Web Server, Database Server"},
+  {tag:"เครื่องพิมพ์", q:"เครื่องพิมพ์ประเภทใดใช้หลักการพ่นหมึกเหลวลงบนกระดาษ", options:["เครื่องพิมพ์เลเซอร์ (Laser Printer)","เครื่องพิมพ์อิงค์เจ็ต (Inkjet Printer)","เครื่องพิมพ์ดอตเมทริกซ์ (Dot Matrix Printer)","เครื่องพิมพ์ 3 มิติ"], correct:1, explain:"เครื่องพิมพ์อิงค์เจ็ต (Inkjet Printer) ใช้หลักการพ่นหยดหมึกเหลวขนาดเล็กมากลงบนกระดาษเพื่อสร้างภาพและตัวอักษร ต่างจากเครื่องพิมพ์เลเซอร์ที่ใช้ผงหมึก (toner) และความร้อน"},
+  {tag:"จอภาพ", q:"หน่วยที่ใช้วัดความละเอียด (Resolution) ของจอภาพหรือรูปภาพดิจิทัลคือข้อใด", options:["Hertz (Hz)","Pixel (พิกเซล)","Byte","Watt"], correct:1, explain:"Pixel (พิกเซล) คือหน่วยจุดภาพที่เล็กที่สุดที่ประกอบกันเป็นภาพบนจอแสดงผลดิจิทัล ความละเอียดของจอภาพจะบอกเป็นจำนวนพิกเซลในแนวนอน x แนวตั้ง เช่น 1920x1080"},
+  {tag:"ระบบไฟฟ้า", q:"UPS (Uninterruptible Power Supply) มีหน้าที่หลักคือข้อใด", options:["เพิ่มความเร็วในการประมวลผลของ CPU","จ่ายไฟสำรองให้เครื่องคอมพิวเตอร์ทำงานต่อไปได้ชั่วขณะเมื่อไฟฟ้าดับกะทันหัน ป้องกันข้อมูลสูญหาย","เพิ่มพื้นที่จัดเก็บข้อมูล","เชื่อมต่อเครือข่ายไร้สาย"], correct:1, explain:"UPS คืออุปกรณ์สำรองไฟฟ้าที่จะจ่ายพลังงานไฟฟ้าให้เครื่องคอมพิวเตอร์ทำงานต่อไปได้ชั่วขณะเมื่อไฟฟ้าหลักดับกะทันหัน ทำให้ผู้ใช้มีเวลาบันทึกงานและปิดเครื่องอย่างปลอดภัย ป้องกันข้อมูลสูญหายหรือฮาร์ดแวร์เสียหาย"},
+  {tag:"ระบบเลขฐาน", q:"คอมพิวเตอร์ประมวลผลข้อมูลภายในโดยใช้ระบบเลขฐานใดเป็นพื้นฐาน", options:["เลขฐาน 10 (Decimal)","เลขฐาน 2 (Binary) คือ 0 และ 1","เลขฐาน 16 (Hexadecimal)","เลขฐาน 8 (Octal)"], correct:1, explain:"คอมพิวเตอร์ประมวลผลข้อมูลภายในด้วยระบบเลขฐานสอง (Binary) ซึ่งมีเพียง 2 สถานะคือ 0 และ 1 สอดคล้องกับสถานะทางไฟฟ้า (ปิด/เปิด) ของวงจรอิเล็กทรอนิกส์"},
+  {tag:"อุปกรณ์นำเข้า", q:"เมาส์ (Mouse) จัดเป็นอุปกรณ์ประเภทใด", options:["Output Device","Storage Device","Input Device (Pointing Device)","Processing Device"], correct:2, explain:"เมาส์เป็นอุปกรณ์รับข้อมูลเข้า (Input Device) ประเภท Pointing Device ใช้สำหรับควบคุมตัวชี้ (cursor) บนหน้าจอและเลือกคำสั่งต่าง ๆ"},
+  {tag:"หน่วยความจำสำรอง", q:"ข้อใดคือความแตกต่างหลักระหว่างหน่วยความจำหลัก (Primary Storage) กับหน่วยความจำสำรอง (Secondary Storage)", options:["ไม่มีความแตกต่างกันเลย","หน่วยความจำหลัก (เช่น RAM) เร็วแต่ส่วนใหญ่เก็บข้อมูลชั่วคราว ส่วนหน่วยความจำสำรอง (เช่น HDD/SSD) เก็บข้อมูลถาวรแต่ความเร็วเข้าถึงข้อมูลช้ากว่า","หน่วยความจำสำรองเร็วกว่าหน่วยความจำหลักเสมอ","หน่วยความจำหลักใช้เก็บข้อมูลถาวรเท่านั้น"], correct:1, explain:"หน่วยความจำหลัก เช่น RAM มีความเร็วสูงแต่ส่วนใหญ่เป็นหน่วยความจำชั่วคราว (ยกเว้น ROM) ส่วนหน่วยความจำสำรอง เช่น HDD, SSD ใช้เก็บข้อมูลอย่างถาวรในระยะยาว แต่ความเร็วในการเข้าถึงข้อมูลโดยทั่วไปช้ากว่าหน่วยความจำหลัก"},
+  {tag:"บุคลากร", q:"'Peopleware' ในองค์ประกอบของระบบคอมพิวเตอร์หมายถึงข้อใด", options:["โปรแกรมประยุกต์ที่ใช้งานทั่วไป","บุคลากรที่เกี่ยวข้องกับการใช้งานและดูแลระบบคอมพิวเตอร์ เช่น ผู้ใช้งาน โปรแกรมเมอร์ ผู้ดูแลระบบ","อุปกรณ์อิเล็กทรอนิกส์ที่จับต้องได้","ข้อมูลดิบที่ป้อนเข้าสู่ระบบ"], correct:1, explain:"Peopleware คือบุคลากรที่เกี่ยวข้องกับระบบคอมพิวเตอร์ทั้งหมด ตั้งแต่ผู้ใช้งานทั่วไป (User), โปรแกรมเมอร์ (Programmer), นักวิเคราะห์ระบบ (System Analyst) จนถึงผู้ดูแลระบบ (System Administrator)"},
+  {tag:"หน่วยประมวลผล", q:"CPU แบบ Multi-core (หลายแกน) มีข้อดีอย่างไร", options:["ทำให้จอภาพแสดงสีสันสดใสขึ้น","สามารถประมวลผลหลายชุดคำสั่งพร้อมกันได้ในเวลาเดียวกัน ทำให้ทำงานหลายอย่างพร้อมกันได้มีประสิทธิภาพมากขึ้น","ลดขนาดของฮาร์ดดิสก์","ใช้แทนหน่วยความจำ RAM ได้ทั้งหมด"], correct:1, explain:"CPU แบบ Multi-core มีหน่วยประมวลผล (core) มากกว่า 1 แกนอยู่ในชิปเดียวกัน ทำให้สามารถประมวลผลหลายงานหรือหลายชุดคำสั่งพร้อมกันได้ (parallel processing) ส่งผลให้ประสิทธิภาพโดยรวมของเครื่องดีขึ้นเมื่อใช้งานหลายโปรแกรมพร้อมกัน"}
+];
+
+const userAnswers = new Array(questions.length).fill(null);
+const answeredLocked = new Array(questions.length).fill(false);
+
+const root = document.getElementById('quiz-root');
+
+function render() {
+  root.innerHTML = '';
+  questions.forEach((item, qi) => {
+    const card = document.createElement('div');
+    card.className = 'question-card';
+
+    const num = document.createElement('div');
+    num.className = 'q-number';
+    num.textContent = 'ข้อ ' + (qi + 1) + ' / ' + questions.length;
+    card.appendChild(num);
+
+    if (item.tag) {
+      const tag = document.createElement('span');
+      tag.className = 'q-tag';
+      tag.textContent = item.tag;
+      card.appendChild(tag);
+    }
+
+    const prompt = document.createElement('p');
+    prompt.className = 'q-prompt';
+    prompt.textContent = item.q;
+    card.appendChild(prompt);
+
+    const optWrap = document.createElement('div');
+    optWrap.className = 'options';
+
+    item.options.forEach((optText, oi) => {
+      const label = document.createElement('label');
+      label.className = 'option';
+      label.id = 'opt-' + qi + '-' + oi;
+
+      const input = document.createElement('input');
+      input.type = 'radio';
+      input.name = 'q' + qi;
+      input.value = oi;
+      input.onchange = () => selectAnswer(qi, oi);
+
+      const span = document.createElement('span');
+      span.textContent = optText;
+
+      label.appendChild(input);
+      label.appendChild(span);
+      optWrap.appendChild(label);
+    });
+
+    card.appendChild(optWrap);
+
+    const verdict = document.createElement('div');
+    verdict.className = 'verdict';
+    verdict.id = 'verdict-' + qi;
+    card.appendChild(verdict);
+
+    const explain = document.createElement('div');
+    explain.className = 'explanation';
+    explain.id = 'explain-' + qi;
+    explain.innerHTML = '<b>เฉลย: </b>' + item.options[item.correct] + '<br>' + item.explain;
+    card.appendChild(explain);
+
+    root.appendChild(card);
+  });
+  updateScoreBox();
+}
+
+function selectAnswer(qi, oi) {
+  if (answeredLocked[qi]) return;
+  userAnswers[qi] = oi;
+  lockQuestion(qi);
+}
+
+function lockQuestion(qi) {
+  answeredLocked[qi] = true;
+  const item = questions[qi];
+  const chosen = userAnswers[qi];
+
+  item.options.forEach((_, oi) => {
+    const label = document.getElementById('opt-' + qi + '-' + oi);
+    label.classList.add('disabled');
+    if (oi === item.correct) label.classList.add('correct');
+    if (oi === chosen && chosen !== item.correct) label.classList.add('incorrect');
+  });
+
+  const verdict = document.getElementById('verdict-' + qi);
+  if (chosen === item.correct) {
+    verdict.textContent = '✓ ถูกต้อง';
+    verdict.className = 'verdict correct-v';
+  } else {
+    verdict.textContent = '✗ ยังไม่ถูก';
+    verdict.className = 'verdict incorrect-v';
+  }
+
+  document.getElementById('explain-' + qi).classList.add('show');
+  updateScoreBox();
+}
+
+function checkAll() {
+  questions.forEach((_, qi) => {
+    if (!answeredLocked[qi]) {
+      const checked = document.querySelector('input[name="q' + qi + '"]:checked');
+      if (checked) {
+        userAnswers[qi] = parseInt(checked.value);
+      }
+      lockQuestion(qi);
+    }
+  });
+  showSummary();
+}
+
+function updateScoreBox() {
+  const answeredCount = answeredLocked.filter(Boolean).length;
+  document.getElementById('answered-count').textContent = answeredCount;
+}
+
+function showSummary() {
+  let score = 0;
+  questions.forEach((item, qi) => {
+    if (userAnswers[qi] === item.correct) score++;
+  });
+  document.getElementById('final-score').textContent = score;
+  document.getElementById('result-summary').classList.add('show');
+  document.getElementById('result-summary').scrollIntoView({behavior: 'smooth'});
+  saveQuizScore(score, questions.length);
+}
+
+/* ---------- ส่งคะแนนกลับไปให้หน้า quiz.html แสดงสรุป ----------
+   ไฟล์ควิซทุกไฟล์ในระบบนี้เรียกฟังก์ชันนี้เหมือนกัน — id จะดึงจากชื่อไฟล์ตัวเองอัตโนมัติ
+   (ต้องตรงกับ id ที่ประกาศไว้ใน QUIZ_SETS ของ quiz.html ซึ่งปกติจะตรงกันเองเพราะใช้ชื่อไฟล์เดียวกัน) */
+function saveQuizScore(score, total) {
+  try {
+    const id = location.pathname.split('/').pop().replace(/\.html$/, '');
+    const key = 'quiz_scores_v1';
+    const all = JSON.parse(localStorage.getItem(key) || '{}');
+    const prev = all[id] || {};
+    all[id] = {
+      score, total,
+      at: Date.now(),
+      best: Math.max(score, prev.best || 0),
+      bestTotal: total,
+      attempts: (prev.attempts || 0) + 1,
+    };
+    localStorage.setItem(key, JSON.stringify(all));
+  } catch (e) {}
+}
+
+function resetQuiz() {
+  userAnswers.fill(null);
+  answeredLocked.fill(false);
+  document.getElementById('result-summary').classList.remove('show');
+  render();
+  window.scrollTo({top: 0, behavior: 'smooth'});
+}
+
+render();
+</script>
+
+</body>
+</html>
