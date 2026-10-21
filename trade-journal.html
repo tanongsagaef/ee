@@ -13,7 +13,7 @@
     --surface-alt: #f3f4f9;
     --border: #e5e7f0;
     --text: #14162a;
-    --muted: #6b7080;
+    --muted: #595e6f;
     --accent: #4f46e5;
     --accent-hover: #4338ca;
     --accent-soft: #eef0fe;
@@ -42,6 +42,23 @@
     --shadow: 0 1px 3px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
   }
   * { box-sizing: border-box; }
+  ::selection {
+    background: color-mix(in srgb, var(--accent) 30%, transparent);
+    color: var(--text);
+  }
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 999px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
   body {
     margin: 0;
     font-family: "Sarabun", "Noto Sans Thai", "Segoe UI", system-ui, sans-serif;
@@ -51,6 +68,7 @@
     padding-bottom: 60px;
   }
   .mono { font-family: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", monospace; }
+  .mono, table, .metric-value, .stat-value { font-variant-numeric: tabular-nums; }
   .pos { color: var(--bull); }
   .neg { color: var(--bear); }
   .header {
@@ -440,7 +458,7 @@
     <a href="stock-decision-terminal.html" class="back-link">STOCK/DECIDE</a>
     <div class="row" id="syncWidget" style="gap:6px;">
       <button class="ghost" id="syncSignInBtn" title="ลงชื่อเข้าใช้ด้วย Google เพื่อซิงค์ข้อมูลข้ามอุปกรณ์แบบเรียลไทม์">☁ ซิงค์ข้ามอุปกรณ์</button>
-      <img id="syncAvatar" class="hidden" style="width:26px;height:26px;border-radius:50%;vertical-align:middle;">
+      <img id="syncAvatar" class="hidden" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E" alt="Avatar" style="width:26px;height:26px;border-radius:50%;vertical-align:middle;object-fit:cover;">
       <span id="syncStatus" class="hidden" style="font-size:11.5px;color:var(--muted);white-space:nowrap;"></span>
       <button class="ghost hidden" id="syncSignOutBtn" title="ออกจากระบบ (หยุดซิงค์บนเครื่องนี้)">ออกจากระบบ</button>
     </div>
@@ -1118,7 +1136,7 @@
 <!-- Image Lightbox -->
 <div id="imageLightbox" class="lightbox-backdrop">
   <button class="icon-btn lightbox-close" id="lightboxClose">✕</button>
-  <img id="lightboxImg" src="" alt="">
+  <img id="lightboxImg" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E" alt="ภาพขยาย">
 </div>
 
 <!-- Day-detail Modal -->
