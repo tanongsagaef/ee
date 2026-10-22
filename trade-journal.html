@@ -103,7 +103,8 @@
   button.primary:hover { background: var(--accent-hover); }
   button.ghost { background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 9px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; }
   button.ghost:hover { border-color: var(--accent); color: var(--accent); }
-  button.ghost.danger:hover { border-color: var(--bear); color: var(--bear); }
+  button.ghost.danger { color: var(--bear); }
+  button.ghost.danger:hover { border-color: var(--bear); color: var(--bear); background: var(--bear-soft); }
   .icon-btn { background: var(--surface); border: 1px solid var(--border); color: var(--text); width: 34px; height: 34px; border-radius: 8px; cursor: pointer; font-size: 15px; display: inline-flex; align-items: center; justify-content: center; }
   .icon-btn:hover { border-color: var(--accent); color: var(--accent); }
   .field { margin-bottom: 12px; flex: 1; min-width: 140px; }
@@ -464,6 +465,7 @@
     </div>
     <button class="ghost" id="exportBtn" title="ส่งออกข้อมูลทั้งหมด (Elliott Wave + Trade Journal + Stock/Decide) เป็นไฟล์เดียว">⬇ ส่งออกข้อมูลทั้งหมด</button>
     <button class="ghost" id="importBtn" title="นำเข้าไฟล์สำรองรวม — จะเพิ่มต่อท้ายข้อมูลเดิมของทั้ง 3 ระบบ ไม่ทับของเดิม">⬆ นำเข้าข้อมูลทั้งหมด</button>
+    <button class="ghost danger" id="clearAllTradesBtn" title="ล้างข้อมูลเทรดทั้งหมดเพื่อเริ่มต้นใหม่">🗑 ล้างข้อมูล</button>
     <input type="file" id="importInput" accept="application/json" hidden>
     <button class="primary" id="addTradeBtn">+ เพิ่มเทรด</button>
     <button id="themeToggle" class="icon-btn" aria-label="สลับโหมดสี" title="สลับโหมดสว่าง/มืด">
@@ -4499,6 +4501,59 @@
       Swal.fire({ icon: "error", title: "นำเข้าข้อมูลไม่สำเร็จ", text: "ไฟล์อาจเสียหายหรือไม่ใช่ไฟล์สำรองที่ถูกต้อง" });
     }
   });
+
+  const clearTradesBtn = document.getElementById("clearAllTradesBtn");
+  if (clearTradesBtn) {
+    clearTradesBtn.addEventListener("click", async () => {
+      const res = await Swal.fire({
+        title: "ยืนยันการล้างข้อมูลทั้งหมด?",
+        html: `<div style="text-align:left;font-size:13.5px;line-height:1.6;">
+          ระบบจะล้างข้อมูลบันทึกใน Trade Journal ทั้งหมด:<br>
+          • ข้อมูลการเทรดทุกรายการ (Trades)<br>
+          • บันทึกการทบทวนประจำสัปดาห์ / เดือน (Reviews)<br>
+          • สถิติ Playbooks และ Watchlist<br>
+          • รีเซ็ตเงินทุนเริ่มต้นพอร์ตกลับเป็น 0<br><br>
+          <span style="color:var(--bear);font-weight:700;">⚠️ ข้อควรระวัง:</span> การดำเนินการนี้ไม่สามารถย้อนกลับได้ แนะนำให้กด <b>"⬇ ส่งออกข้อมูลทั้งหมด"</b> เพื่อสำรองไฟล์ไว้ก่อนหากต้องการเก็บข้อมูลเดิม
+        </div>`,
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#dc2626",
+        cancelButtonColor: "#6b7280",
+        confirmButtonText: "🗑 ยืนยันล้างข้อมูล",
+        cancelButtonText: "ยกเลิก",
+        reverseButtons: true,
+      });
+
+      if (res.isConfirmed) {
+        trades = [];
+        reviews = [];
+        playbooks = [];
+        coinWatch = [];
+        saveTrades();
+        saveReviews();
+        savePlaybooks();
+        saveCoinWatch();
+
+        capitals = { forex: 0, futures: 0, other: 0 };
+        saveCapitals();
+
+        renderCalendar();
+        renderLog();
+        if (typeof renderOverview === "function") renderOverview();
+        if (typeof renderPlaybooks === "function" && !document.getElementById("tab-playbook").classList.contains("hidden")) renderPlaybooks();
+        if (typeof renderReviewTab === "function" && !document.getElementById("tab-review").classList.contains("hidden")) renderReviewTab();
+        if (typeof renderCoinWatch === "function" && !document.getElementById("tab-coinwatch").classList.contains("hidden")) renderCoinWatch();
+
+        Swal.fire({
+          icon: "success",
+          title: "ล้างข้อมูลเรียบร้อยแล้ว",
+          text: "รีเซ็ตข้อมูล Trade Journal ให้เป็นค่าเริ่มต้นแล้ว คุณสามารถเริ่มต้นใส่ข้อมูลใหม่ได้ทันที",
+          timer: 2000,
+          showConfirmButton: false,
+        });
+      }
+    });
+  }
 
   /* ---------- cloud sync (Google sign-in, cross-device realtime) ----------
      Off by default — the app works fully offline/local-only until the user
