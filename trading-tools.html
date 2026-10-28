@@ -236,7 +236,7 @@
 
         <label class="fld"><span>ราคาเข้า (Entry)</span><input id="cEntry" type="number" step="any" inputmode="decimal" placeholder="0.00"></label>
         <label class="fld"><span>ราคาตัดขาดทุน (Stop Loss)</span><input id="cSl" type="number" step="any" inputmode="decimal" placeholder="0.00"></label>
-        <label class="fld" id="levWrap" hidden><span>Leverage (เท่า)</span><input id="cLev" type="number" step="any" inputmode="decimal" placeholder="เช่น 10"></label>
+        <label class="fld" id="levWrap" hidden><span>Leverage (เท่า)</span><input id="cLev" type="number" step="any" inputmode="decimal" value="10" placeholder="เช่น 10"></label>
         <label class="fld" id="stockLotWrap" hidden><span>ขนาดกระดานซื้อขาย</span>
           <select id="cStockLot">
             <option value="100">Board Lot 100 หุ้น (หุ้นไทย SET)</option>
@@ -540,7 +540,7 @@
         flags.push(["warn", "มูลค่าซื้อรวม (" + money(totalCost) + ") เกินเงินทุนในพอร์ต (" + money(bal) + ") — หากเทรดบัญชี Cash / Cash Balance ต้องลดขนาดไม้ หรือเลือกหุ้นราคาต่ำลง"]);
       }
     } else {
-      /* ---- crypto perp (OKX) ---- */
+      /* ---- crypto perp / futures ---- */
       const lev = parseFloat($("cLev").value);
       const mmr = parseFloat($("cMmr").value) || 0;
       const fundingR = (parseFloat($("cFunding").value) || 0) / 100;
@@ -550,44 +550,62 @@
       const notional = riskAmt / stopFrac;
       const coins = notional / entry;
       const actualRisk = riskAmt;
-      bigNum = fmt(coins, coins < 1 ? 4 : coins < 100 ? 3 : 2) + " เหรียญ";
-      bigSub = money(notional) + " Notional · " + dirTxt + " · SL " + fmt(stopFrac * 100, 2) + "%";
+      const hasLev = isFinite(lev) && lev > 0;
+      const margin = hasLev ? notional / lev : 0;
+
+      /* ---- primary display: show margin (what you type into the exchange) ---- */
+      if (hasLev) {
+        bigNum = money(margin) + " Margin";
+        bigSub = "Lev " + fmt(lev, 0) + "x → " + money(notional) + " Notional = " + fmt(coins, coins < 1 ? 4 : coins < 100 ? 3 : 2) + " เหรียญ · " + dirTxt;
+      } else {
+        bigNum = fmt(coins, coins < 1 ? 4 : coins < 100 ? 3 : 2) + " เหรียญ";
+        bigSub = money(notional) + " Notional · " + dirTxt + " · กรุณาใส่ Leverage";
+      }
       lossNum = money(actualRisk);
       lossSub = fmt(actualRisk / bal * 100, 2) + "% ของพอร์ต · ชน SL เหลือ " + money(bal - actualRisk);
+
       rows.push(["พอร์ตปัจจุบัน", money(bal)]);
-      rows.push(["ยอมขาดทุนได้สูงสุด (Max Loss)", money(actualRisk) + " (" + fmt(actualRisk / bal * 100, 2) + "%)"]);
+      rows.push(["ยอมขาดทุนได้ (Max Loss)", money(actualRisk) + " (" + fmt(actualRisk / bal * 100, 2) + "%)"]);
       rows.push(["เงินคงเหลือหากชน SL", money(bal - actualRisk)]);
-      rows.push(["มูลค่าสัญญา (Notional)", money(notional)]);
-      rows.push(["จำนวนเหรียญที่ต้องเปิด", fmt(coins, coins < 1 ? 6 : 3) + " เหรียญ"]);
-      rows.push(["ระยะตัดขาดทุน (SL)", fmt(stopDist, 2) + " (" + fmt(stopFrac * 100, 2) + "%)"]);
-      if (isFinite(lev) && lev > 0) {
-        const margin = notional / lev;
+      rows.push(["ระยะ SL จากราคาเข้า", px(stopDist) + " (" + fmt(stopFrac * 100, 2) + "%)"]);
+      if (hasLev) {
+        rows.push(["Margin ที่ต้องวาง (Isolated)", money(margin) + " (" + fmt(margin / bal * 100, 1) + "% ของพอร์ต)"]);
+        rows.push(["Leverage ที่ตั้ง", fmt(lev, 0) + "x"]);
+        rows.push(["มูลค่าสัญญา (Notional)", money(notional)]);
+        rows.push(["จำนวนเหรียญ", fmt(coins, coins < 1 ? 6 : 3) + " เหรียญ"]);
+        rows.push(["Leverage จริงเทียบพอร์ตทั้งหมด", fmt(notional / bal, 2) + "x"]);
+
         const liq = dir === 1 ? entry * (1 - 1 / lev + mmr) : entry * (1 + 1 / lev - mmr);
         const liqFrac = Math.abs(entry - liq) / entry;
-        rows.push(["Margin ที่ต้องวาง (Isolated)", money(margin)]);
-        rows.push(["Leverage จริงเทียบพอร์ต", fmt(notional / bal, 2) + "x"]);
-        rows.push(["ราคาโดนล้างพอร์ต (Liq Price)", px(liq) + " (" + fmt(liqFrac * 100, 2) + "% จากราคาเข้า)"]);
+        rows.push(["ราคาโดนล้าง (Liq Price)", px(liq) + " (" + fmt(liqFrac * 100, 2) + "% จากราคาเข้า)"]);
+
         if (margin > bal) flags.push(["warn", "Margin " + money(margin) + " เกินพอร์ต (" + money(bal) + ") — ลดขนาดไม้ หรือเพิ่ม Leverage"]);
         const slBeyondLiq = dir === 1 ? (sl <= liq) : (sl >= liq);
         if (slBeyondLiq) {
-          flags.push(["danger", "⚠ SL อยู่เลยราคาโดนล้าง — จะโดน Liquidation ล้างพอร์ตก่อนถึง SL! ลด Leverage หรือขยับ SL ให้แคบลง"]);
+          flags.push(["danger", "⚠ SL อยู่เลยราคาโดนล้าง — จะโดน Liquidation ก่อนถึง SL! ลด Leverage หรือขยับ SL เข้ามา"]);
         } else {
           const buf = (liqFrac - stopFrac) / stopFrac;
-          if (buf < 0.5) flags.push(["warn", "ราคาโดนล้างห่างจาก SL เพียง " + fmt(buf * 100, 0) + "% ของระยะ SL — ปลอดภัยน้อย หากสวิงแรงอาจโดนล้างก่อน"]);
-          else flags.push(["ok", "SL ถึงก่อนราคาโดนล้างแน่นอน (มี Buffer ห่าง " + fmt(buf * 100, 0) + "% ของระยะ SL)"]);
+          if (buf < 0.5) flags.push(["warn", "ราคาโดนล้างห่างจาก SL เพียง " + fmt(buf * 100, 0) + "% ของระยะ SL — ปลอดภัยน้อย"]);
+          else flags.push(["ok", "SL ถึงก่อนราคาโดนล้าง (Buffer " + fmt(buf * 100, 0) + "% ของระยะ SL)"]);
         }
       } else {
-        flags.push(["warn", "ใส่ Leverage เพื่อดู Margin ที่ต้องใช้ และราคาที่พอร์ตจะโดนล้าง (Liquidation Price)"]);
+        rows.push(["มูลค่าสัญญา (Notional)", money(notional)]);
+        rows.push(["จำนวนเหรียญ", fmt(coins, coins < 1 ? 6 : 3) + " เหรียญ"]);
+        flags.push(["warn", "ใส่ Leverage เพื่อดู Margin ที่ต้องวาง และราคาโดนล้าง (Liquidation Price)"]);
       }
       rows.push(["ค่าธรรมเนียม เปิด+ปิด (ประมาณ)", money(notional * feeR * 2)]);
-      rows.push(["ต้นทุน Funding / 8ชม (ถ้าฝั่งจ่าย)", money(notional * fundingR)]);
+      rows.push(["Funding / 8ชม (ถ้าฝั่งจ่าย)", money(notional * fundingR)]);
       if (isFinite(tp) && tp !== entry) {
         const tpDist = Math.abs(tp - entry), rr = tpDist / stopDist;
         const tpProfit = notional * tpDist / entry;
-        rows.push(["ระยะเป้าหมายกำไร (TP)", fmt(tpDist / entry * 100, 2) + "%"]);
+        rows.push(["ระยะเป้า TP", fmt(tpDist / entry * 100, 2) + "% (" + px(tpDist) + ")"]);
         rows.push(["Risk : Reward (R:R)", "1 : " + fmt(rr, 2)]);
-        rows.push(["กำไรคาดหวังหากถึงเป้า TP (ก่อน fee)", "+" + money(tpProfit) + " (" + fmt(tpProfit / bal * 100, 2) + "%)"]);
-        rows.push(["เงินในพอร์ตหากชนะ TP", money(bal + tpProfit)]);
+        rows.push(["กำไรหากถึง TP (ก่อน fee)", "+" + money(tpProfit) + " (" + fmt(tpProfit / bal * 100, 2) + "%)"]);
+        rows.push(["พอร์ตหากชนะ TP", money(bal + tpProfit)]);
+      }
+      /* exchange how-to tip */
+      if (hasLev) {
+        flags.push(["ok", "📋 สั่งที่ Exchange → วาง Margin " + money(margin) + " ตั้ง Leverage " + fmt(lev, 0) + "x → ได้ Position " + fmt(coins, coins < 1 ? 4 : 3) + " เหรียญ (" + money(notional) + ") → ตั้ง SL ที่ " + px(sl)]);
       }
     }
     R.innerHTML =
