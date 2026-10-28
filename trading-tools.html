@@ -9,7 +9,7 @@
   :root {
     color-scheme: light;
     --bg: #f4f6fb; --surface: #ffffff; --surface-alt: #f3f4f9; --border: #e5e7f0;
-    --text: #14162a; --muted: #6b7080;
+    --text: #14162a; --muted: #595e6f;
     --accent: #4f46e5; --accent-hover: #4338ca; --accent-soft: #eef0fe;
     --bull: #16a34a; --bull-soft: rgba(22,163,74,0.10);
     --bear: #dc2626; --bear-soft: rgba(220,38,38,0.10);
@@ -20,7 +20,7 @@
   :root[data-theme="dark"] {
     color-scheme: dark;
     --bg: #0f1117; --surface: #171923; --surface-alt: #1e2029; --border: #2a2d3a;
-    --text: #eceefb; --muted: #9a9db3;
+    --text: #eceefb; --muted: #a4a9c8;
     --accent: #8386ff; --accent-hover: #9a9dff; --accent-soft: #262a52;
     --bull: #34c77b; --bull-soft: rgba(52,199,123,0.14);
     --bear: #ff6f68; --bear-soft: rgba(255,111,104,0.14);
@@ -28,12 +28,32 @@
     --shadow: 0 1px 3px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
   }
   * { box-sizing: border-box; }
+  ::selection {
+    background: color-mix(in srgb, var(--accent) 30%, transparent);
+    color: var(--text);
+  }
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 999px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
   body {
     margin: 0; padding: 20px 20px 60px;
     font-family: "Sarabun", "Noto Sans Thai", "Segoe UI", system-ui, sans-serif;
     background: var(--bg); color: var(--text);
   }
   .mono { font-family: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", monospace; }
+  .mono, table, .num, .big .num { font-variant-numeric: tabular-nums; }
+  .pos { color: var(--bull); font-weight: 700; }
+  .neg { color: var(--bear); font-weight: 700; }
   a { color: inherit; }
 
   .header {
@@ -70,21 +90,28 @@
   }
   .panel h2 .sub { text-transform: none; letter-spacing: 0; font-weight: 600; color: var(--muted); margin-left: 8px; }
 
-  .seg { display: inline-flex; gap: 4px; background: var(--surface-alt); border-radius: 10px; padding: 4px; margin-bottom: 12px; }
+  .seg { display: inline-flex; gap: 4px; background: var(--surface-alt); border-radius: 10px; padding: 4px; margin-bottom: 12px; flex-wrap: wrap; }
   .seg button {
     border: none; background: transparent; color: var(--muted); font-weight: 700; font-size: 12.5px;
-    padding: 7px 16px; border-radius: 7px; cursor: pointer; font-family: inherit;
+    padding: 7px 14px; border-radius: 7px; cursor: pointer; font-family: inherit;
   }
   .seg button.active { background: var(--surface); color: var(--accent); box-shadow: var(--shadow); }
 
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .fld { display: flex; flex-direction: column; gap: 3px; }
-  .fld > span { font-size: 10px; letter-spacing: .3px; color: var(--muted); font-weight: 800; text-transform: uppercase; }
+  .fld > span, .fld-label { font-size: 11px; letter-spacing: .3px; color: var(--muted); font-weight: 800; text-transform: uppercase; }
   .fld input, .fld select {
     background: var(--surface-alt); border: 1px solid var(--border); color: var(--text);
     padding: 8px 10px; border-radius: 9px; font-size: 13px; font-family: inherit; width: 100%;
   }
   .fld input:focus, .fld select:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+  .btn-text {
+    background: none; border: none; padding: 0; color: var(--accent);
+    font-size: 11px; font-weight: 700; cursor: pointer; text-decoration: underline;
+    font-family: inherit;
+  }
+  .btn-text:hover { color: var(--accent-hover); }
+
   .adv { margin-top: 10px; border: 1px solid var(--border); border-radius: 9px; padding: 8px 12px; background: var(--surface-alt); }
   .adv summary { cursor: pointer; font-size: 12px; font-weight: 800; color: var(--muted); list-style: none; }
   .adv summary::-webkit-details-marker { display: none; }
@@ -94,15 +121,24 @@
   .mini-seg button { border: none; background: var(--surface-alt); color: var(--muted); font-weight: 800; font-size: 12px; padding: 8px 10px; cursor: pointer; font-family: inherit; }
   .mini-seg button.active { background: var(--accent); color: #fff; }
 
-  .result { margin-top: 14px; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
-  .result .big { background: var(--accent-soft); padding: 14px 16px; }
-  .result .big .lbl { font-size: 10.5px; text-transform: uppercase; letter-spacing: .4px; color: var(--muted); font-weight: 800; }
-  .result .big .num { font-size: 30px; font-weight: 900; line-height: 1.1; color: var(--accent); }
-  .result .big .sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .result { margin-top: 14px; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--surface); }
+  .res-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 10px; background: var(--surface-alt); border-bottom: 1px solid var(--border); }
+  @media (max-width: 520px) { .res-cards { grid-template-columns: 1fr; } }
+  .res-card { padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); }
+  .res-card.loss { background: var(--bear-soft); border-color: rgba(220,38,38,0.25); }
+  .res-card.loss .lbl { color: var(--bear); }
+  .res-card.loss .num { color: var(--bear); }
+  .res-card.size { background: var(--bull-soft); border-color: rgba(22,163,74,0.25); }
+  .res-card.size .lbl { color: var(--bull); }
+  .res-card.size .num { color: var(--bull); }
+  .res-card .lbl { font-size: 11.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .3px; margin-bottom: 4px; display: flex; align-items: center; gap: 5px; }
+  .res-card .num { font-size: 24px; font-weight: 900; line-height: 1.15; }
+  .res-card .sub { font-size: 11.5px; color: var(--muted); margin-top: 4px; }
+
   .result table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  .result td { padding: 8px 16px; border-top: 1px solid var(--border); }
+  .result td { padding: 8px 14px; border-top: 1px solid var(--border); }
   .result td:last-child { text-align: right; font-weight: 700; }
-  .flag { margin-top: 8px; font-size: 12px; padding: 8px 10px; border-radius: 9px; }
+  .flag { margin: 8px 10px; font-size: 12px; padding: 8px 12px; border-radius: 8px; }
   .flag.warn { background: var(--warn-soft); color: var(--warn); }
   .flag.ok { background: var(--bull-soft); color: var(--bull); }
   .flag.danger { background: rgba(220,38,38,0.13); color: #dc2626; font-weight: 700; }
@@ -111,11 +147,11 @@
   .clock-now { font-size: 13px; color: var(--muted); margin-bottom: 10px; }
   .clock-now b { color: var(--text); font-size: 15px; }
   .tl { position: relative; height: 132px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-alt); overflow: hidden; }
-  .tl .lane { position: absolute; height: 24px; border-radius: 5px; font-size: 10.5px; font-weight: 800; color: #fff;
+  .tl .lane { position: absolute; height: 24px; border-radius: 5px; font-size: 11px; font-weight: 800; color: #fff;
     display: flex; align-items: center; padding-left: 7px; white-space: nowrap; overflow: hidden; }
-  .tl .hr { position: absolute; top: 0; bottom: 18px; border-left: 1px solid var(--border); font-size: 8.5px; color: var(--muted); padding-left: 2px; }
+  .tl .hr { position: absolute; top: 0; bottom: 18px; border-left: 1px solid var(--border); font-size: 9px; color: var(--muted); padding-left: 2px; }
   .tl .now { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--bear); z-index: 5; }
-  .tl .now::after { content: "now"; position: absolute; top: 2px; left: 3px; font-size: 8.5px; color: var(--bear); font-weight: 800; }
+  .tl .now::after { content: "now"; position: absolute; top: 2px; left: 3px; font-size: 9px; color: var(--bear); font-weight: 800; }
   .sess-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap: 8px; margin-top: 10px; }
   .sess { border: 1px solid var(--border); border-radius: 9px; padding: 8px 10px; font-size: 12px; }
   .sess .nm { font-weight: 800; }
@@ -142,10 +178,8 @@
     .riskrow { flex-wrap: wrap; }
     .riskrow .mini-seg { width: 100%; }
     .riskrow .mini-seg button { flex: 1; }
-    .result .big .num { font-size: 25px; }
     .result td { padding: 8px 12px; }
     .tl { height: 150px; }
-    .tl .hr { font-size: 7.5px; }
     .sess-list { grid-template-columns: 1fr 1fr; }
     .seg { display: flex; width: 100%; }
     .seg button { flex: 1; padding: 8px 6px; }
@@ -170,26 +204,46 @@
   <div class="col">
 
     <div class="panel">
-      <h2>เครื่องคิดขนาดโพสิชัน <span class="sub">คำนวณจากความเสี่ยงที่รับได้</span></h2>
+      <h2>เครื่องคิดขนาดโพสิชัน <span class="sub">คำนวณจากความเสี่ยงที่รับได้ (Risk-based Sizing)</span></h2>
       <div class="seg" id="calcMode">
-        <button data-m="forex" class="active">Forex</button>
-        <button data-m="futures">Futures</button>
+        <button data-m="forex" class="active">Forex / ทองคำ</button>
         <button data-m="perp">Crypto Perp</button>
+        <button data-m="stock">หุ้น (Stocks)</button>
+        <button data-m="futures">Futures</button>
       </div>
 
       <div class="grid2">
-        <label class="fld" id="fxPairWrap" style="grid-column:1/-1;"><span>สินค้า</span><select id="cInst"></select></label>
-        <label class="fld"><span>พอร์ต ($)</span><input id="cBal" type="number" step="any" inputmode="decimal" value="1000"></label>
-        <div class="fld"><span>เสี่ยงต่อไม้</span>
+        <label class="fld" id="fxPairWrap" style="grid-column:1/-1;"><span>เลือกสินค้า / สินทรัพย์</span><select id="cInst"></select></label>
+        
+        <div class="fld">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span>เงินทุนในพอร์ต</span>
+            <button type="button" id="pullCapitalBtn" class="btn-text" title="ดึงเงินทุนที่บันทึกไว้ใน Trade Journal">↺ ดึงทุนจากพอร์ต</button>
+          </div>
           <div class="riskrow">
-            <input id="cRisk" type="number" step="any" inputmode="decimal" value="1" style="flex:1;">
-            <span class="mini-seg" id="riskUnit"><button data-u="pct" class="active">%</button><button data-u="usd">$</button></span>
+            <input id="cBal" type="number" step="any" inputmode="decimal" value="1000" style="flex:1;">
+            <span class="mini-seg" id="currUnit"><button data-c="usd" class="active">$</button><button data-c="thb">฿</button></span>
           </div>
         </div>
-        <label class="fld"><span>ราคาเข้า</span><input id="cEntry" type="number" step="any" inputmode="decimal"></label>
-        <label class="fld"><span>ราคา SL</span><input id="cSl" type="number" step="any" inputmode="decimal"></label>
+
+        <div class="fld">
+          <span>ความเสี่ยงต่อไม้ (ยอมขาดทุนได้)</span>
+          <div class="riskrow">
+            <input id="cRisk" type="number" step="any" inputmode="decimal" value="1" style="flex:1;">
+            <span class="mini-seg" id="riskUnit"><button data-u="pct" class="active">%</button><button data-u="cash" id="riskCashBtn">$</button></span>
+          </div>
+        </div>
+
+        <label class="fld"><span>ราคาเข้า (Entry)</span><input id="cEntry" type="number" step="any" inputmode="decimal" placeholder="0.00"></label>
+        <label class="fld"><span>ราคาตัดขาดทุน (Stop Loss)</span><input id="cSl" type="number" step="any" inputmode="decimal" placeholder="0.00"></label>
         <label class="fld" id="levWrap" hidden><span>Leverage (เท่า)</span><input id="cLev" type="number" step="any" inputmode="decimal" placeholder="เช่น 10"></label>
-        <label class="fld" style="grid-column:1/-1;"><span>TP — ไม่บังคับ (ไว้ดู R:R + กำไรที่เป้า)</span><input id="cTp" type="number" step="any" inputmode="decimal"></label>
+        <label class="fld" id="stockLotWrap" hidden><span>ขนาดกระดานซื้อขาย</span>
+          <select id="cStockLot">
+            <option value="100">Board Lot 100 หุ้น (หุ้นไทย SET)</option>
+            <option value="1">หุ้นเดี่ยว 1 หุ้น (หุ้นสหรัฐฯ / Fractional)</option>
+          </select>
+        </label>
+        <label class="fld" style="grid-column:1/-1;"><span>ราคาเป้าหมายกำไร (Take Profit) — ไม่บังคับ (ไว้คำนวณ R:R และกำไร)</span><input id="cTp" type="number" step="any" inputmode="decimal" placeholder="0.00"></label>
       </div>
 
       <details class="adv">
@@ -272,7 +326,9 @@
   $("themeToggle").addEventListener("click", () => applyTheme(root.getAttribute("data-theme") === "dark" ? "light" : "dark"));
 
   const fmt = (n, d = 2) => (n == null || !isFinite(n)) ? "—" : Number(n).toLocaleString("en-US", { maximumFractionDigits: d, minimumFractionDigits: d > 2 ? 0 : 0 });
-  const money = (n) => (n == null || !isFinite(n)) ? "—" : "$" + Number(n).toLocaleString("en-US", { maximumFractionDigits: 2 });
+  let curr = "usd";
+  const currSym = () => curr === "thb" ? "฿" : "$";
+  const money = (n) => (n == null || !isFinite(n)) ? "—" : currSym() + Number(n).toLocaleString("en-US", { maximumFractionDigits: 2 });
 
   /* ================= position calculator ================= */
   const FX = [
@@ -299,6 +355,12 @@
     { k: "6B  British Pound", ts: 0.0001, tv: 6.25 }, { k: "6J  Japanese Yen", ts: 0.0000005, tv: 6.25 },
     { k: "กำหนดเอง", ts: 0.25, tv: 12.5 },
   ];
+  const STOCKS = [
+    { k: "SET (หุ้นไทย Board Lot 100 หุ้น)", lot: 100, curr: "thb" },
+    { k: "US Stocks / หุ้นต่างประเทศ (1 หุ้น)", lot: 1, curr: "usd" },
+    { k: "หุ้นไทย เศษหุ้น / Odd Lot (1 หุ้น)", lot: 1, curr: "thb" },
+    { k: "กำหนดเอง (Board Lot 100)", lot: 100, curr: "thb" },
+  ];
   // OKX USDT-perp — mmr = maintenance-margin-rate ประมาณ tier แรก (ปรับได้ในค่าขั้นสูง)
   const PERP = [
     { k: "BTC-USDT", mmr: 0.004 }, { k: "ETH-USDT", mmr: 0.005 },
@@ -312,34 +374,46 @@
 
   function fillInst() {
     const sel = $("cInst");
-    const list = calcMode === "forex" ? FX : calcMode === "futures" ? FUT : PERP;
+    const list = calcMode === "forex" ? FX : calcMode === "futures" ? FUT : calcMode === "stock" ? STOCKS : PERP;
     sel.innerHTML = list.map((o, i) => `<option value="${i}">${o.k}</option>`).join("");
     onInst();
   }
   function onInst() {
     const i = +$("cInst").value || 0;
     if (calcMode === "forex") {
-      const o = FX[i]; $("cPipSize").value = o.pip; $("cPipVal").value = o.val;
+      const o = FX[i]; if (o) { $("cPipSize").value = o.pip; $("cPipVal").value = o.val; }
     } else if (calcMode === "futures") {
-      const o = FUT[i]; $("cTickSize").value = o.ts; $("cTickVal").value = o.tv;
+      const o = FUT[i]; if (o) { $("cTickSize").value = o.ts; $("cTickVal").value = o.tv; }
+    } else if (calcMode === "stock") {
+      const o = STOCKS[i];
+      if (o) {
+        $("cStockLot").value = String(o.lot);
+        if (o.curr && curr !== o.curr) {
+          curr = o.curr;
+          [...$("currUnit").children].forEach(x => x.classList.toggle("active", x.dataset.c === curr));
+          $("riskCashBtn").textContent = currSym();
+        }
+      }
     } else {
-      const o = PERP[i]; $("cMmr").value = o.mmr;
+      const o = PERP[i]; if (o) $("cMmr").value = o.mmr;
     }
     calc();
   }
   function setMode(m) {
     calcMode = m;
     [...$("calcMode").children].forEach(b => b.classList.toggle("active", b.dataset.m === m));
-    const fx = m === "forex", fut = m === "futures", perp = m === "perp";
+    const fx = m === "forex", fut = m === "futures", perp = m === "perp", stock = m === "stock";
     $("pipSizeWrap").hidden = !fx; $("pipValWrap").hidden = !fx;
     $("tickSizeWrap").hidden = !fut; $("tickValWrap").hidden = !fut;
     $("mmrWrap").hidden = !perp; $("fundingWrap").hidden = !perp; $("feeWrap").hidden = !perp;
     $("levWrap").hidden = !perp;
+    $("stockLotWrap").hidden = !stock;
+    $("advSum").parentElement.hidden = stock;
     $("fxPairWrap").querySelector("span").textContent =
-      fx ? "สินค้า (Forex / CFD)" : fut ? "สินค้า (Futures)" : "เหรียญ (OKX Perpetual)";
+      fx ? "สินค้า (Forex / CFD)" : fut ? "สินค้า (Futures)" : stock ? "กระดาน / ประเภทหุ้น" : "เหรียญ (OKX Perpetual)";
     $("advNote").textContent = perp
       ? "mmr = maintenance margin rate โดยประมาณของ OKX (BTC ~0.4%) · funding ทุก 8 ชม. · ราคาโดนล้างเป็นค่าประมาณแบบ isolated margin ไม่รวม fee ที่จ่ายไปแล้ว"
-      : "JPY pairs / ทอง / index ปรับตามเรทปัจจุบันได้";
+      : fut ? "ขนาดและมูลค่า Tick ตามมาตรฐานสัญญา Futures" : "JPY pairs / ทอง / index ปรับตามเรทปัจจุบันได้";
     fillInst();
   }
 
@@ -349,96 +423,186 @@
     const R = $("cResult");
     const riskAmt = riskUnit === "pct" ? (bal * risk / 100) : risk;
     if (!isFinite(riskAmt) || riskAmt <= 0 || !isFinite(entry) || !isFinite(sl) || entry === sl) {
-      R.innerHTML = `<div class="big"><div class="lbl">ขนาดโพสิชัน</div><div class="num">—</div><div class="sub">กรอก พอร์ต · ความเสี่ยง · ราคาเข้า · ราคา SL</div></div>`;
+      R.innerHTML =
+        `<div class="res-cards">` +
+          `<div class="res-card loss">` +
+            `<div class="lbl">🛑 ขาดทุนได้เท่าไหร่ (Max Loss)</div>` +
+            `<div class="num">${isFinite(riskAmt) && riskAmt > 0 ? money(riskAmt) : "—"}</div>` +
+            `<div class="sub">${isFinite(riskAmt) && riskAmt > 0 ? (fmt(riskUnit === "pct" ? risk : (riskAmt / (bal || 1) * 100), 2) + "% ของพอร์ต") : "คำนวณจากความเสี่ยงที่ตั้งไว้"}</div>` +
+          `</div>` +
+          `<div class="res-card size">` +
+            `<div class="lbl">🎯 ออก Position เท่าไหร่</div>` +
+            `<div class="num">—</div>` +
+            `<div class="sub">กรอก ราคาเข้า (Entry) และ Stop Loss เพื่อคำนวณ</div>` +
+          `</div>` +
+        `</div>` +
+        `<div style="padding:14px;font-size:12.5px;color:var(--muted);text-align:center;">ใส่ราคาเข้า (Entry) และราคาตัดขาดทุน (SL) ระบบจะคำนวณขนาด Position และเงินที่ยอมขาดทุนให้ทันที</div>`;
       return;
     }
-    let rows = [], bigNum, bigSub, flags = [], bigLbl = "ขนาดโพสิชัน";
+    const stopDist = Math.abs(entry - sl);
+    const dir = entry > sl ? 1 : -1;
+    const dirTxt = dir === 1 ? "Long (ฝั่งซื้อ)" : "Short (ฝั่งขาย)";
+    let rows = [], bigNum = "—", bigSub = "—", lossNum = "—", lossSub = "—", flags = [];
+
     if (calcMode === "forex") {
       const pipSize = parseFloat($("cPipSize").value), pipVal = parseFloat($("cPipVal").value);
-      if (!(pipSize > 0) || !(pipVal > 0)) { R.innerHTML = `<div class="big"><div class="num">—</div><div class="sub">ตรวจค่า pip</div></div>`; return; }
-      const stopPips = Math.abs(entry - sl) / pipSize;
+      if (!(pipSize > 0) || !(pipVal > 0)) {
+        R.innerHTML = `<div class="res-cards"><div class="res-card loss"><div class="lbl">🛑 ขาดทุนได้เท่าไหร่</div><div class="num">—</div></div><div class="res-card size"><div class="lbl">🎯 ออก Position</div><div class="num">—</div><div class="sub">ตรวจค่า pip</div></div></div>`;
+        return;
+      }
+      const stopPips = stopDist / pipSize;
       const lots = riskAmt / (stopPips * pipVal);
+      const actualRisk = lots * stopPips * pipVal;
       const units = lots * 100000;
       bigNum = fmt(lots, 2) + " lot";
-      bigSub = fmt(units, 0) + " units · SL " + fmt(stopPips, 1) + " pips";
-      rows.push(["$ ที่เสี่ยงจริง", money(stopPips * pipVal * lots)]);
-      rows.push(["มูลค่า/pip (โพสิชันนี้)", money(pipVal * lots)]);
-      rows.push(["Mini / Micro", fmt(lots * 10, 1) + " / " + fmt(lots * 100, 0)]);
+      bigSub = fmt(units, 0) + " units · " + dirTxt + " · SL " + fmt(stopPips, 1) + " pips";
+      lossNum = money(actualRisk);
+      lossSub = fmt(actualRisk / bal * 100, 2) + "% ของพอร์ต · ชน SL เหลือ " + money(bal - actualRisk);
+      rows.push(["พอร์ตปัจจุบัน", money(bal)]);
+      rows.push(["เงินที่ยอมขาดทุนได้ (Risk)", money(actualRisk) + " (" + fmt(actualRisk / bal * 100, 2) + "%)"]);
+      rows.push(["เงินคงเหลือหากชน SL", money(bal - actualRisk)]);
+      rows.push(["ระยะตัดขาดทุน (SL)", fmt(stopPips, 1) + " pips (" + fmt(stopDist, 5) + ")"]);
+      rows.push(["มูลค่าต่อ 1 pip (โพสิชันนี้)", money(pipVal * lots)]);
+      rows.push(["เทียบเท่า Mini / Micro Lots", fmt(lots * 10, 1) + " mini / " + fmt(lots * 100, 0) + " micro"]);
       if (isFinite(tp) && tp !== entry) {
         const tpPips = Math.abs(tp - entry) / pipSize, rr = tpPips / stopPips;
-        rows.push(["ระยะเป้า", fmt(tpPips, 1) + " pips"]);
-        rows.push(["R:R", "1 : " + fmt(rr, 2)]);
-        rows.push(["กำไรที่เป้า", money(tpPips * pipVal * lots)]);
+        const tpProfit = tpPips * pipVal * lots;
+        rows.push(["ระยะเป้าหมายกำไร (TP)", fmt(tpPips, 1) + " pips"]);
+        rows.push(["Risk : Reward (R:R)", "1 : " + fmt(rr, 2)]);
+        rows.push(["กำไรคาดหวังหากถึงเป้า TP", "+" + money(tpProfit) + " (" + fmt(tpProfit / bal * 100, 2) + "%)"]);
+        rows.push(["เงินในพอร์ตหากชนะ TP", money(bal + tpProfit)]);
       }
-      if (lots < 0.01) flags.push(["warn", "ขนาด < 0.01 lot — SL ไกลไป หรือความเสี่ยงน้อยไป"]);
+      if (lots < 0.01) flags.push(["warn", "ขนาดต่ำกว่าขั้นต่ำ 0.01 lot — ระยะ SL กว้างไป หรืองบเสี่ยงน้อยไปสำหรับบัญชี Standard"]);
     } else if (calcMode === "futures") {
       const ts = parseFloat($("cTickSize").value), tv = parseFloat($("cTickVal").value);
-      if (!(ts > 0) || !(tv > 0)) { R.innerHTML = `<div class="big"><div class="num">—</div><div class="sub">ตรวจค่า tick</div></div>`; return; }
-      const stopPts = Math.abs(entry - sl);
-      const ticks = stopPts / ts;
+      if (!(ts > 0) || !(tv > 0)) {
+        R.innerHTML = `<div class="res-cards"><div class="res-card loss"><div class="lbl">🛑 ขาดทุนได้เท่าไหร่</div><div class="num">—</div></div><div class="res-card size"><div class="lbl">🎯 ออก Position</div><div class="num">—</div><div class="sub">ตรวจค่า tick</div></div></div>`;
+        return;
+      }
+      const ticks = stopDist / ts;
       const riskPerC = ticks * tv;
       const contracts = Math.floor(riskAmt / riskPerC);
-      const actual = contracts * riskPerC;
+      const actualRisk = contracts * riskPerC;
       bigNum = contracts + " สัญญา";
-      bigSub = "SL " + fmt(stopPts, 2) + " จุด (" + fmt(ticks, 0) + " ticks) · $" + fmt(riskPerC, 2) + "/สัญญา";
-      rows.push(["$ ที่เสี่ยงจริง", contracts ? money(actual) : "—"]);
-      rows.push(["ความเสี่ยงที่ตั้งไว้", money(riskAmt)]);
+      bigSub = "SL " + fmt(stopDist, 2) + " จุด (" + fmt(ticks, 0) + " ticks) · " + money(riskPerC) + "/สัญญา";
+      lossNum = contracts > 0 ? money(actualRisk) : money(riskAmt);
+      lossSub = contracts > 0
+        ? (fmt(actualRisk / bal * 100, 2) + "% ของพอร์ต · ชน SL เหลือ " + money(bal - actualRisk))
+        : "งบเสี่ยง " + money(riskAmt) + " ไม่พอออกแม้แต่ 1 สัญญา";
+      rows.push(["พอร์ตปัจจุบัน", money(bal)]);
+      rows.push(["งบเสี่ยงที่ตั้งไว้", money(riskAmt)]);
+      rows.push(["ขาดทุนจริงเมื่อชน SL (ปัดสัญญาเต็ม)", contracts > 0 ? money(actualRisk) + " (" + fmt(actualRisk / bal * 100, 2) + "%)" : "—"]);
+      rows.push(["เงินคงเหลือหากชน SL", contracts > 0 ? money(bal - actualRisk) : "—"]);
+      rows.push(["ระยะตัดขาดทุน (SL)", fmt(stopDist, 2) + " จุด (" + fmt(ticks, 0) + " ticks)"]);
+      rows.push(["ความเสี่ยงต่อ 1 สัญญา", money(riskPerC)]);
       if (isFinite(tp) && tp !== entry) {
-        const tpPts = Math.abs(tp - entry), rr = tpPts / stopPts;
-        rows.push(["ระยะเป้า", fmt(tpPts, 2) + " จุด"]);
-        rows.push(["R:R", "1 : " + fmt(rr, 2)]);
-        rows.push(["กำไรที่เป้า", contracts ? money((tpPts / ts) * tv * contracts) : "—"]);
+        const tpPts = Math.abs(tp - entry), rr = tpPts / stopDist;
+        const tpProfit = contracts ? (tpPts / ts) * tv * contracts : 0;
+        rows.push(["ระยะเป้าหมายกำไร (TP)", fmt(tpPts, 2) + " จุด"]);
+        rows.push(["Risk : Reward (R:R)", "1 : " + fmt(rr, 2)]);
+        rows.push(["กำไรคาดหวังหากถึงเป้า TP", contracts > 0 ? "+" + money(tpProfit) + " (" + fmt(tpProfit / bal * 100, 2) + "%)" : "—"]);
+        if (contracts > 0) rows.push(["เงินในพอร์ตหากชนะ TP", money(bal + tpProfit)]);
       }
-      if (contracts < 1) flags.push(["warn", "ได้ 0 สัญญา — 1 สัญญาเสี่ยง " + money(riskPerC) + " เกินความเสี่ยงที่รับได้ · ลด SL หรือใช้ Micro"]);
-      else if (Math.abs(actual - riskAmt) / riskAmt > 0.2) flags.push(["warn", "ปัดจำนวนสัญญาแล้วเสี่ยงจริงต่างจากที่ตั้ง " + fmt(Math.abs(actual - riskAmt) / riskAmt * 100, 0) + "%"]);
+      if (contracts < 1) flags.push(["warn", "ได้ 0 สัญญา — 1 สัญญาเสี่ยง " + money(riskPerC) + " เกินงบเสี่ยงที่รับได้ (" + money(riskAmt) + ") · กรุณาลดระยะ SL หรือเทรด Micro Contract"]);
+      else if (Math.abs(actualRisk - riskAmt) / riskAmt > 0.2) flags.push(["warn", "เนื่องจากต้องปัดเศษสัญญาเต็ม ความเสี่ยงจริงจึงต่างจากที่ตั้งไว้ " + fmt(Math.abs(actualRisk - riskAmt) / riskAmt * 100, 0) + "%"]);
+    } else if (calcMode === "stock") {
+      const lotSize = parseInt($("cStockLot").value, 10) || 100;
+      const rawShares = riskAmt / stopDist;
+      const shares = Math.floor(rawShares / lotSize) * lotSize;
+      const actualRisk = shares * stopDist;
+      const totalCost = shares * entry;
+      const boardLots = lotSize > 1 ? Math.floor(shares / lotSize) : 0;
+      bigNum = fmt(shares, 0) + " หุ้น";
+      bigSub = (lotSize > 1 ? (fmt(boardLots, 0) + " Board Lots · ") : "") + "มูลค่าซื้อ " + money(totalCost) + " · SL " + fmt(stopDist / entry * 100, 2) + "%";
+      lossNum = shares > 0 ? money(actualRisk) : money(riskAmt);
+      lossSub = shares > 0
+        ? (fmt(actualRisk / bal * 100, 2) + "% ของพอร์ต · ชน SL เหลือ " + money(bal - actualRisk))
+        : "งบเสี่ยง " + money(riskAmt) + " ไม่พอซื้อขั้นต่ำ 1 Lot";
+      rows.push(["พอร์ตปัจจุบัน", money(bal)]);
+      rows.push(["งบเสี่ยงที่ตั้งไว้", money(riskAmt)]);
+      rows.push(["ขาดทุนจริงเมื่อชน SL (ปัดเศษ Lot)", shares > 0 ? money(actualRisk) + " (" + fmt(actualRisk / bal * 100, 2) + "%)" : "—"]);
+      rows.push(["เงินคงเหลือหากชน SL", shares > 0 ? money(bal - actualRisk) : "—"]);
+      rows.push(["เงินทุนที่ต้องใช้ซื้อ (Position Cost)", money(totalCost) + " (" + fmt(totalCost / bal * 100, 1) + "% ของพอร์ต)"]);
+      rows.push(["ระยะตัดขาดทุนต่อหุ้น (SL)", (curr === "thb" ? "฿" : "$") + fmt(stopDist, 2) + " (" + fmt(stopDist / entry * 100, 2) + "%)"]);
+      if (isFinite(tp) && tp !== entry) {
+        const tpDist = Math.abs(tp - entry), rr = tpDist / stopDist;
+        const tpProfit = shares * tpDist;
+        rows.push(["ราคาเป้าหมายกำไร (TP)", (curr === "thb" ? "฿" : "$") + fmt(tp, 2) + " (" + fmt(tpDist / entry * 100, 2) + "%)"]);
+        rows.push(["Risk : Reward (R:R)", "1 : " + fmt(rr, 2)]);
+        rows.push(["กำไรคาดหวังหากถึงเป้า TP", shares > 0 ? "+" + money(tpProfit) + " (" + fmt(tpProfit / bal * 100, 2) + "%)" : "—"]);
+        if (shares > 0) rows.push(["มูลค่าพอร์ตหากชนะ TP", money(bal + tpProfit)]);
+      }
+      if (shares < lotSize) {
+        const minRisk = lotSize * stopDist;
+        flags.push(["warn", "ซื้อไม่ได้แม้แต่ 1 " + (lotSize > 1 ? "Board Lot (100 หุ้น)" : "หุ้น") + " — ความเสี่ยงของ 1 Lot คือ " + money(minRisk) + " เกินงบเสี่ยง " + money(riskAmt) + " · ปรับ SL ให้แคบลง หรือเพิ่มงบเสี่ยง"]);
+      }
+      if (totalCost > bal) {
+        flags.push(["warn", "มูลค่าซื้อรวม (" + money(totalCost) + ") เกินเงินทุนในพอร์ต (" + money(bal) + ") — หากเทรดบัญชี Cash / Cash Balance ต้องลดขนาดไม้ หรือเลือกหุ้นราคาต่ำลง"]);
+      }
     } else {
       /* ---- crypto perp (OKX) ---- */
       const lev = parseFloat($("cLev").value);
       const mmr = parseFloat($("cMmr").value) || 0;
       const fundingR = (parseFloat($("cFunding").value) || 0) / 100;
       const feeR = (parseFloat($("cFee").value) || 0) / 100;
-      const dir = entry > sl ? 1 : -1;                 // Long ถ้า SL อยู่ใต้ราคาเข้า
-      const dirTxt = dir === 1 ? "Long" : "Short";
       const px = (v) => fmt(v, v < 1 ? 6 : v < 100 ? 4 : 2);
-      const stopDist = Math.abs(entry - sl);
       const stopFrac = stopDist / entry;
-      const notional = riskAmt / stopFrac;             // ขาดทุนที่ SL = notional * stopFrac = riskAmt
+      const notional = riskAmt / stopFrac;
       const coins = notional / entry;
-      bigLbl = "ขนาดโพสิชัน (Notional)";
-      bigNum = money(notional);
-      bigSub = fmt(coins, coins < 1 ? 6 : 3) + " เหรียญ · " + dirTxt + " · SL " + fmt(stopFrac * 100, 2) + "% จากราคาเข้า";
-      rows.push(["$ ที่เสี่ยงจริง", money(riskAmt)]);
-      rows.push(["ขนาด (เหรียญ)", fmt(coins, coins < 1 ? 6 : 3)]);
+      const actualRisk = riskAmt;
+      bigNum = fmt(coins, coins < 1 ? 4 : coins < 100 ? 3 : 2) + " เหรียญ";
+      bigSub = money(notional) + " Notional · " + dirTxt + " · SL " + fmt(stopFrac * 100, 2) + "%";
+      lossNum = money(actualRisk);
+      lossSub = fmt(actualRisk / bal * 100, 2) + "% ของพอร์ต · ชน SL เหลือ " + money(bal - actualRisk);
+      rows.push(["พอร์ตปัจจุบัน", money(bal)]);
+      rows.push(["ยอมขาดทุนได้สูงสุด (Max Loss)", money(actualRisk) + " (" + fmt(actualRisk / bal * 100, 2) + "%)"]);
+      rows.push(["เงินคงเหลือหากชน SL", money(bal - actualRisk)]);
+      rows.push(["มูลค่าสัญญา (Notional)", money(notional)]);
+      rows.push(["จำนวนเหรียญที่ต้องเปิด", fmt(coins, coins < 1 ? 6 : 3) + " เหรียญ"]);
+      rows.push(["ระยะตัดขาดทุน (SL)", fmt(stopDist, 2) + " (" + fmt(stopFrac * 100, 2) + "%)"]);
       if (isFinite(lev) && lev > 0) {
         const margin = notional / lev;
         const liq = dir === 1 ? entry * (1 - 1 / lev + mmr) : entry * (1 + 1 / lev - mmr);
         const liqFrac = Math.abs(entry - liq) / entry;
-        rows.push(["Margin ที่ต้องใช้ (isolated)", money(margin)]);
+        rows.push(["Margin ที่ต้องวาง (Isolated)", money(margin)]);
         rows.push(["Leverage จริงเทียบพอร์ต", fmt(notional / bal, 2) + "x"]);
-        rows.push(["ราคาโดนล้าง (ประมาณ)", px(liq) + "  ·  " + fmt(liqFrac * 100, 2) + "% จากราคาเข้า"]);
-        if (margin > bal) flags.push(["warn", "Margin " + money(margin) + " เกินพอร์ต ($" + fmt(bal, 0) + ") — ลดขนาดไม้ หรือเพิ่ม leverage"]);
+        rows.push(["ราคาโดนล้างพอร์ต (Liq Price)", px(liq) + " (" + fmt(liqFrac * 100, 2) + "% จากราคาเข้า)"]);
+        if (margin > bal) flags.push(["warn", "Margin " + money(margin) + " เกินพอร์ต (" + money(bal) + ") — ลดขนาดไม้ หรือเพิ่ม Leverage"]);
         const slBeyondLiq = dir === 1 ? (sl <= liq) : (sl >= liq);
         if (slBeyondLiq) {
-          flags.push(["danger", "⚠ SL อยู่เลยราคาโดนล้าง — จะโดนล้างก่อนถึง SL! ลด leverage ลง หรือขยับ SL เข้ามา"]);
+          flags.push(["danger", "⚠ SL อยู่เลยราคาโดนล้าง — จะโดน Liquidation ล้างพอร์ตก่อนถึง SL! ลด Leverage หรือขยับ SL ให้แคบลง"]);
         } else {
           const buf = (liqFrac - stopFrac) / stopFrac;
-          if (buf < 0.5) flags.push(["warn", "ระยะราคาโดนล้างห่างจาก SL แค่ " + fmt(buf * 100, 0) + "% ของระยะ SL — บางไป ถ้าสวนแรงอาจโดนล้างก่อน"]);
-          else flags.push(["ok", "SL ถึงก่อนราคาโดนล้าง (buffer " + fmt(buf * 100, 0) + "% ของระยะ SL)"]);
+          if (buf < 0.5) flags.push(["warn", "ราคาโดนล้างห่างจาก SL เพียง " + fmt(buf * 100, 0) + "% ของระยะ SL — ปลอดภัยน้อย หากสวิงแรงอาจโดนล้างก่อน"]);
+          else flags.push(["ok", "SL ถึงก่อนราคาโดนล้างแน่นอน (มี Buffer ห่าง " + fmt(buf * 100, 0) + "% ของระยะ SL)"]);
         }
       } else {
-        flags.push(["warn", "ใส่ Leverage เพื่อดู margin ที่ต้องใช้ + ราคาโดนล้าง"]);
+        flags.push(["warn", "ใส่ Leverage เพื่อดู Margin ที่ต้องใช้ และราคาที่พอร์ตจะโดนล้าง (Liquidation Price)"]);
       }
       rows.push(["ค่าธรรมเนียม เปิด+ปิด (ประมาณ)", money(notional * feeR * 2)]);
       rows.push(["ต้นทุน Funding / 8ชม (ถ้าฝั่งจ่าย)", money(notional * fundingR)]);
       if (isFinite(tp) && tp !== entry) {
         const tpDist = Math.abs(tp - entry), rr = tpDist / stopDist;
-        rows.push(["ระยะเป้า", fmt(tpDist / entry * 100, 2) + "%"]);
-        rows.push(["R:R", "1 : " + fmt(rr, 2)]);
-        rows.push(["กำไรที่เป้า (ก่อน fee/funding)", money(notional * tpDist / entry)]);
+        const tpProfit = notional * tpDist / entry;
+        rows.push(["ระยะเป้าหมายกำไร (TP)", fmt(tpDist / entry * 100, 2) + "%"]);
+        rows.push(["Risk : Reward (R:R)", "1 : " + fmt(rr, 2)]);
+        rows.push(["กำไรคาดหวังหากถึงเป้า TP (ก่อน fee)", "+" + money(tpProfit) + " (" + fmt(tpProfit / bal * 100, 2) + "%)"]);
+        rows.push(["เงินในพอร์ตหากชนะ TP", money(bal + tpProfit)]);
       }
     }
     R.innerHTML =
-      `<div class="big"><div class="lbl">${bigLbl}</div><div class="num">${bigNum}</div><div class="sub">${bigSub}</div></div>` +
+      `<div class="res-cards">` +
+        `<div class="res-card loss">` +
+          `<div class="lbl">🛑 ยอมขาดทุนได้สูงสุด (Max Loss)</div>` +
+          `<div class="num">${lossNum}</div>` +
+          `<div class="sub">${lossSub}</div>` +
+        `</div>` +
+        `<div class="res-card size">` +
+          `<div class="lbl">🎯 ขนาด Position ที่ต้องออก</div>` +
+          `<div class="num">${bigNum}</div>` +
+          `<div class="sub">${bigSub}</div>` +
+        `</div>` +
+      `</div>` +
       `<table>${rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join("")}</table>` +
       flags.map(f => `<div class="flag ${f[0]}">${f[1]}</div>`).join("");
   }
@@ -448,17 +612,18 @@
   function saveCalc() {
     try {
       localStorage.setItem(CALC_KEY, JSON.stringify({
-        bal: $("cBal").value, risk: $("cRisk").value, unit: riskUnit, mode: calcMode,
-        lev: $("cLev").value,
+        bal: $("cBal").value, risk: $("cRisk").value, unit: riskUnit, mode: calcMode, curr: curr,
+        lev: $("cLev").value, lot: $("cStockLot").value,
         fx: calcMode === "forex" ? $("cInst").value : undefined,
         fut: calcMode === "futures" ? $("cInst").value : undefined,
         perp: calcMode === "perp" ? $("cInst").value : undefined,
+        stock: calcMode === "stock" ? $("cInst").value : undefined,
       }));
     } catch (e) {}
   }
   let savedCalc = {};
   try { savedCalc = JSON.parse(localStorage.getItem(CALC_KEY) || "{}") || {}; } catch (e) {}
-  let savedFx = savedCalc.fx, savedFut = savedCalc.fut, savedPerp = savedCalc.perp;
+  let savedFx = savedCalc.fx, savedFut = savedCalc.fut, savedPerp = savedCalc.perp, savedStock = savedCalc.stock;
 
   $("calcMode").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) { setMode(b.dataset.m); saveCalc(); } });
   $("riskUnit").addEventListener("click", (e) => {
@@ -467,9 +632,48 @@
     [...$("riskUnit").children].forEach(x => x.classList.toggle("active", x === b));
     calc(); saveCalc();
   });
+  $("currUnit").addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    curr = b.dataset.c;
+    [...$("currUnit").children].forEach(x => x.classList.toggle("active", x === b));
+    $("riskCashBtn").textContent = currSym();
+    calc(); saveCalc();
+  });
+  $("pullCapitalBtn").addEventListener("click", () => {
+    let cap = 0;
+    try {
+      const caps = JSON.parse(localStorage.getItem("tj_capitals_v1") || "null");
+      if (caps && typeof caps === "object") {
+        if (calcMode === "forex" && caps.forex > 0) cap = Number(caps.forex);
+        else if ((calcMode === "futures" || calcMode === "perp") && caps.futures > 0) cap = Number(caps.futures);
+        else if (calcMode === "stock" && caps.other > 0) cap = Number(caps.other);
+        else cap = (Number(caps.forex) || 0) + (Number(caps.futures) || 0) + (Number(caps.other) || 0);
+      }
+    } catch (e) {}
+    if (!cap) {
+      try {
+        const legacy = Number(localStorage.getItem("tj_capital"));
+        if (isFinite(legacy) && legacy > 0) cap = legacy;
+      } catch (e) {}
+    }
+    if (cap > 0) {
+      $("cBal").value = cap;
+      calc();
+      saveCalc();
+      $("pullCapitalBtn").textContent = "✓ ดึงทุนสำเร็จ (" + money(cap) + ")";
+      setTimeout(() => { $("pullCapitalBtn").textContent = "↺ ดึงทุนจากพอร์ต"; }, 2500);
+    } else {
+      alert("ยังไม่มีข้อมูลเงินทุนใน Trade Journal — กรุณาระบุเงินทุนใน Trade Journal ก่อน");
+    }
+  });
   $("cInst").addEventListener("change", () => { onInst(); saveCalc(); });
-  ["cBal", "cRisk", "cEntry", "cSl", "cTp", "cPipSize", "cPipVal", "cTickSize", "cTickVal", "cLev", "cMmr", "cFunding", "cFee"].forEach(id => $(id).addEventListener("input", calc));
-  ["cBal", "cRisk", "cLev"].forEach(id => $(id).addEventListener("input", saveCalc));
+  $("cStockLot").addEventListener("change", () => { calc(); saveCalc(); });
+  ["cBal", "cRisk", "cEntry", "cSl", "cTp", "cStockLot", "cPipSize", "cPipVal", "cTickSize", "cTickVal", "cLev", "cMmr", "cFunding", "cFee"].forEach(id => {
+    const el = $(id); if (el) el.addEventListener("input", calc);
+  });
+  ["cBal", "cRisk", "cLev", "cStockLot"].forEach(id => {
+    const el = $(id); if (el) el.addEventListener("input", saveCalc);
+  });
 
   /* ================= P/L calculator (futures / crypto perp) ================= */
   let pnlDir = "long";
@@ -691,11 +895,17 @@
   if (savedCalc.bal != null && savedCalc.bal !== "") $("cBal").value = savedCalc.bal;
   if (savedCalc.risk != null && savedCalc.risk !== "") $("cRisk").value = savedCalc.risk;
   if (savedCalc.lev != null && savedCalc.lev !== "") $("cLev").value = savedCalc.lev;
-  riskUnit = savedCalc.unit === "usd" ? "usd" : "pct";
+  if (savedCalc.lot != null && savedCalc.lot !== "") $("cStockLot").value = savedCalc.lot;
+  if (savedCalc.curr === "thb" || savedCalc.curr === "usd") {
+    curr = savedCalc.curr;
+    [...$("currUnit").children].forEach(x => x.classList.toggle("active", x.dataset.c === curr));
+    $("riskCashBtn").textContent = currSym();
+  }
+  riskUnit = savedCalc.unit === "cash" || savedCalc.unit === "usd" ? "cash" : "pct";
   [...$("riskUnit").children].forEach(x => x.classList.toggle("active", x.dataset.u === riskUnit));
-  calcMode = savedCalc.mode === "futures" ? "futures" : savedCalc.mode === "perp" ? "perp" : "forex";
+  calcMode = ["forex", "futures", "perp", "stock"].includes(savedCalc.mode) ? savedCalc.mode : "forex";
   setMode(calcMode);
-  const wantIdx = calcMode === "forex" ? savedFx : calcMode === "futures" ? savedFut : savedPerp;
+  const wantIdx = calcMode === "forex" ? savedFx : calcMode === "futures" ? savedFut : calcMode === "stock" ? savedStock : savedPerp;
   if (wantIdx != null && $("cInst").options[+wantIdx]) { $("cInst").value = wantIdx; onInst(); }
 })();
 </script>
