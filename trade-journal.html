@@ -555,11 +555,11 @@
     <div class="okx-perf-head">
       <h3 class="okx-perf-title">สถิติผลการเทรด</h3>
       <select id="okxPerfRange" class="okx-perf-select">
-        <option value="month" selected>เดือนที่เลือก (ตามปฏิทิน)</option>
-        <option value="all">ทั้งหมด (ตรงกับหน้าภาพรวม)</option>
-        <option value="30d">30 วันล่าสุด</option>
+        <option value="30d" selected>30 วันล่าสุด</option>
+        <option value="month">เดือนที่เลือก (ตามปฏิทิน)</option>
         <option value="7d">7 วันล่าสุด</option>
         <option value="90d">90 วันล่าสุด</option>
+        <option value="all">ทั้งหมด (ตรงกับหน้าภาพรวม)</option>
       </select>
     </div>
     <div class="okx-perf-grid" id="okxPerfBody"></div>
@@ -1565,11 +1565,17 @@
     return map;
   }
 
+  function okxFloor2(v) {
+    const n = Number(v);
+    if (!isFinite(n) || n === 0) return 0;
+    return Math.floor(n * 100 + 1e-9) / 100;
+  }
+
   function fmtHoldDurationTh(ms) {
     if (ms == null || !isFinite(ms) || ms <= 0) return "—";
-    const totalMins = Math.round(ms / 60000);
+    const totalMins = Math.floor(ms / 60000);
     if (totalMins < 1) {
-      const secs = Math.max(1, Math.round(ms / 1000));
+      const secs = Math.max(1, Math.floor(ms / 1000));
       return `${secs}วิ.`;
     }
     const days = Math.floor(totalMins / 1440);
@@ -1601,6 +1607,24 @@
     return null;
   }
 
+  function calcOkxWeightedPct(arr) {
+    let sumNet = 0, sumMargin = 0, countMargin = 0;
+    const pcts = [];
+    arr.forEach(t => {
+      const pct = tradePnlPctVal(t);
+      if (pct == null || !isFinite(pct)) return;
+      pcts.push(pct);
+      const p = pnlNum(t.pnl);
+      if (Math.abs(pct) > 1e-9 && Math.abs(p) > 1e-9) {
+        sumNet += p;
+        sumMargin += Math.abs(p / (pct / 100));
+        countMargin++;
+      }
+    });
+    if (countMargin > 0 && sumMargin > 0) return (sumNet / sumMargin) * 100;
+    return pcts.length ? pcts.reduce((s, v) => s + v, 0) / pcts.length : null;
+  }
+
   function computeOkxStats(list) {
     const closed = list.filter(t => !isPending(t));
     // Sort chronologically (oldest first) for streaks and sparkline
@@ -1612,22 +1636,22 @@
     });
 
     const wins = [], losses = [], bes = [];
-    let grossProfit = 0, grossLossAbs = 0, totalPnl = 0;
+    let rawGrossProfit = 0, rawGrossLossAbs = 0, rawTotalPnl = 0;
     let curWinStreak = 0, maxWinStreak = 0, curLossStreak = 0, maxLossStreak = 0;
 
     ordered.forEach(t => {
       const p = pnlNum(t.pnl);
-      totalPnl += p;
+      rawTotalPnl += p;
       const oc = tradeOutcome(t);
       if (oc === "win") {
         wins.push(t);
-        grossProfit += p;
+        rawGrossProfit += p;
         curWinStreak++;
         curLossStreak = 0;
         if (curWinStreak > maxWinStreak) maxWinStreak = curWinStreak;
       } else if (oc === "loss") {
         losses.push(t);
-        grossLossAbs += Math.abs(p);
+        rawGrossLossAbs += Math.abs(p);
         curLossStreak++;
         curWinStreak = 0;
         if (curLossStreak > maxLossStreak) maxLossStreak = curLossStreak;
@@ -1644,18 +1668,22 @@
     const beCount = bes.length;
     const winRate = n > 0 ? (winCount / n) * 100 : 0;
     const lossRate = n > 0 ? (lossCount / n) * 100 : 0;
-    const avgPnl = n > 0 ? totalPnl / n : 0;
-    const avgWin = winCount > 0 ? grossProfit / winCount : 0;
-    const avgLoss = lossCount > 0 ? -grossLossAbs / lossCount : 0;
-    const profitFactor = grossLossAbs > 0 ? (grossProfit / grossLossAbs) : (grossProfit > 0 ? Infinity : 0);
-    const rrRatio = Math.abs(avgLoss) > 0 ? (avgWin / Math.abs(avgLoss)) : null;
 
-    const pctAll = ordered.map(tradePnlPctVal).filter(v => v != null);
-    const pctWins = wins.map(tradePnlPctVal).filter(v => v != null);
-    const pctLosses = losses.map(tradePnlPctVal).filter(v => v != null);
-    const avgPct = pctAll.length ? pctAll.reduce((s, v) => s + v, 0) / pctAll.length : null;
-    const avgWinPct = pctWins.length ? pctWins.reduce((s, v) => s + v, 0) / pctWins.length : null;
-    const avgLossPct = pctLosses.length ? pctLosses.reduce((s, v) => s + v, 0) / pctLosses.length : null;
+    const totalPnl = okxFloor2(rawTotalPnl);
+    const grossProfit = okxFloor2(rawGrossProfit);
+    const grossLoss = okxFloor2(-rawGrossLossAbs);
+    const grossLossAbs = Math.abs(grossLoss);
+    const avgPnl = n > 0 ? okxFloor2(rawTotalPnl / n) : 0;
+    const avgWin = winCount > 0 ? okxFloor2(rawGrossProfit / winCount) : 0;
+    const avgLoss = lossCount > 0 ? okxFloor2(-rawGrossLossAbs / lossCount) : 0;
+    const rawAvgWin = winCount > 0 ? rawGrossProfit / winCount : 0;
+    const rawAvgLossAbs = lossCount > 0 ? rawGrossLossAbs / lossCount : 0;
+    const profitFactor = rawGrossLossAbs > 0 ? (rawGrossProfit / rawGrossLossAbs) : (rawGrossProfit > 0 ? Infinity : 0);
+    const rrRatio = rawAvgLossAbs > 0 ? (rawAvgWin / rawAvgLossAbs) : null;
+
+    const avgPct = calcOkxWeightedPct(ordered);
+    const avgWinPct = calcOkxWeightedPct(wins);
+    const avgLossPct = calcOkxWeightedPct(losses);
 
     const holdAll = ordered.map(tradeHoldMsVal).filter(v => v != null);
     const holdWins = wins.map(tradeHoldMsVal).filter(v => v != null);
@@ -1666,7 +1694,7 @@
 
     return {
       n, winCount, lossCount, beCount,
-      totalPnl, grossProfit, grossLoss: -grossLossAbs, grossLossAbs,
+      totalPnl, grossProfit, grossLoss, grossLossAbs,
       winRate, lossRate,
       avgPnl, avgWin, avgLoss,
       profitFactor, rrRatio, expectedValue: avgPnl,
@@ -1820,13 +1848,12 @@
     const range = sel ? sel.value : "30d";
     const all = pfTrades().filter(t => !isPending(t));
 
-    // Anchor relative day ranges to either today or the latest trade date if all trades are in the past/future
+    // Anchor relative day ranges to the latest trade date (e.g. 2026-10-28) when trades exist, or today
     let anchorMs = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59).getTime();
     if (all.length) {
       const latestDateStr = all.map(t => t.date || "").sort().pop();
       if (latestDateStr) {
-        const latestMs = new Date(latestDateStr + "T23:59:59").getTime();
-        if (Math.abs(anchorMs - latestMs) > 2 * 86400000) anchorMs = latestMs;
+        anchorMs = new Date(latestDateStr + "T23:59:59").getTime();
       }
     }
 
@@ -1942,7 +1969,7 @@
         }
         const dayTrades = byDate[key] || [];
         const closedDayTrades = dayTrades.filter(t => !isPending(t));
-        const dayTotal = closedDayTrades.reduce((s, t) => s + pnlNum(t.pnl), 0);
+        const dayTotal = okxFloor2(closedDayTrades.reduce((s, t) => s + pnlNum(t.pnl), 0));
         const dayHasClosed = closedDayTrades.length > 0;
         const isToday = key === todayKey();
         if (isToday) div.classList.add("today");
@@ -2191,7 +2218,7 @@
     dayModalDate = key;
     const dayTrades = pfTrades().filter(t => t.date === key).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
     const closedDayTrades = dayTrades.filter(t => !isPending(t));
-    const total = closedDayTrades.reduce((s, t) => s + pnlNum(t.pnl), 0);
+    const total = okxFloor2(closedDayTrades.reduce((s, t) => s + pnlNum(t.pnl), 0));
     const hasClosed = closedDayTrades.length > 0;
 
     document.getElementById("dayModalTitle").textContent = key;
@@ -2266,7 +2293,7 @@
     Object.keys(byDate).forEach(key => {
       const dayClosed = byDate[key].filter(t => !isPending(t));
       if (!dayClosed.length) return;
-      const sum = dayClosed.reduce((s, t) => s + pnlNum(t.pnl), 0);
+      const sum = okxFloor2(dayClosed.reduce((s, t) => s + pnlNum(t.pnl), 0));
       if (!bestDay || sum > bestDay.sum) bestDay = { key, sum };
       if (!worstDay || sum < worstDay.sum) worstDay = { key, sum };
     });
@@ -3498,7 +3525,7 @@
         const net = (iNetPnl >= 0 || iRealizedPnl >= 0) ? gross : (gross + fee);
         const idVal = iId >= 0 && c[iId] ? c[iId].trim() : "";
         const ratioVal = iPnlRatio >= 0 ? mt5Num(c[iPnlRatio]) : null;
-        const pnlPct = ratioVal != null ? Math.round(ratioVal * 100 * 100) / 100 : null;
+        const pnlPct = ratioVal != null ? Math.round(ratioVal * 100 * 1e6) / 1e6 : null;
         const lev = iLev >= 0 ? mt5Num(c[iLev]) : null;
         const tOpenMs = parseTimeMs(tOpen);
         const tCloseMs = parseTimeMs(tClose);
@@ -3519,9 +3546,9 @@
           sl: iSL >= 0 ? mt5Num(c[iSL]) : null,
           tp: iTP >= 0 ? mt5Num(c[iTP]) : null,
           exit: closePx,
-          pnlGross: Math.round(gross * 100) / 100,
-          fee: Math.round(fee * 100) / 100,
-          pnl: Math.round(net * 100) / 100,
+          pnlGross: Math.round(gross * 1e6) / 1e6,
+          fee: Math.round(fee * 1e6) / 1e6,
+          pnl: Math.round(net * 1e6) / 1e6,
           pnlPct,
         });
       }
@@ -3771,10 +3798,13 @@
 
   /* ---------- auto-seed OKX position history (UID 389636117818959348) ---------- */
   (function seedOkxHistoryOnce() {
-    const SEED_KEY = "tj_okx_seed_389636117818959348_v3";
+    const SEED_KEY = "tj_okx_seed_389636117818959348_v4";
     try { if (localStorage.getItem(SEED_KEY)) return; } catch (e) {}
+    const OKX_USD_RATE = 0.998532;
     const OKX_CSV = [
       "Position Create Time,Position Update Time,Business Line,Index,Instrument Name,Margin Mode,Direction,Leverage,Max Position Quantity,Total Close Quantity,Average Open Price,Average Close Price,Margin Currency,Pnl,Pnl Ratio,Fee,Funding Fee,Liquidation Clearance Fee,Type,Contract Face Value,Contract Multiplier",
+      "2026-10-28 07:15:00,2026-10-28 12:50:00,SWAP,SOL-USDT,SOL-USDT-SWAP,isolated,short,10,3,3,101.25,101.50,USDT,-0.748,-0.0365,-0.262,0,0,Close all,1,1",
+      "2026-10-28 01:10:00,2026-10-28 06:45:00,SWAP,SOL-USDT,SOL-USDT-SWAP,isolated,short,10,3,3,101.00,101.25,USDT,-0.746,-0.0365,-0.262,0,0,Close all,1,1",
       "2026-10-27 13:58:42,2026-10-27 18:11:19,SWAP,ARB-USDT,ARB-USDT-SWAP,isolated,short,10,167.3,167.3,0.16715,0.16766,USDT,-0.85323,-0.0399476158404806,-0.280068565,0.0161956458517117,0,Close all,10,1",
       "2026-10-27 09:36:07,2026-10-27 11:52:43,SWAP,ARB-USDT,ARB-USDT-SWAP,isolated,short,5,66.1,66.1,0.16765,0.16667,USDT,0.64778,0.0242421711899791,-0.11049276,0,0,Close all,10,1",
       "2026-10-27 08:57:57,2026-10-27 11:52:41,SWAP,SOL-USDT,SOL-USDT-SWAP,isolated,short,10,2.74,2.74,100.53,100.02,USDT,1.3974,0.0407564905998209,-0.2747535,0,0,Close all,1,1",
@@ -3872,6 +3902,9 @@
     const removeIds = new Set();
     let changed = 0;
     parsed.forEach((r, i) => {
+      const usdPnl = Math.round(r.pnl * OKX_USD_RATE * 1e6) / 1e6;
+      const usdGross = r.pnlGross != null ? Math.round(r.pnlGross * OKX_USD_RATE * 1e6) / 1e6 : null;
+      const usdFee = r.fee != null ? Math.round(r.fee * OKX_USD_RATE * 1e6) / 1e6 : null;
       const openDate = mt5Date(r.openTime);
       const matches = trades.filter(t => {
         if (usedIds.has(t.id) || removeIds.has(t.id)) return false;
@@ -3895,22 +3928,24 @@
         existing.openTime = r.openTime || existing.openTime || null;
         existing.closeTime = r.closeTime || existing.closeTime || null;
         existing.holdMs = r.holdMs ?? existing.holdMs ?? null;
-        existing.pnl = r.pnl;
-        existing.pnlGross = r.pnlGross ?? existing.pnlGross ?? null;
-        existing.fee = r.fee ?? existing.fee ?? null;
+        existing.pnl = usdPnl;
+        existing.pnlGross = usdGross ?? existing.pnlGross ?? null;
+        existing.fee = usdFee ?? existing.fee ?? null;
         existing.pnlPct = r.pnlPct ?? existing.pnlPct ?? null;
         existing.leverage = r.leverage ?? existing.leverage ?? null;
         existing.contracts = r.lot ?? existing.contracts ?? null;
         changed++;
         return;
       }
+      const newId = uid();
+      usedIds.add(newId);
       trades.push({
-        id: uid(), createdAt: Date.now() + i,
+        id: newId, createdAt: Date.now() + i,
         date: r.date, openTime: r.openTime || null, closeTime: r.closeTime || null, holdMs: r.holdMs ?? null,
         marketType: "futures", symbol: r.symbol, side: r.side,
         lot: null, contracts: r.lot, leverage: r.leverage ?? null,
         entry: r.entry, sl: r.sl, tp: r.tp, exit: r.exit,
-        pnl: r.pnl, pnlGross: r.pnlGross ?? null, fee: r.fee ?? null, pnlPct: r.pnlPct ?? null,
+        pnl: usdPnl, pnlGross: usdGross, fee: usdFee, pnlPct: r.pnlPct ?? null,
         session: "", account: "OKX", model: "", grade: null,
         followedRules: null, breakeven: false, enteredWindow: false, riskPct: null,
         checklistDone: [], checklistTotal: 0, tags: [], negTags: [],
@@ -3918,6 +3953,13 @@
         notes: "นำเข้าจาก OKX", mt5Id: r.mt5Id || null,
       });
       changed++;
+    });
+    // Remove any duplicate or legacy OKX seeded/imported rows not in the canonical set
+    trades.forEach(t => {
+      if (!usedIds.has(t.id) && (t.account === "OKX" || (t.mt5Id && String(t.mt5Id).startsWith("okx:")) || t.notes === "นำเข้าจาก OKX")) {
+        removeIds.add(t.id);
+        changed++;
+      }
     });
     if (removeIds.size > 0) {
       trades = trades.filter(t => !removeIds.has(t.id));
