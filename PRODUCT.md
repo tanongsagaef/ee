@@ -33,7 +33,7 @@ Cockpit การเทรดภาษาไทยที่เบา คล่�
 - **เครื่องมือวิเคราะห์ Elliott Wave (`elliott-wave.html`, `elliott-wave-analyzer.html`):** ตรวจสอบโครงสร้างคลื่น สัดส่วน Fibonacci Retracement/Extension
 - **เครื่องมือคำนวณการเทรด (`trading-tools.html`):** คำนวณ Lot/Position Size, Risk per Trade, Breakeven
 - **ระบบ Cloud Sync (`firebase-sync.js`):** ซิงค์ข้อมูลพอร์ตและบันทึกข้ามอุปกรณ์ด้วย Google Firebase
-- **ส่วนเสริมการเรียนรู้/สันทนาการ:** คลังแบบทดสอบข้อสอบ ก.พ. / กฎหมาย / ไอที (`quiz.html`) และมินิเกมการ์ด (`card-battler.html`)
+- **ส่วนเสริมการเรียนรู้:** คลังแบบทดสอบข้อสอบ ก.พ. / กฎหมาย / ไอที (`quiz.html`)
 
 ### Constraints
 - Pure Web: ใช้ HTML5, Vanilla JavaScript และ CSS3 โดยตรง ไม่ต้องพึ่งพา Node build step หรือ Framework ภายนอก
