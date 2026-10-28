@@ -218,50 +218,86 @@
   .metric-value.pos { color: var(--bull); }
   .metric-value.neg { color: var(--bear); }
 
-  /* calendar */
-  .calendar-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
-  .calendar-nav { display: flex; align-items: center; gap: 10px; }
-  .calendar-month-label { font-size: 17px; font-weight: 800; min-width: 150px; text-align: center; }
-  .calendar-total { font-size: 14px; color: var(--muted); font-weight: 600; }
-  .calendar-total .mono { font-weight: 800; font-size: 16px; }
-  .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr) 1.3fr; gap: 7px; }
-  .calendar-summary-cell { min-height: 84px; border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; background: var(--surface); display: flex; flex-direction: column; justify-content: center; }
-  .calendar-summary-label { font-size: 9.5px; color: var(--muted); text-transform: uppercase; font-weight: 700; margin-bottom: 4px; }
-  .calendar-summary-pnl { font-family: ui-monospace, monospace; font-weight: 800; font-size: 13px; }
-  .calendar-summary-pnl.pos { color: var(--bull); }
-  .calendar-summary-pnl.neg { color: var(--bear); }
-  .calendar-summary-count { font-size: 10px; color: var(--muted); margin-top: 2px; }
-  .calendar-dow { font-size: 11px; color: var(--muted); text-transform: uppercase; text-align: center; padding-bottom: 4px; font-weight: 700; }
-  .calendar-day { min-height: 84px; border: 1px solid var(--border); border-radius: 10px; padding: 7px 9px; background: var(--surface-alt); display: flex; flex-direction: column; }
-  .calendar-day.other-month { opacity: 0.35; }
+  /* calendar (OKX style) */
+  .okx-cal-top { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(300px, 1fr); gap: 16px; align-items: stretch; margin-bottom: 16px; }
+  .okx-cal-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 22px 24px; box-shadow: var(--shadow); display: flex; flex-direction: column; }
+  .okx-cal-title { font-size: 19px; font-weight: 800; color: var(--text); margin: 0 0 12px; letter-spacing: -0.01em; }
+  .okx-cal-subbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; flex-wrap: wrap; gap: 10px; }
+  .okx-cal-month-text { font-size: 14px; color: var(--muted); font-weight: 500; }
+  .okx-cal-nav-wrap { display: flex; align-items: center; gap: 8px; }
+  .okx-cal-pill { display: inline-flex; align-items: center; border: 1px solid var(--border); border-radius: 999px; padding: 3px 6px; background: var(--surface); gap: 4px; }
+  .okx-cal-pill button { border: none; background: transparent; color: var(--text); width: 26px; height: 26px; border-radius: 50%; padding: 0; font-size: 16px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+  .okx-cal-pill button:hover { background: var(--surface-alt); }
+  .okx-cal-pill-ym { font-size: 13px; font-weight: 600; padding: 0 6px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--text); min-width: 68px; text-align: center; }
+  .okx-today-btn { padding: 5px 12px; font-size: 12px; border-radius: 999px; }
+  .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+  .calendar-dow { font-size: 12px; color: var(--muted); text-align: center; padding-bottom: 8px; font-weight: 500; }
+  .calendar-day { min-height: 58px; border-radius: 8px; padding: 8px 6px; background: transparent; border: 1px solid transparent; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; transition: transform .12s ease, box-shadow .12s ease, background .12s ease; position: relative; }
+  .calendar-day.other-month { opacity: 0; pointer-events: none; }
   .calendar-day.has-trades { cursor: pointer; }
   .calendar-day.has-trades:hover { transform: translateY(-1px); box-shadow: var(--shadow); }
-  .calendar-day.profit { background: var(--bull-soft); border-color: rgba(22,163,74,0.35); }
-  .calendar-day.loss { background: var(--bear-soft); border-color: rgba(220,38,38,0.35); }
-  .calendar-day.today { box-shadow: 0 0 0 2px var(--accent) inset; }
-  .calendar-day-num { font-size: 11px; color: var(--muted); font-weight: 600; }
-  .calendar-day-pnl { font-family: ui-monospace, monospace; font-weight: 800; font-size: 13px; margin-top: 4px; }
-  .calendar-day-pnl.pos { color: var(--bull); }
-  .calendar-day-pnl.neg { color: var(--bear); }
-  .calendar-day-count { font-size: 10px; color: var(--muted); margin-top: 1px; }
-  .calendar-day-tags { display: flex; flex-wrap: wrap; gap: 3px; margin-top: auto; padding-top: 4px; }
-  .calendar-tag { font-size: 8.5px; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; color: var(--muted); white-space: nowrap; font-weight: 600; }
-  .cal-chips { margin-top: 4px; display: flex; flex-direction: column; gap: 2px; }
-  .cal-chip { font-size: 9.5px; font-weight: 700; line-height: 1.35; padding: 1px 4px 1px 5px; border-radius: 4px;
-    background: var(--surface); border: 1px solid var(--border); border-left-width: 3px; white-space: nowrap;
-    overflow: hidden; text-overflow: ellipsis; cursor: grab; }
-  .cal-chip:active { cursor: grabbing; }
-  .cal-chip.dragging { opacity: .35; }
-  .cal-chip.win { border-left-color: var(--bull); }
-  .cal-chip.loss { border-left-color: var(--bear); }
-  .cal-chip.be { border-left-color: #d97706; }
-  .cal-chip.pending { border-left-color: var(--muted); font-style: italic; color: var(--muted); }
-  .cal-chip-more { font-size: 9px; color: var(--muted); font-weight: 700; margin-top: 1px; }
+  .calendar-day.profit { background: #d3ecaa; border-color: rgba(108, 192, 26, 0.28); }
+  .calendar-day.loss { background: #f9bfd0; border-color: rgba(240, 62, 129, 0.28); }
+  .calendar-day.pending-day { background: var(--surface-alt); border-color: var(--border); }
+  [data-theme="dark"] .calendar-day.profit { background: rgba(114, 204, 39, 0.22); border-color: rgba(114, 204, 39, 0.38); }
+  [data-theme="dark"] .calendar-day.loss { background: rgba(244, 63, 133, 0.22); border-color: rgba(244, 63, 133, 0.38); }
+  .calendar-day.today:not(.has-trades) { background: var(--surface-alt); border-color: var(--border); }
+  .calendar-day-num { font-size: 13px; color: var(--text); font-weight: 500; line-height: 1.2; text-align: center; }
+  .calendar-day.profit .calendar-day-num, .calendar-day.loss .calendar-day-num { color: #1f2329; font-weight: 500; font-size: 12.5px; }
+  [data-theme="dark"] .calendar-day.profit .calendar-day-num, [data-theme="dark"] .calendar-day.loss .calendar-day-num { color: #f1f5f9; }
+  .calendar-day-pnl { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 600; font-size: 12px; line-height: 1.2; text-align: center; }
+  .calendar-day-pnl.pos { color: #2f7d14; }
+  .calendar-day-pnl.neg { color: #9c3856; }
+  [data-theme="dark"] .calendar-day-pnl.pos { color: #8ce542; }
+  [data-theme="dark"] .calendar-day-pnl.neg { color: #ff7aa8; }
   .calendar-day.drop-target { outline: 2px dashed var(--accent); outline-offset: -2px; background: var(--accent-soft); }
-  @media (max-width: 720px) {
-    .calendar-day { min-height: 58px; padding: 5px 6px; }
-    .calendar-day-tags, .calendar-day-num, .cal-chips { display: none; }
-    .calendar-day-pnl { font-size: 11px; margin-top: 2px; }
+
+  /* OKX Right KPI Stack */
+  .okx-kpi-stack { display: flex; flex-direction: column; gap: 12px; justify-content: space-between; }
+  .okx-kpi-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 18px 22px; box-shadow: var(--shadow); display: flex; align-items: center; justify-content: space-between; gap: 14px; flex: 1; min-height: 94px; }
+  .okx-kpi-label { font-size: 12.5px; font-weight: 600; color: var(--text); display: inline-block; margin-bottom: 6px; }
+  .okx-kpi-label.dotted { text-decoration: underline dotted var(--muted); text-underline-offset: 4px; }
+  .okx-kpi-val { font-size: 22px; font-weight: 800; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--text); line-height: 1.15; }
+  .okx-kpi-val.pos { color: #358c17; }
+  .okx-kpi-val.neg { color: #a3395b; }
+  [data-theme="dark"] .okx-kpi-val.pos { color: #7ed932; }
+  [data-theme="dark"] .okx-kpi-val.neg { color: #fb6096; }
+  .okx-kpi-dual { display: flex; align-items: flex-start; gap: 24px; }
+  .okx-kpi-chart { flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+  .okx-rr-bar-wrap { width: 138px; display: flex; flex-direction: column; gap: 4px; }
+  .okx-rr-bar { height: 7px; border-radius: 999px; background: var(--surface-alt); overflow: hidden; display: flex; width: 100%; }
+  .okx-rr-bar-win { background: #6cc01a; height: 100%; }
+  .okx-rr-bar-loss { background: #f03e81; height: 100%; }
+  .okx-rr-sub { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); font-family: ui-monospace, monospace; }
+
+  /* OKX Performance Stats Panel */
+  .okx-perf-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 24px 26px; box-shadow: var(--shadow); margin-bottom: 18px; }
+  .okx-perf-head { display: flex; align-items: center; gap: 14px; margin-bottom: 22px; flex-wrap: wrap; }
+  .okx-perf-title { font-size: 18px; font-weight: 800; color: var(--text); margin: 0; }
+  .okx-perf-select { width: auto; border: none; background: transparent; color: var(--muted); font-size: 13.5px; font-weight: 600; padding: 4px 8px; cursor: pointer; border-radius: 6px; }
+  .okx-perf-select:hover { background: var(--surface-alt); color: var(--text); }
+  .okx-perf-grid { display: grid; grid-template-columns: repeat(4, 1fr); column-gap: 38px; row-gap: 28px; }
+  .okx-perf-group-title { font-size: 13.5px; font-weight: 700; color: var(--text); margin: 0 0 14px; }
+  .okx-perf-row { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 12.5px; margin-bottom: 11px; }
+  .okx-perf-row:last-child { margin-bottom: 0; }
+  .okx-perf-k { color: var(--muted); font-weight: 500; }
+  .okx-perf-k.dotted { text-decoration: underline dotted var(--muted); text-underline-offset: 4px; }
+  .okx-perf-v { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 600; color: var(--text); text-align: right; white-space: nowrap; }
+  .okx-perf-v.pos { color: #358c17; }
+  .okx-perf-v.neg { color: #a3395b; }
+  [data-theme="dark"] .okx-perf-v.pos { color: #7ed932; }
+  [data-theme="dark"] .okx-perf-v.neg { color: #fb6096; }
+
+  @media (max-width: 1024px) {
+    .okx-cal-top { grid-template-columns: 1fr; }
+    .okx-perf-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 640px) {
+    .okx-cal-panel, .okx-perf-panel { padding: 16px; }
+    .calendar-day { min-height: 48px; padding: 5px 3px; }
+    .calendar-day-num { font-size: 11px; }
+    .calendar-day-pnl { font-size: 10px; }
+    .okx-perf-grid { grid-template-columns: 1fr; row-gap: 20px; }
   }
 
   /* charts */
@@ -495,18 +531,38 @@
 
 <!-- CALENDAR TAB -->
 <div id="tab-calendar">
-  <div class="panel">
-    <div class="calendar-toolbar">
-      <div class="calendar-nav">
-        <button class="icon-btn" id="prevMonthBtn">‹</button>
-        <div class="calendar-month-label" id="calMonthLabel"></div>
-        <button class="icon-btn" id="nextMonthBtn">›</button>
-        <button class="ghost" id="todayBtn">วันนี้</button>
+  <div class="okx-cal-top">
+    <div class="okx-cal-panel">
+      <h3 class="okx-cal-title">ปฏิทินการเทรด</h3>
+      <div class="okx-cal-subbar">
+        <div class="okx-cal-month-text" id="calMonthLabel"></div>
+        <div class="okx-cal-nav-wrap">
+          <button class="ghost okx-today-btn" id="todayBtn">วันนี้</button>
+          <div class="okx-cal-pill">
+            <button type="button" id="prevMonthBtn" title="เดือนก่อนหน้า">‹</button>
+            <span class="okx-cal-pill-ym" id="calMonthPill"></span>
+            <button type="button" id="nextMonthBtn" title="เดือนถัดไป">›</button>
+          </div>
+        </div>
       </div>
-      <div class="calendar-total">รวมเดือนนี้ <span class="mono" id="calMonthTotal"></span></div>
+      <div class="calendar-grid" id="calendarDow"></div>
+      <div class="calendar-grid" id="calendarGrid" style="margin-top:6px;"></div>
     </div>
-    <div class="calendar-grid" id="calendarDow"></div>
-    <div class="calendar-grid" id="calendarGrid" style="margin-top:7px;"></div>
+    <div class="okx-kpi-stack" id="okxMonthKpis"></div>
+  </div>
+
+  <div class="okx-perf-panel">
+    <div class="okx-perf-head">
+      <h3 class="okx-perf-title">สถิติผลการเทรด</h3>
+      <select id="okxPerfRange" class="okx-perf-select">
+        <option value="30d" selected>30 วันล่าสุด</option>
+        <option value="month">เดือนที่เลือก (ตามปฏิทิน)</option>
+        <option value="7d">7 วันล่าสุด</option>
+        <option value="90d">90 วันล่าสุด</option>
+        <option value="all">ทั้งหมด</option>
+      </select>
+    </div>
+    <div class="okx-perf-grid" id="okxPerfBody"></div>
   </div>
 </div>
 
@@ -1171,7 +1227,7 @@
   const LS_KEY = "tj_trades_v1";
   const MONTH_NAMES_TH = ["มกราคม","กุมภาพันธ์","มีนาคม","เมษายน","พฤษภาคม","มิถุนายน","กรกฎาคม","สิงหาคม","กันยายน","ตุลาคม","พฤศจิกายน","ธันวาคม"];
   const MONTH_SHORT_TH = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
-  const DOW_TH = ["อา","จ","อ","พ","พฤ","ศ","ส","สรุป"];
+  const DOW_TH = ["อา","จ","อ","พ","พฤ","ศ","ส"];
   const MARKET_LABEL = { forex: "Forex", futures: "Futures", other: "อื่นๆ" };
 
   /* ---------- review-system vocab ---------- */
@@ -1493,10 +1549,9 @@
   let calMonth = today.getMonth();
 
   const calendarDow = document.getElementById("calendarDow");
-  DOW_TH.forEach((d, i) => {
+  DOW_TH.forEach((d) => {
     const el = document.createElement("div");
     el.className = "calendar-dow";
-    if (i === DOW_TH.length - 1) el.style.color = "var(--accent)";
     el.textContent = d;
     calendarDow.appendChild(el);
   });
@@ -1510,8 +1565,353 @@
     return map;
   }
 
+  function fmtHoldDurationTh(ms) {
+    if (ms == null || !isFinite(ms) || ms <= 0) return "—";
+    const totalMins = Math.round(ms / 60000);
+    if (totalMins < 1) {
+      const secs = Math.max(1, Math.round(ms / 1000));
+      return `${secs}วิ.`;
+    }
+    const days = Math.floor(totalMins / 1440);
+    const hours = Math.floor((totalMins % 1440) / 60);
+    const mins = totalMins % 60;
+    const parts = [];
+    if (days > 0) parts.push(`${days}วัน`);
+    if (hours > 0) parts.push(`${hours}ชม.`);
+    if (mins > 0 || parts.length === 0) parts.push(`${mins}น.`);
+    return parts.join(" ");
+  }
+
+  function tradePnlPctVal(t) {
+    if (t.pnlPct != null && isFinite(Number(t.pnlPct))) return Number(t.pnlPct);
+    const entry = Number(t.entry), exit = Number(t.exit);
+    if (entry > 0 && exit > 0) {
+      const dir = t.side === "short" ? -1 : 1;
+      return ((exit - entry) / entry) * dir * 100;
+    }
+    return null;
+  }
+
+  function tradeHoldMsVal(t) {
+    if (t.holdMs != null && isFinite(Number(t.holdMs)) && Number(t.holdMs) >= 0) return Number(t.holdMs);
+    if (t.openTime && t.closeTime) {
+      const a = parseTimeMs(t.openTime), b = parseTimeMs(t.closeTime);
+      if (a > 0 && b >= a) return b - a;
+    }
+    return null;
+  }
+
+  function computeOkxStats(list) {
+    const closed = list.filter(t => !isPending(t));
+    // Sort chronologically (oldest first) for streaks and sparkline
+    const ordered = closed.slice().sort((a, b) => {
+      if (a.date !== b.date) return (a.date || "").localeCompare(b.date || "");
+      const ta = a.closeTime ? parseTimeMs(a.closeTime) : (a.createdAt || 0);
+      const tb = b.closeTime ? parseTimeMs(b.closeTime) : (b.createdAt || 0);
+      return ta - tb;
+    });
+
+    const wins = [], losses = [], bes = [];
+    let grossProfit = 0, grossLossAbs = 0, totalPnl = 0;
+    let curWinStreak = 0, maxWinStreak = 0, curLossStreak = 0, maxLossStreak = 0;
+
+    ordered.forEach(t => {
+      const p = pnlNum(t.pnl);
+      totalPnl += p;
+      const oc = tradeOutcome(t);
+      if (oc === "win") {
+        wins.push(t);
+        grossProfit += p;
+        curWinStreak++;
+        curLossStreak = 0;
+        if (curWinStreak > maxWinStreak) maxWinStreak = curWinStreak;
+      } else if (oc === "loss") {
+        losses.push(t);
+        grossLossAbs += Math.abs(p);
+        curLossStreak++;
+        curWinStreak = 0;
+        if (curLossStreak > maxLossStreak) maxLossStreak = curLossStreak;
+      } else {
+        bes.push(t);
+        curWinStreak = 0;
+        curLossStreak = 0;
+      }
+    });
+
+    const n = ordered.length;
+    const winCount = wins.length;
+    const lossCount = losses.length;
+    const beCount = bes.length;
+    const winRate = n > 0 ? (winCount / n) * 100 : 0;
+    const lossRate = n > 0 ? (lossCount / n) * 100 : 0;
+    const avgPnl = n > 0 ? totalPnl / n : 0;
+    const avgWin = winCount > 0 ? grossProfit / winCount : 0;
+    const avgLoss = lossCount > 0 ? -grossLossAbs / lossCount : 0;
+    const profitFactor = grossLossAbs > 0 ? (grossProfit / grossLossAbs) : (grossProfit > 0 ? Infinity : 0);
+    const rrRatio = Math.abs(avgLoss) > 0 ? (avgWin / Math.abs(avgLoss)) : null;
+
+    const pctAll = ordered.map(tradePnlPctVal).filter(v => v != null);
+    const pctWins = wins.map(tradePnlPctVal).filter(v => v != null);
+    const pctLosses = losses.map(tradePnlPctVal).filter(v => v != null);
+    const avgPct = pctAll.length ? pctAll.reduce((s, v) => s + v, 0) / pctAll.length : null;
+    const avgWinPct = pctWins.length ? pctWins.reduce((s, v) => s + v, 0) / pctWins.length : null;
+    const avgLossPct = pctLosses.length ? pctLosses.reduce((s, v) => s + v, 0) / pctLosses.length : null;
+
+    const holdAll = ordered.map(tradeHoldMsVal).filter(v => v != null);
+    const holdWins = wins.map(tradeHoldMsVal).filter(v => v != null);
+    const holdLosses = losses.map(tradeHoldMsVal).filter(v => v != null);
+    const avgHoldMs = holdAll.length ? holdAll.reduce((s, v) => s + v, 0) / holdAll.length : null;
+    const avgWinHoldMs = holdWins.length ? holdWins.reduce((s, v) => s + v, 0) / holdWins.length : null;
+    const avgLossHoldMs = holdLosses.length ? holdLosses.reduce((s, v) => s + v, 0) / holdLosses.length : null;
+
+    return {
+      n, winCount, lossCount, beCount,
+      totalPnl, grossProfit, grossLoss: -grossLossAbs, grossLossAbs,
+      winRate, lossRate,
+      avgPnl, avgWin, avgLoss,
+      profitFactor, rrRatio, expectedValue: avgPnl,
+      maxWinStreak, maxLossStreak,
+      avgPct, avgWinPct, avgLossPct,
+      avgHoldMs, avgWinHoldMs, avgLossHoldMs,
+      ordered
+    };
+  }
+
+  function buildOkxSparklineSvg(dailySeries, totalPnl) {
+    const W = 136, H = 52, pad = 4;
+    const pts = [0];
+    let acc = 0;
+    dailySeries.forEach(v => { acc += v; pts.push(acc); });
+    if (pts.length === 1) pts.push(0);
+
+    const minV = Math.min(0, ...pts);
+    const maxV = Math.max(0, ...pts);
+    const span = (maxV - minV) || 1;
+    const xOf = (i) => pad + (i / (pts.length - 1)) * (W - pad * 2);
+    const yOf = (v) => pad + (1 - (v - minV) / span) * (H - pad * 2);
+    const yZero = yOf(0);
+
+    // Step-like path matching OKX cumulative PnL chart
+    let dLine = `M ${xOf(0).toFixed(1)} ${yOf(pts[0]).toFixed(1)}`;
+    for (let i = 1; i < pts.length; i++) {
+      const xPrev = xOf(i - 1), xCur = xOf(i);
+      const xMid = (xPrev + xCur) / 2;
+      dLine += ` L ${xMid.toFixed(1)} ${yOf(pts[i - 1]).toFixed(1)} L ${xCur.toFixed(1)} ${yOf(pts[i]).toFixed(1)}`;
+    }
+    const dArea = `${dLine} L ${xOf(pts.length - 1).toFixed(1)} ${H} L ${xOf(0).toFixed(1)} ${H} Z`;
+    const isPos = totalPnl >= 0;
+    const strokeCol = isPos ? "#6cc01a" : "#f03e81";
+    const gradId = isPos ? "okxSparkPos" : "okxSparkNeg";
+
+    return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="overflow:visible">
+      <defs>
+        <linearGradient id="${gradId}" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="${strokeCol}" stop-opacity="0.24"/>
+          <stop offset="100%" stop-color="${strokeCol}" stop-opacity="0.0"/>
+        </linearGradient>
+      </defs>
+      <line x1="${pad}" y1="${yZero.toFixed(1)}" x2="${W - pad}" y2="${yZero.toFixed(1)}" stroke="var(--border)" stroke-dasharray="2 2" stroke-width="1"/>
+      <path d="${dArea}" fill="url(#${gradId})"/>
+      <path d="${dLine}" fill="none" stroke="${strokeCol}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>`;
+  }
+
+  function buildOkxDonutSvg(grossProfit, grossLossAbs) {
+    const size = 56, r = 21, cx = 28, cy = 28;
+    const C = 2 * Math.PI * r;
+    const tot = grossProfit + grossLossAbs;
+    if (tot <= 0) {
+      return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+        <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--surface-alt)" stroke-width="6"/>
+      </svg>`;
+    }
+    const winFrac = Math.max(0, Math.min(1, grossProfit / tot));
+    const winLen = winFrac * C;
+    const lossLen = (1 - winFrac) * C;
+    return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="transform:rotate(-90deg)">
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#f03e81" stroke-width="6"/>
+      ${winLen > 0 ? `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#6cc01a" stroke-width="6" stroke-dasharray="${winLen.toFixed(2)} ${C.toFixed(2)}" stroke-dashoffset="0"/>` : ""}
+    </svg>`;
+  }
+
+  function buildOkxGaugeSvg(winRatePct, hasTrades) {
+    const W = 68, H = 50;
+    const d = "M 10 42 A 24 24 0 1 1 58 42";
+    if (!hasTrades) {
+      return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+        <path d="${d}" fill="none" stroke="var(--surface-alt)" stroke-width="6" stroke-linecap="round"/>
+      </svg>`;
+    }
+    const wPct = Math.max(0, Math.min(100, winRatePct));
+    return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+      <path d="${d}" fill="none" stroke="#f03e81" stroke-width="6" stroke-linecap="round" pathLength="100"/>
+      ${wPct > 0 ? `<path d="${d}" fill="none" stroke="#6cc01a" stroke-width="6" stroke-linecap="round" pathLength="100" stroke-dasharray="${wPct.toFixed(2)} 100"/>` : ""}
+    </svg>`;
+  }
+
+  function renderOkxMonthKpis(monthTrades, dailySeries) {
+    const box = document.getElementById("okxMonthKpis");
+    if (!box) return;
+    const st = computeOkxStats(monthTrades);
+    const hasTrades = st.n > 0;
+    const pnlCls = st.totalPnl > 0 ? "pos" : st.totalPnl < 0 ? "neg" : "";
+    const pfStr = !hasTrades ? "—" : (st.profitFactor === Infinity ? "∞" : st.profitFactor.toFixed(2));
+    const winRateStr = hasTrades ? `${st.winRate.toFixed(2)}%` : "0.00%";
+    const lossRateStr = hasTrades ? `${st.lossRate.toFixed(2)}%` : "0.00%";
+    const rrStr = (hasTrades && st.rrRatio != null) ? `1:${st.rrRatio.toFixed(2)}` : "—";
+    const rrWinShare = (hasTrades && st.avgWin + Math.abs(st.avgLoss) > 0)
+      ? (st.avgWin / (st.avgWin + Math.abs(st.avgLoss))) * 100
+      : 50;
+
+    box.innerHTML = `
+      <div class="okx-kpi-card">
+        <div>
+          <div class="okx-kpi-label dotted" title="กำไร/ขาดทุนสุทธิของเดือนที่เลือก">กำไร/ขาดทุนรวม</div>
+          <div class="okx-kpi-val ${pnlCls}">${fmtMoney(st.totalPnl)}</div>
+        </div>
+        <div class="okx-kpi-chart">${buildOkxSparklineSvg(dailySeries, st.totalPnl)}</div>
+      </div>
+
+      <div class="okx-kpi-card">
+        <div>
+          <div class="okx-kpi-label dotted" title="กำไรรวม ÷ ขาดทุนรวม (Profit Factor)">Profit factor</div>
+          <div class="okx-kpi-val">${pfStr}</div>
+        </div>
+        <div class="okx-kpi-chart">${buildOkxDonutSvg(st.grossProfit, st.grossLossAbs)}</div>
+      </div>
+
+      <div class="okx-kpi-card">
+        <div class="okx-kpi-dual">
+          <div>
+            <div class="okx-kpi-label">อัตราชนะ</div>
+            <div class="okx-kpi-val pos">${winRateStr}</div>
+          </div>
+          <div>
+            <div class="okx-kpi-label">อัตราแพ้</div>
+            <div class="okx-kpi-val neg">${lossRateStr}</div>
+          </div>
+        </div>
+        <div class="okx-kpi-chart">${buildOkxGaugeSvg(st.winRate, hasTrades)}</div>
+      </div>
+
+      <div class="okx-kpi-card">
+        <div>
+          <div class="okx-kpi-label dotted" title="อัตราส่วนความเสี่ยงต่อผลตอบแทนเฉลี่ย (1 : กำไรเฉลี่ย/ขาดทุนเฉลี่ย)">อัตราส่วน Risk/Reward</div>
+          <div class="okx-kpi-val">${rrStr}</div>
+        </div>
+        <div class="okx-rr-bar-wrap">
+          <div class="okx-rr-bar">
+            <div class="okx-rr-bar-win" style="width:${hasTrades ? rrWinShare.toFixed(1) : 50}%"></div>
+            <div class="okx-rr-bar-loss" style="width:${hasTrades ? (100 - rrWinShare).toFixed(1) : 50}%"></div>
+          </div>
+          <div class="okx-rr-sub">
+            <span>${hasTrades && st.avgWin > 0 ? fmtMoney(st.avgWin) : "--"}</span>
+            <span>${hasTrades && st.avgLoss < 0 ? fmtMoney(st.avgLoss) : "--"}</span>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderOkxPerfStats() {
+    const body = document.getElementById("okxPerfBody");
+    const sel = document.getElementById("okxPerfRange");
+    if (!body) return;
+    const range = sel ? sel.value : "30d";
+    const all = pfTrades().filter(t => !isPending(t));
+
+    // Anchor relative day ranges to either today or the latest trade date if all trades are in the past/future
+    let anchorMs = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59).getTime();
+    if (all.length) {
+      const latestDateStr = all.map(t => t.date || "").sort().pop();
+      if (latestDateStr) {
+        const latestMs = new Date(latestDateStr + "T23:59:59").getTime();
+        if (Math.abs(anchorMs - latestMs) > 2 * 86400000) anchorMs = latestMs;
+      }
+    }
+
+    let filtered = all;
+    if (range === "month") {
+      const ym = `${calYear}-${pad2(calMonth + 1)}`;
+      filtered = all.filter(t => (t.date || "").startsWith(ym));
+    } else if (range === "7d" || range === "30d" || range === "90d") {
+      const days = range === "7d" ? 7 : range === "30d" ? 30 : 90;
+      const cutoffDate = new Date(anchorMs - (days - 1) * 86400000);
+      const cutoffKey = dateKey(cutoffDate.getFullYear(), cutoffDate.getMonth(), cutoffDate.getDate());
+      const endDate = new Date(anchorMs);
+      const endKey = dateKey(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+      filtered = all.filter(t => t.date >= cutoffKey && t.date <= endKey);
+    }
+
+    const st = computeOkxStats(filtered);
+    const has = st.n > 0;
+    const fmtPctSigned = (v) => v == null ? "—" : `${v > 0 ? "+" : ""}${v.toFixed(2)}%`;
+    const clsOf = (v) => v > 0 ? "pos" : v < 0 ? "neg" : "";
+
+    body.innerHTML = `
+      <div>
+        <div class="okx-perf-group-title">กำไร/ขาดทุน (PnL)</div>
+        <div class="okx-perf-row"><span class="okx-perf-k dotted">กำไร/ขาดทุนรวม</span><span class="okx-perf-v ${clsOf(st.totalPnl)}">${fmtMoney(st.totalPnl)}</span></div>
+        <div class="okx-perf-row"><span class="okx-perf-k">กำไรรวม</span><span class="okx-perf-v ${clsOf(st.grossProfit)}">${fmtMoney(st.grossProfit)}</span></div>
+        <div class="okx-perf-row"><span class="okx-perf-k">ขาดทุนรวม</span><span class="okx-perf-v ${clsOf(st.grossLoss)}">${fmtMoney(st.grossLoss)}</span></div>
+      </div>
+
+      <div>
+        <div class="okx-perf-group-title">ค่าเฉลี่ยกำไร/ขาดทุน</div>
+        <div class="okx-perf-row"><span class="okx-perf-k">กำไร/ขาดทุนเฉลี่ย</span><span class="okx-perf-v ${clsOf(st.avgPnl)}">${has ? fmtMoney(st.avgPnl) : "$0.00"}</span></div>
+        <div class="okx-perf-row"><span class="okx-perf-k">กำไรเฉลี่ยต่อไม้</span><span class="okx-perf-v ${clsOf(st.avgWin)}">${st.winCount ? fmtMoney(st.avgWin) : "$0.00"}</span></div>
+        <div class="okx-perf-row"><span class="okx-perf-k">ขาดทุนเฉลี่ยต่อไม้</span><span class="okx-perf-v ${clsOf(st.avgLoss)}">${st.lossCount ? fmtMoney(st.avgLoss) : "$0.00"}</span></div>
+      </div>
+
+      <div>
+        <div class="okx-perf-group-title">ค่าเฉลี่ย PnL%</div>
+        <div class="okx-perf-row"><span class="okx-perf-k">เฉลี่ย PnL%</span><span class="okx-perf-v ${clsOf(st.avgPct || 0)}">${fmtPctSigned(st.avgPct)}</span></div>
+        <div class="okx-perf-row"><span class="okx-perf-k">เฉลี่ย PnL% ไม้ที่ชนะ</span><span class="okx-perf-v ${clsOf(st.avgWinPct || 0)}">${fmtPctSigned(st.avgWinPct)}</span></div>
+        <div class="okx-perf-row"><span class="okx-perf-k">เฉลี่ย PnL% ไม้ที่แพ้</span><span class="okx-perf-v ${clsOf(st.avgLossPct || 0)}">${fmtPctSigned(st.avgLossPct)}</span></div>
+      </div>
+
+      <div>
+        <div class="okx-perf-group-title">ระยะเวลาถือครอง</div>
+        <div class="okx-perf-row"><span class="okx-perf-k">เวลาถือครองเฉลี่ย</span><span class="okx-perf-v">${fmtHoldDurationTh(st.avgHoldMs)}</span></div>
+        <div class="okx-perf-row"><span class="okx-perf-k">เวลาถือครองเฉลี่ยไม้ที่ชนะ</span><span class="okx-perf-v">${fmtHoldDurationTh(st.avgWinHoldMs)}</span></div>
+        <div class="okx-perf-row"><span class="okx-perf-k">เวลาถือครองเฉลี่ยไม้ที่แพ้</span><span class="okx-perf-v">${fmtHoldDurationTh(st.avgLossHoldMs)}</span></div>
+      </div>
+
+      <div>
+        <div class="okx-perf-group-title">จำนวนโพสิชัน</div>
+        <div class="okx-perf-row"><span class="okx-perf-k">จำนวนโพสิชันที่ปิดแล้ว</span><span class="okx-perf-v">${st.n}</span></div>
+        <div class="okx-perf-row"><span class="okx-perf-k">จำนวนไม้ที่ชนะ</span><span class="okx-perf-v ${st.winCount > 0 ? "pos" : ""}">${st.winCount}</span></div>
+        <div class="okx-perf-row"><span class="okx-perf-k">จำนวนไม้ที่แพ้</span><span class="okx-perf-v ${st.lossCount > 0 ? "neg" : ""}">${st.lossCount}</span></div>
+        <div class="okx-perf-row"><span class="okx-perf-k">จำนวนไม้ที่เสมอ</span><span class="okx-perf-v">${st.beCount}</span></div>
+      </div>
+
+      <div>
+        <div class="okx-perf-group-title">อัตราชนะและแพ้</div>
+        <div class="okx-perf-row"><span class="okx-perf-k">อัตราชนะ</span><span class="okx-perf-v">${has ? st.winRate.toFixed(2) + "%" : "0.00%"}</span></div>
+        <div class="okx-perf-row"><span class="okx-perf-k">อัตราแพ้</span><span class="okx-perf-v">${has ? st.lossRate.toFixed(2) + "%" : "0.00%"}</span></div>
+        <div class="okx-perf-row"><span class="okx-perf-k dotted">ชนะติดต่อกันสูงสุด</span><span class="okx-perf-v">${st.maxWinStreak}</span></div>
+        <div class="okx-perf-row"><span class="okx-perf-k dotted">แพ้ติดต่อกันสูงสุด</span><span class="okx-perf-v">${st.maxLossStreak}</span></div>
+      </div>
+
+      <div>
+        <div class="okx-perf-group-title">ความเสี่ยงและผลตอบแทน</div>
+        <div class="okx-perf-row"><span class="okx-perf-k dotted">Profit factor</span><span class="okx-perf-v">${!has ? "0.00" : (st.profitFactor === Infinity ? "∞" : st.profitFactor.toFixed(2))}</span></div>
+        <div class="okx-perf-row"><span class="okx-perf-k dotted">ค่าคาดหวังต่อไม้ (EV)</span><span class="okx-perf-v ${clsOf(st.expectedValue)}">${has ? fmtMoney(st.expectedValue) : "$0.00"}</span></div>
+        <div class="okx-perf-row"><span class="okx-perf-k dotted">อัตราส่วน Risk/Reward</span><span class="okx-perf-v">${has && st.rrRatio != null ? "1:" + st.rrRatio.toFixed(2) : "—"}</span></div>
+      </div>
+    `;
+  }
+
+  const okxPerfRangeEl = document.getElementById("okxPerfRange");
+  if (okxPerfRangeEl) {
+    okxPerfRangeEl.addEventListener("change", renderOkxPerfStats);
+  }
+
   function renderCalendar() {
     document.getElementById("calMonthLabel").textContent = `${MONTH_NAMES_TH[calMonth]} ${calYear}`;
+    const pillEl = document.getElementById("calMonthPill");
+    if (pillEl) pillEl.textContent = `${calYear}-${pad2(calMonth + 1)}`;
+
     const byDate = tradesByDate();
     const grid = document.getElementById("calendarGrid");
     grid.innerHTML = "";
@@ -1523,19 +1923,13 @@
     const totalCells = Math.ceil((firstDowSun + daysInThisMonth) / 7) * 7;
     const weekCount = totalCells / 7;
 
-    let monthTotal = 0;
+    const monthTrades = [];
+    const dailySeries = [];
 
     for (let w = 0; w < weekCount; w++) {
-      const weekDates = [];
       for (let d = 0; d < 7; d++) {
         const dt = new Date(firstCellDate);
         dt.setDate(firstCellDate.getDate() + w * 7 + d);
-        weekDates.push(dt);
-      }
-
-      // Sun-Sat visible cells
-      for (let d = 0; d < 7; d++) {
-        const dt = weekDates[d];
         const inMonth = dt.getMonth() === calMonth;
         const key = dateKey(dt.getFullYear(), dt.getMonth(), dt.getDate());
         const div = document.createElement("div");
@@ -1543,7 +1937,6 @@
         div.dataset.key = key;
         if (!inMonth) {
           div.classList.add("other-month");
-          div.innerHTML = `<div class="calendar-day-num">${dt.getDate()}</div>`;
           grid.appendChild(div);
           continue;
         }
@@ -1551,78 +1944,33 @@
         const closedDayTrades = dayTrades.filter(t => !isPending(t));
         const dayTotal = closedDayTrades.reduce((s, t) => s + pnlNum(t.pnl), 0);
         const dayHasClosed = closedDayTrades.length > 0;
-        if (key === todayKey()) div.classList.add("today");
+        const isToday = key === todayKey();
+        if (isToday) div.classList.add("today");
         if (dayTrades.length) {
           div.classList.add("has-trades");
           if (dayHasClosed) div.classList.add(dayTotal >= 0 ? "profit" : "loss");
+          else div.classList.add("pending-day");
         }
-        monthTotal += dayTotal;
+        if (dayTrades.length) monthTrades.push(...dayTrades);
+        if (dayHasClosed) dailySeries.push(dayTotal);
 
-        let tagsHtml = "";
-        if (dayTrades.length) {
-          const allTags = [].concat(...dayTrades.map(t => t.tags || []));
-          const shown = allTags.slice(0, 2);
-          tagsHtml = `<div class="calendar-day-tags">` +
-            shown.map(tag => `<span class="calendar-tag">${escapeHtml(tag)}</span>`).join("") +
-            (allTags.length > shown.length ? `<span class="calendar-tag">+${allTags.length - shown.length}</span>` : "") +
-            `</div>`;
-        }
-
-        let chipsHtml = "";
-        if (dayTrades.length) {
-          const MAXCHIP = 4;
-          const ordered = dayTrades.slice().sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
-          chipsHtml = `<div class="cal-chips">` + ordered.slice(0, MAXCHIP).map(t => {
-            const oc = tradeOutcome(t);
-            const money = isPending(t) ? "" : " " + fmtMoney(pnlNum(t.pnl)).replace(/\.00$/, "");
-            return `<div class="cal-chip ${oc}" draggable="true" data-tid="${t.id}" title="${escapeHtml(t.symbol || "")} — ลากไปวางวันอื่นเพื่อย้ายวันที่">${escapeHtml((t.symbol || "—").slice(0, 12))}${money}</div>`;
-          }).join("") +
-            (ordered.length > MAXCHIP ? `<div class="cal-chip-more">+${ordered.length - MAXCHIP} เทรด</div>` : "") +
-            `</div>`;
-        }
-
+        const dayLabel = isToday ? "วันนี้" : dt.getDate();
         div.innerHTML = `
-          <div class="calendar-day-num">${dt.getDate()}</div>
-          ${dayTrades.length ? `<div class="calendar-day-pnl ${dayHasClosed ? (dayTotal >= 0 ? "pos" : "neg") : ""} mono" ${dayHasClosed ? "" : 'style="color:var(--muted);font-style:italic;"'}>${dayHasClosed ? fmtMoney(dayTotal) : "รอผล"}</div>
-          <div class="calendar-day-count">${dayTrades.length} เทรด</div>` : ""}
-          ${chipsHtml}
-          ${tagsHtml}
+          <div class="calendar-day-num">${dayLabel}</div>
+          ${dayTrades.length ? `<div class="calendar-day-pnl ${dayHasClosed ? (dayTotal >= 0 ? "pos" : "neg") : ""}" ${dayHasClosed ? "" : 'style="color:var(--muted);font-style:italic;"'}>${dayHasClosed ? fmtMoney(dayTotal) : "รอผล"}</div>` : ""}
         `;
         if (dayTrades.length) {
-          div.addEventListener("click", (e) => { if (!e.target.closest(".cal-chip")) openDayModal(key); });
+          div.title = `${key} · ${dayTrades.length} ไม้ (${dayHasClosed ? fmtMoney(dayTotal) : "รอผล"}) — คลิกเพื่อดูรายละเอียด`;
+          div.addEventListener("click", () => openDayModal(key));
+        } else {
+          div.addEventListener("click", () => openDayModal(key));
         }
         grid.appendChild(div);
       }
-
-      // weekly summary cell (sums all 7 days of the week)
-      let weekTotal = 0, weekCount2 = 0, weekHasClosed = false;
-      weekDates.forEach(dt => {
-        const key = dateKey(dt.getFullYear(), dt.getMonth(), dt.getDate());
-        const dayTrades = byDate[key] || [];
-        const closed = dayTrades.filter(t => !isPending(t));
-        if (closed.length) weekHasClosed = true;
-        weekTotal += closed.reduce((s, t) => s + pnlNum(t.pnl), 0);
-        weekCount2 += dayTrades.length;
-      });
-      const sumDiv = document.createElement("div");
-      sumDiv.className = "calendar-summary-cell";
-      if (weekCount2) {
-        sumDiv.innerHTML = `
-          <div class="calendar-summary-label">สัปดาห์นี้</div>
-          ${weekHasClosed
-            ? `<div class="calendar-summary-pnl ${weekTotal >= 0 ? "pos" : "neg"} mono">${fmtMoney(weekTotal)}</div>`
-            : `<div class="calendar-summary-pnl mono" style="color:var(--muted);font-style:italic;">รอผล</div>`}
-          <div class="calendar-summary-count">${weekCount2} เทรด</div>
-        `;
-      } else {
-        sumDiv.innerHTML = `<div class="calendar-summary-label">สัปดาห์นี้</div><div class="calendar-summary-count">—</div>`;
-      }
-      grid.appendChild(sumDiv);
     }
 
-    const totalEl = document.getElementById("calMonthTotal");
-    totalEl.textContent = fmtMoney(monthTotal);
-    totalEl.style.color = monthTotal > 0 ? "var(--bull)" : monthTotal < 0 ? "var(--bear)" : "var(--muted)";
+    renderOkxMonthKpis(monthTrades, dailySeries);
+    renderOkxPerfStats();
   }
 
   document.getElementById("prevMonthBtn").addEventListener("click", () => {
@@ -3133,10 +3481,18 @@
         const gross = rawPnl != null ? rawPnl : ((openPx != null && closePx != null && qty != null) ? (closePx - openPx) * (side === "long" ? 1 : -1) * qty : 0);
         const net = (iNetPnl >= 0 || iRealizedPnl >= 0) ? gross : (gross + fee);
         const idVal = iId >= 0 && c[iId] ? c[iId].trim() : "";
+        const ratioVal = iPnlRatio >= 0 ? mt5Num(c[iPnlRatio]) : null;
+        const pnlPct = ratioVal != null ? Math.round(ratioVal * 100 * 1e6) / 1e6 : null;
+        const tOpenMs = parseTimeMs(tOpen);
+        const tCloseMs = parseTimeMs(tClose);
+        const holdMs = (tOpenMs > 0 && tCloseMs >= tOpenMs) ? (tCloseMs - tOpenMs) : null;
 
         out.push({
           mt5Id: `okx:${idVal || (sym + "|" + tOpen + "|" + tClose + "|" + openPx + "|" + closePx + "|" + qty)}`,
           date,
+          openTime: tOpen || null,
+          closeTime: tClose || null,
+          holdMs,
           symbol: sym,
           tvSymbol: okxTvSymbol(sym),
           side,
@@ -3145,9 +3501,10 @@
           sl: iSL >= 0 ? mt5Num(c[iSL]) : null,
           tp: iTP >= 0 ? mt5Num(c[iTP]) : null,
           exit: closePx,
-          pnlGross: Math.round(gross * 100) / 100,
-          fee: Math.round(fee * 100) / 100,
-          pnl: Math.round(net * 100) / 100,
+          pnlGross: Math.round(gross * 1e6) / 1e6,
+          fee: Math.round(fee * 1e6) / 1e6,
+          pnl: Math.round(net * 1e6) / 1e6,
+          pnlPct,
         });
       }
       out._dual = true;
@@ -3396,7 +3753,7 @@
 
   /* ---------- auto-seed OKX position history (UID 389636117818959348) ---------- */
   (function seedOkxHistoryOnce() {
-    const SEED_KEY = "tj_okx_seed_389636117818959348_v1";
+    const SEED_KEY = "tj_okx_seed_389636117818959348_v2";
     try { if (localStorage.getItem(SEED_KEY)) return; } catch (e) {}
     const OKX_CSV = [
       "Position Create Time,Position Update Time,Business Line,Index,Instrument Name,Margin Mode,Direction,Leverage,Max Position Quantity,Total Close Quantity,Average Open Price,Average Close Price,Margin Currency,Pnl,Pnl Ratio,Fee,Funding Fee,Liquidation Clearance Fee,Type,Contract Face Value,Contract Multiplier",
@@ -3492,25 +3849,35 @@
     ].join("\n");
     const parsed = rowsFromCsv(OKX_CSV);
     if (!parsed || !parsed.length) return;
-    const existIds = new Set(trades.map(t => t.mt5Id).filter(Boolean));
-    let added = 0;
+    const existById = new Map(trades.filter(t => t.mt5Id).map(t => [t.mt5Id, t]));
+    let changed = 0;
     parsed.forEach((r, i) => {
-      if (r.mt5Id && existIds.has(r.mt5Id)) return;
+      const existing = r.mt5Id ? existById.get(r.mt5Id) : null;
+      if (existing) {
+        existing.pnl = r.pnl;
+        existing.pnlPct = r.pnlPct ?? existing.pnlPct ?? null;
+        existing.holdMs = r.holdMs ?? existing.holdMs ?? null;
+        existing.openTime = r.openTime || existing.openTime || null;
+        existing.closeTime = r.closeTime || existing.closeTime || null;
+        changed++;
+        return;
+      }
       trades.push({
         id: uid(), createdAt: Date.now() + i,
-        date: r.date, marketType: "futures", symbol: r.symbol, side: r.side,
+        date: r.date, openTime: r.openTime || null, closeTime: r.closeTime || null, holdMs: r.holdMs ?? null,
+        marketType: "futures", symbol: r.symbol, side: r.side,
         lot: null, contracts: r.lot,
-        entry: r.entry, sl: r.sl, tp: r.tp, exit: r.exit, pnl: r.pnl,
+        entry: r.entry, sl: r.sl, tp: r.tp, exit: r.exit, pnl: r.pnl, pnlPct: r.pnlPct ?? null,
         session: "", account: "OKX", model: "", grade: null,
         followedRules: null, breakeven: false, enteredWindow: false, riskPct: null,
         checklistDone: [], checklistTotal: 0, tags: [], negTags: [],
         imageBefore: null, imageAfter: null, tvLink: "", tvSymbol: r.tvSymbol || "",
         notes: "นำเข้าจาก OKX", mt5Id: r.mt5Id || null,
       });
-      added++;
+      changed++;
     });
     try { localStorage.setItem(SEED_KEY, "1"); } catch (e) {}
-    if (added > 0) {
+    if (changed > 0) {
       saveTrades();
       if (activePf !== "all" && activePf !== "futures") {
         activePf = "futures";
@@ -3612,9 +3979,10 @@
       const finalPnl = (hasFeeCol && !res.incFee && r.pnlGross != null) ? r.pnlGross : r.pnl;
       trades.push({
         id: uid(), createdAt: Date.now() + i,
-        date: r.date, marketType: market, symbol: r.symbol, side: r.side,
+        date: r.date, openTime: r.openTime || null, closeTime: r.closeTime || null, holdMs: r.holdMs ?? null,
+        marketType: market, symbol: r.symbol, side: r.side,
         lot: market === "futures" ? null : r.lot, contracts: market === "futures" ? r.lot : null,
-        entry: r.entry, sl: r.sl, tp: r.tp, exit: r.exit, pnl: finalPnl,
+        entry: r.entry, sl: r.sl, tp: r.tp, exit: r.exit, pnl: finalPnl, pnlPct: r.pnlPct ?? null,
         session: "", account: isOkx ? "OKX" : "", model: "", grade: null,
         followedRules: null, breakeven: false, enteredWindow: false, riskPct: null,
         checklistDone: [], checklistTotal: 0, tags: [], negTags: [],
