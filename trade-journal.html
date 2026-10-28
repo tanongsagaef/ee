@@ -464,9 +464,10 @@
       <button class="ghost hidden" id="syncSignOutBtn" title="ออกจากระบบ (หยุดซิงค์บนเครื่องนี้)">ออกจากระบบ</button>
     </div>
     <button class="ghost" id="exportBtn" title="ส่งออกข้อมูลทั้งหมด (Elliott Wave + Trade Journal + Stock/Decide) เป็นไฟล์เดียว">⬇ ส่งออกข้อมูลทั้งหมด</button>
-    <button class="ghost" id="importBtn" title="นำเข้าไฟล์สำรองรวม — จะเพิ่มต่อท้ายข้อมูลเดิมของทั้ง 3 ระบบ ไม่ทับของเดิม">⬆ นำเข้าข้อมูลทั้งหมด</button>
+    <button class="ghost" id="importBtn" title="นำเข้าไฟล์สำรอง (.json) หรือไฟล์ประวัติเทรด CSV/HTML จาก OKX / MT5">⬆ นำเข้าข้อมูลทั้งหมด</button>
+    <button class="ghost" id="topCsvImportBtn" title="นำเข้าไฟล์ CSV ประวัติเทรดจาก OKX หรือ MT5 / IUX">⬆ นำเข้า OKX / MT5 (CSV)</button>
     <button class="ghost danger" id="clearAllTradesBtn" title="ล้างข้อมูลเทรดทั้งหมดเพื่อเริ่มต้นใหม่">🗑 ล้างข้อมูล</button>
-    <input type="file" id="importInput" accept="application/json" hidden>
+    <input type="file" id="importInput" accept=".json,.csv,.html,.htm,application/json,text/csv,text/html" hidden>
     <button class="primary" id="addTradeBtn">+ เพิ่มเทรด</button>
     <button id="themeToggle" class="icon-btn" aria-label="สลับโหมดสี" title="สลับโหมดสว่าง/มืด">
       <svg id="iconSun" viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M12 4.5a1 1 0 0 1-1-1V2a1 1 0 1 1 2 0v1.5a1 1 0 0 1-1 1zm0 15a1 1 0 0 1 1 1V22a1 1 0 1 1-2 0v-1.5a1 1 0 0 1 1-1zm7.5-7.5a1 1 0 0 1 1-1H22a1 1 0 1 1 0 2h-1.5a1 1 0 0 1-1-1zm-15 0a1 1 0 0 1-1 1H2a1 1 0 1 1 0-2h1.5a1 1 0 0 1 1 1zm12.02-5.52a1 1 0 0 1 0-1.42l1.06-1.06a1 1 0 1 1 1.42 1.42l-1.06 1.06a1 1 0 0 1-1.42 0zm-11.04 11.04a1 1 0 0 1 0-1.42l1.06-1.06a1 1 0 1 1 1.42 1.42L6.9 17.52a1 1 0 0 1-1.42 0zm11.04 0a1 1 0 0 1 1.42 0l1.06 1.06a1 1 0 1 1-1.42 1.42l-1.06-1.06a1 1 0 0 1 0-1.42zM5.48 5.48a1 1 0 0 1 1.42 0l1.06 1.06A1 1 0 1 1 6.54 7.96L5.48 6.9a1 1 0 0 1 0-1.42zM12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10z"/></svg>
@@ -648,7 +649,7 @@
         </select>
         <button class="ghost" id="logFilterClearBtn" title="ล้างตัวกรอง">ล้าง</button>
         <button class="ghost" id="logExportCsvBtn" title="ส่งออกรายการที่กรองอยู่ + สรุปรายสัปดาห์/เดือน (เปิดใน Excel/Sheets)">⬇ Excel</button>
-        <button class="ghost" id="mt5ImportBtn" title="นำเข้าประวัติจาก MT5 / IUX (ไฟล์ HTML รายงาน หรือ CSV)">⬆ นำเข้า MT5</button>
+        <button class="ghost" id="mt5ImportBtn" title="นำเข้าประวัติจาก OKX (CSV) หรือ MT5 / IUX (HTML / CSV)">⬆ นำเข้า OKX / MT5</button>
         <input type="file" id="mt5ImportInput" accept=".html,.htm,.csv,text/html,text/csv" hidden>
       </div>
     </div>
@@ -1695,10 +1696,25 @@
   let dayModalDate = null;
 
   /* ---------- embedded TradingView live chart ---------- */
+  function okxTvSymbol(sym) {
+    const s = String(sym || "").trim().toUpperCase();
+    if (!s) return "";
+    if (s.includes(":")) return s;
+    if (/-SWAP$/i.test(s) || /\bPERP/i.test(s)) {
+      const base = s.replace(/-SWAP$/i, "").replace(/PERP(ETUAL)?/i, "").replace(/[^A-Z0-9]/g, "");
+      return base ? `OKX:${base}.P` : "";
+    }
+    if (/^[A-Z0-9]+-[A-Z0-9]+(-\d+)?$/.test(s)) {
+      return `OKX:${s.replace(/-.*$/, "")}${s.split("-")[1] || ""}`;
+    }
+    return "";
+  }
   function tvSymbolFor(src) {
     let s = ((src && (src.tvSymbol || src.symbol)) || "").trim();
     if (!s) return "";
     if (s.indexOf(":") !== -1) return s.toUpperCase();
+    const okx = okxTvSymbol(s);
+    if (okx) return okx;
     return s.replace(/[\s/]+/g, "").toUpperCase();
   }
   function renderTvWidget(containerId, symbol, interval, timezone) {
@@ -2992,34 +3008,322 @@
       `trade-journal-${todayKey()}.xls`);
   });
 
-  /* ---------- import MT5 / IUX history ---------- */
+  /* ---------- import OKX / MT5 / IUX history ---------- */
   const mt5Num = (s) => {
-    let x = String(s == null ? "" : s).replace(/[\s  ]/g, "").replace(/[^\d.,-]/g, "");
+    if (s == null) return null;
+    const str = String(s).replace(/\u2212/g, "-").replace(/[\s\u00a0\u202f]/g, "");
+    const m = str.match(/[-+]?\d[\d.,]*(?:e[-+]?\d+)?/i);
+    if (!m) return null;
+    let x = m[0].replace(/[.,]+$/, "");
     if (x.includes(",") && x.includes(".")) x = x.replace(/,/g, "");
-    else if (x.includes(",") && !x.includes(".")) x = x.replace(",", ".");
-    const n = parseFloat(x); return isNaN(n) ? null : n;
+    else if (x.includes(",") && !x.includes(".")) {
+      if (/^[-+]?\d{1,3}(,\d{3})+$/.test(x)) x = x.replace(/,/g, "");
+      else x = x.replace(",", ".");
+    }
+    const n = parseFloat(x);
+    return isFinite(n) ? n : null;
   };
-  const mt5Date = (s) => { const m = String(s || "").match(/(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})/); return m ? `${m[1]}-${pad2(+m[2])}-${pad2(+m[3])}` : ""; };
-  const norm = (s) => String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
+  const mt5Date = (s) => {
+    const str = String(s || "").replace(/^["']|["']$/g, "").trim();
+    if (!str) return "";
+    let m = str.match(/(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})/);
+    if (m) return `${m[1]}-${pad2(+m[2])}-${pad2(+m[3])}`;
+    m = str.match(/(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{4})/);
+    if (m) {
+      let d = +m[1], mo = +m[2], y = m[3];
+      if (mo > 12 && d <= 12) { const tmp = d; d = mo; mo = tmp; }
+      return `${y}-${pad2(mo)}-${pad2(d)}`;
+    }
+    if (/^\d{10,13}$/.test(str)) {
+      const ms = str.length === 10 ? Number(str) * 1000 : Number(str);
+      const dt = new Date(ms);
+      if (!isNaN(dt.getTime())) return `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}`;
+    }
+    return "";
+  };
+  const parseTimeMs = (s) => {
+    const str = String(s || "").replace(/^["']|["']$/g, "").trim();
+    if (!str) return 0;
+    if (/^\d{10,13}$/.test(str)) return str.length === 10 ? Number(str) * 1000 : Number(str);
+    const t = Date.parse(str.replace(/\./g, "-"));
+    return isNaN(t) ? 0 : t;
+  };
+  const norm = (s) => String(s || "").replace(/^\uFEFF/, "").replace(/^["']|["']$/g, "").trim().toLowerCase().replace(/\s+/g, " ");
+  const normHdr = (s) => norm(s).replace(/\s*\([^)]*\)/g, "").trim();
+
+  function parseOkxRows(cellRows) {
+    let hi = -1, H = null, Hraw = null;
+    for (let i = 0; i < Math.min(cellRows.length, 30); i++) {
+      const hRaw = cellRows[i].map(norm);
+      const h = cellRows[i].map(normHdr);
+      if (h.length < 4) continue;
+      const hasInst = h.some(x => /instrument|instid|symbol|contract|trading pair|pair|ชื่อตราสาร|ตราสาร|สินทรัพย์|คู่เทรด|สัญญา|合约|交易品种|币对/.test(x));
+      const hasPnlOrPx = h.some(x => /\bpnl\b|realized|closing pnl|fillpnl|profit|กำไร|盈亏|收益|open price|close price|average price|avg\.? price|fill price|fillpx|avgpx|^price$|^px$/.test(x));
+      const hasTimeOrDir = h.some(x => /time|date|ts|timestamp|ctime|utime|direction|posside|side|เวลา|วันที่|ทิศทาง|ฝั่ง|时间|方向/.test(x));
+      const isOkx = hRaw.some(x => /instrument|instid|\bpnl\b|fillpx|openavgpx|closeavgpx|posside|margin mode|mgnmode|funding|billid|ordid|tradeid|business line|closetotalpos|ชื่อตราสาร|ตราสาร|โพสิชัน|เลเวอเรจ|คู่เทรด|合约|平仓|开仓/.test(x));
+      if (hasInst && hasPnlOrPx && hasTimeOrDir && isOkx) {
+        hi = i; H = h; Hraw = hRaw; break;
+      }
+    }
+    if (hi < 0) return [];
+
+    const first = (...re) => H.findIndex((x, idx) => re.some(r => r.test(x) || r.test(Hraw[idx])));
+    const iInst = first(/^instrument name$/, /^instrument$/, /^instid$/, /^symbol$/, /^contract$/, /instrument|instid|symbol|contract|trading pair|pair|ชื่อตราสาร|ตราสาร|สินทรัพย์|คู่เทรด|สัญญา|合约|交易品种|币对/);
+    const iDir = first(/^direction$/, /^position side$/, /^posside$/, /^ทิศทาง$/, /direction|posside|position side|ทิศทาง|持仓方向|方向/);
+    const iSide = first(/^side$/, /^type$/, /^subtype$/, /^order type$/, /^ฝั่ง$/, /side|subtype|ฝั่ง|买卖|交易类型/);
+    const iPosSide = first(/^position side$/, /^posside$/, /持仓方向/);
+    const iState = first(/^state$/, /^status$/, /^order state$/, /^สถานะ$/, /state|status|สถานะ|状态/);
+
+    const iOpenPx = first(/average open price|open avg price|avg\.? open price|open price|entry price|openavgpx|ราคาเปิดเฉลี่ย|ราคาเปิด|ราคาเข้า|开仓均价/);
+    const iClosePx = first(/average close price|close avg price|avg\.? close price|close price|exit price|closeavgpx|ราคาปิดเฉลี่ย|ราคาปิด|ราคาออก|平仓均价/);
+    const iFillPx = first(/average filled price|avg\.? filled price|average price|avg\.? price|fill price|filled price|fillpx|avgpx|^price$|^px$|ราคาเฉลี่ย|ราคาที่จับคู่|ราคา|成交均价|价格/);
+
+    const iCloseQty = first(/total close quantity|close quantity|closed vol|closed amount|closetotalpos|จำนวนที่ปิดทั้งหมด|จำนวนที่ปิด|平仓数量/);
+    const iMaxQty = first(/max position quantity|maxpos|จำนวนโพสิชันสูงสุด|最大持仓量/);
+    const iFillQty = first(/filled amount|filled qty|filled quantity|filled volume|accfillsz|fillsz|^quantity$|^size$|^amount$|^volume$|^sz$|จำนวนที่จับคู่|ปริมาณที่จับคู่|จำนวน|ปริมาณ|成交数量|数量|张数/);
+
+    const iOpenTime = first(/position create time|open time|create time|created time|ctime|เวลาสร้างโพสิชัน|เวลาเปิด|เวลาสร้าง|开仓时间|创建时间/);
+    const iCloseTime = first(/position update time|close time|update time|updated time|utime|เวลาอัปเดตโพสิชัน|เวลาปิด|เวลาอัปเดต|平仓时间|更新时间/);
+    const iTime = first(/fill time|order time|trade time|^time$|^date$|^timestamp$|^ts$|เวลา|วันที่|成交时间|时间/);
+
+    const iNetPnl = first(/^net pnl$|net profit|กำไรสุทธิ|净盈亏/);
+    const iRealizedPnl = first(/realized pnl|realized profit|realizedpnl|กำไรขาดทุนที่รับรู้แล้ว|已实现盈亏/);
+    const iPnl = first(/^pnl$|^closing pnl$|^fillpnl$|\bpnl\b|profit|กำไร\/ขาดทุน|กำไร|平仓盈亏|盈亏|收益/);
+    const iPnlRatio = first(/pnl ratio|pnlratio|อัตราส่วนกำไร/);
+
+    const iFee = first(/^fee$|^trading fee$|ค่าธรรมเนียม|手续费/);
+    const iFunding = first(/funding fee|fundingfee|ค่าธรรมเนียม funding|资金费用/);
+    const iLiqFee = first(/liquidation clearance fee|liqpenalty|ค่าธรรมเนียมการบังคับปิด/);
+
+    const iId = first(/^order id$|^ordid$|^trade id$|^tradeid$|^bill id$|^billid$|^index$|^id$/);
+    const iOrdId = first(/^order id$|^ordid$|รหัสคำสั่ง|订单id/);
+    const iSL = first(/sl trigger price|sltriggerpx|stop loss|\bs\/l\b/);
+    const iTP = first(/tp trigger price|tptriggerpx|take profit|\bt\/p\b/);
+
+    const out = [];
+    // Mode 1: OKX Position History (has both open price and close price columns)
+    if (iOpenPx >= 0 && iClosePx >= 0) {
+      for (let i = hi + 1; i < cellRows.length; i++) {
+        const c = cellRows[i];
+        if (!c || c.length < 4) continue;
+        const sym = (c[iInst] || "").replace(/^["']|["']$/g, "").trim();
+        if (!sym) continue;
+        if (iState >= 0 && /cancel|ยกเลิก|unfilled|撤单/i.test(c[iState] || "")) continue;
+
+        const openPx = mt5Num(c[iOpenPx]);
+        const closePx = mt5Num(c[iClosePx]);
+        const qty = (iCloseQty >= 0 ? mt5Num(c[iCloseQty]) : null) ?? (iMaxQty >= 0 ? mt5Num(c[iMaxQty]) : null) ?? (iFillQty >= 0 ? mt5Num(c[iFillQty]) : null);
+        const rawPnl = (iNetPnl >= 0 ? mt5Num(c[iNetPnl]) : null) ?? (iRealizedPnl >= 0 ? mt5Num(c[iRealizedPnl]) : null) ?? (iPnl >= 0 && iPnl !== iPnlRatio ? mt5Num(c[iPnl]) : null);
+        if (rawPnl == null && openPx == null && closePx == null) continue;
+
+        const fee = (iFee >= 0 ? (mt5Num(c[iFee]) || 0) : 0) + (iFunding >= 0 ? (mt5Num(c[iFunding]) || 0) : 0) + (iLiqFee >= 0 ? (mt5Num(c[iLiqFee]) || 0) : 0);
+        const dirRaw = norm((iPosSide >= 0 ? c[iPosSide] : "") || (iDir >= 0 ? c[iDir] : "") || (iSide >= 0 ? c[iSide] : ""));
+        let side = "long";
+        if (/short|sell|ขาย|空/.test(dirRaw)) side = "short";
+        else if (/long|buy|ซื้อ|多/.test(dirRaw)) side = "long";
+        else if (openPx != null && closePx != null && rawPnl != null && closePx !== openPx) {
+          side = (closePx - openPx) * rawPnl >= 0 ? "long" : "short";
+        }
+
+        const tClose = iCloseTime >= 0 ? c[iCloseTime] : (iTime >= 0 ? c[iTime] : "");
+        const tOpen = iOpenTime >= 0 ? c[iOpenTime] : "";
+        const date = mt5Date(tClose) || mt5Date(tOpen);
+        if (!date) continue;
+
+        const gross = rawPnl != null ? rawPnl : ((openPx != null && closePx != null && qty != null) ? (closePx - openPx) * (side === "long" ? 1 : -1) * qty : 0);
+        const net = (iNetPnl >= 0 || iRealizedPnl >= 0) ? gross : (gross + (fee <= 0 ? fee : -fee));
+        const idVal = iId >= 0 && c[iId] ? c[iId].trim() : "";
+
+        out.push({
+          mt5Id: `okx:${idVal || (sym + "|" + (tOpen || tClose) + "|" + openPx + "|" + closePx + "|" + qty)}`,
+          date,
+          symbol: sym,
+          tvSymbol: okxTvSymbol(sym),
+          side,
+          lot: qty,
+          entry: openPx,
+          sl: iSL >= 0 ? mt5Num(c[iSL]) : null,
+          tp: iTP >= 0 ? mt5Num(c[iTP]) : null,
+          exit: closePx,
+          pnlGross: Math.round(gross * 100) / 100,
+          fee: Math.round(fee * 100) / 100,
+          pnl: Math.round(net * 100) / 100,
+        });
+      }
+      out._dual = true;
+      out._source = "OKX";
+      return out;
+    }
+
+    // Mode 2: OKX Order History / Trade Fills / Bill History (single price column)
+    const rawFills = [];
+    for (let i = hi + 1; i < cellRows.length; i++) {
+      const c = cellRows[i];
+      if (!c || c.length < 4) continue;
+      if (iState >= 0 && /cancel|ยกเลิก|unfilled|撤单|失败/i.test(c[iState] || "")) continue;
+      const sym = (c[iInst] || "").replace(/^["']|["']$/g, "").trim();
+      if (!sym) continue;
+
+      const px = (iFillPx >= 0 ? mt5Num(c[iFillPx]) : null) ?? (iClosePx >= 0 ? mt5Num(c[iClosePx]) : null) ?? (iOpenPx >= 0 ? mt5Num(c[iOpenPx]) : null);
+      const qty = (iFillQty >= 0 ? mt5Num(c[iFillQty]) : null) ?? (iCloseQty >= 0 ? mt5Num(c[iCloseQty]) : null) ?? (iMaxQty >= 0 ? mt5Num(c[iMaxQty]) : null);
+      if (qty !== null && qty <= 0) continue;
+
+      const rawPnl = (iNetPnl >= 0 ? mt5Num(c[iNetPnl]) : null) ?? (iRealizedPnl >= 0 ? mt5Num(c[iRealizedPnl]) : null) ?? (iPnl >= 0 && iPnl !== iPnlRatio ? mt5Num(c[iPnl]) : null);
+      const fee = (iFee >= 0 ? (mt5Num(c[iFee]) || 0) : 0) + (iFunding >= 0 ? (mt5Num(c[iFunding]) || 0) : 0);
+      const timeStr = (iCloseTime >= 0 ? c[iCloseTime] : "") || (iTime >= 0 ? c[iTime] : "") || (iOpenTime >= 0 ? c[iOpenTime] : "");
+      const date = mt5Date(timeStr);
+      if (!date) continue;
+
+      const dirText = norm((iSide >= 0 ? c[iSide] : "") + " " + (iDir >= 0 ? c[iDir] : ""));
+      const psText = norm(iPosSide >= 0 ? c[iPosSide] : "");
+      if (/funding fee|transfer|deposit|withdrawal|โอน|ฝาก|ถอน/.test(dirText) && (px == null || px === 0)) continue;
+
+      let action = "close", posSide = "long";
+      if (/close\s*long|ปิด\s*long|平多|sell.*long/.test(dirText)) { action = "close"; posSide = "long"; }
+      else if (/close\s*short|ปิด\s*short|平空|buy.*short/.test(dirText)) { action = "close"; posSide = "short"; }
+      else if (/open\s*long|เปิด\s*long|开多|buy.*long/.test(dirText)) { action = "open"; posSide = "long"; }
+      else if (/open\s*short|เปิด\s*short|开空|sell.*short/.test(dirText)) { action = "open"; posSide = "short"; }
+      else if (psText.includes("long")) {
+        posSide = "long";
+        action = /sell|ขาย|卖/.test(dirText) ? "close" : "open";
+      } else if (psText.includes("short")) {
+        posSide = "short";
+        action = /buy|ซื้อ|买/.test(dirText) ? "close" : "open";
+      } else if (rawPnl != null && Math.abs(rawPnl) > 1e-9) {
+        action = "close";
+        posSide = /sell|short|ขาย|卖|空/.test(dirText) ? "long" : "short";
+      } else {
+        action = "open";
+        posSide = /sell|short|ขาย|卖|空/.test(dirText) ? "short" : "long";
+      }
+
+      rawFills.push({
+        idx: i,
+        ts: parseTimeMs(timeStr) || (cellRows.length - i),
+        timeStr,
+        date,
+        sym,
+        action,
+        posSide,
+        px,
+        qty: qty || 0,
+        pnl: rawPnl,
+        fee,
+        ordId: iOrdId >= 0 && c[iOrdId] ? c[iOrdId].trim() : "",
+        idVal: iId >= 0 && c[iId] ? c[iId].trim() : "",
+        sl: iSL >= 0 ? mt5Num(c[iSL]) : null,
+        tp: iTP >= 0 ? mt5Num(c[iTP]) : null,
+      });
+    }
+    if (!rawFills.length) return [];
+
+    // Sort chronologically (oldest first)
+    rawFills.sort((a, b) => a.ts !== b.ts ? a.ts - b.ts : b.idx - a.idx);
+
+    // Merge partial fills sharing the same ordId
+    const fills = [];
+    rawFills.forEach(f => {
+      const prev = fills[fills.length - 1];
+      if (f.ordId && prev && prev.ordId === f.ordId && prev.sym === f.sym && prev.action === f.action && prev.posSide === f.posSide) {
+        const totQty = prev.qty + f.qty;
+        if (totQty > 0 && prev.px != null && f.px != null) {
+          prev.px = (prev.px * prev.qty + f.px * f.qty) / totQty;
+        }
+        prev.qty = totQty;
+        prev.pnl = (prev.pnl || 0) + (f.pnl || 0);
+        prev.fee = (prev.fee || 0) + (f.fee || 0);
+        prev.date = f.date || prev.date;
+        prev.timeStr = f.timeStr || prev.timeStr;
+      } else {
+        fills.push({ ...f });
+      }
+    });
+
+    // If all rows were classified as "open" (e.g. Spot Buy/Sell CSV with no PnL column), treat "short" opens (Sells) as closes of "long"
+    if (!fills.some(f => f.action === "close") && fills.some(f => f.posSide === "short")) {
+      fills.forEach(f => {
+        if (f.posSide === "short") { f.action = "close"; f.posSide = "long"; }
+      });
+    }
+
+    const openBuckets = {};
+    fills.forEach(f => {
+      const key = `${f.sym}|${f.posSide}`;
+      if (f.action === "open") {
+        const b = openBuckets[key] || { qty: 0, avgPx: 0, fee: 0, sl: null, tp: null, openTime: f.timeStr };
+        const newQty = b.qty + f.qty;
+        if (newQty > 0 && f.px != null) {
+          b.avgPx = (b.avgPx * b.qty + f.px * f.qty) / newQty;
+        } else if (f.px != null && !b.avgPx) {
+          b.avgPx = f.px;
+        }
+        b.qty = newQty;
+        b.fee += f.fee || 0;
+        if (f.sl) b.sl = f.sl;
+        if (f.tp) b.tp = f.tp;
+        openBuckets[key] = b;
+      } else {
+        const b = openBuckets[key];
+        const entryPx = (b && b.avgPx) ? Math.round(b.avgPx * 1e6) / 1e6 : null;
+        let openFeeShare = 0;
+        if (b && b.qty > 0) {
+          const ratio = Math.min(1, (f.qty || b.qty) / b.qty);
+          openFeeShare = b.fee * ratio;
+          b.qty = Math.max(0, b.qty - f.qty);
+          b.fee -= openFeeShare;
+          if (b.qty <= 1e-9) delete openBuckets[key];
+        }
+        const totalFee = (f.fee || 0) + openFeeShare;
+        let gross = f.pnl;
+        if (gross == null && entryPx != null && f.px != null && f.qty > 0) {
+          gross = (f.px - entryPx) * (f.posSide === "long" ? 1 : -1) * f.qty;
+        }
+        if (gross == null) return;
+        const net = gross + (totalFee <= 0 ? totalFee : -totalFee);
+        out.push({
+          mt5Id: `okx:${f.ordId || f.idVal || (f.sym + "|" + f.timeStr + "|" + f.px + "|" + f.qty)}`,
+          date: f.date,
+          symbol: f.sym,
+          tvSymbol: okxTvSymbol(f.sym),
+          side: f.posSide,
+          lot: f.qty || null,
+          entry: entryPx,
+          sl: f.sl || (b ? b.sl : null),
+          tp: f.tp || (b ? b.tp : null),
+          exit: f.px,
+          pnlGross: Math.round(gross * 100) / 100,
+          fee: Math.round(totalFee * 100) / 100,
+          pnl: Math.round(net * 100) / 100,
+        });
+      }
+    });
+
+    out._dual = true;
+    out._source = "OKX";
+    return out;
+  }
 
   function parseMt5Rows(cellRows) {
+    const okx = parseOkxRows(cellRows);
+    if (okx && okx.length) return okx;
+
     // cellRows: array of string[] (each = one table row's cells). Find the positions/deals header, map columns.
     let hi = -1, H = null;
     for (let i = 0; i < cellRows.length; i++) {
       const h = cellRows[i].map(norm);
-      if (h.some(x => /symbol|สัญลักษณ์/.test(x)) && h.some(x => /profit|กำไร/.test(x)) && h.some(x => /type|ชนิด|direction/.test(x))) { hi = i; H = h; break; }
+      if (h.some(x => /symbol|สัญลักษณ์|instrument/.test(x)) && h.some(x => /profit|กำไร|\bpnl\b/.test(x)) && h.some(x => /type|ชนิด|direction|side/.test(x))) { hi = i; H = h; break; }
     }
     if (hi < 0) return [];
     const first = (...re) => H.findIndex(x => re.some(r => r.test(x)));
     const allIdx = (...re) => H.map((x, i) => re.some(r => r.test(x)) ? i : -1).filter(i => i >= 0);
-    const iSym = first(/symbol|สัญลักษณ์/), iType = first(/type|ชนิด|direction/), iVol = first(/volume|ปริมาณ|lots?/);
-    const iComm = first(/commission|คอมมิช/), iSwap = first(/swap|สว็อป/), iSL = first(/\bs ?\/ ?l\b|stop loss/);
-    const prices = allIdx(/price|ราคา/), times = allIdx(/time|เวลา/), profits = allIdx(/profit|กำไร/);
+    const iSym = first(/symbol|สัญลักษณ์|instrument/), iType = first(/type|ชนิด|direction|side/), iVol = first(/volume|ปริมาณ|lots?|qty|quantity|size/);
+    const iComm = first(/commission|คอมมิช|fee/), iSwap = first(/swap|สว็อป|funding/), iSL = first(/\bs ?\/ ?l\b|stop loss/);
+    const prices = allIdx(/price|ราคา/), times = allIdx(/time|เวลา|date/), profits = allIdx(/profit|กำไร|\bpnl\b/);
     const iPriceOpen = prices[0], iPriceClose = prices.length > 1 ? prices[prices.length - 1] : -1;
     const iTimeOpen = times[0], iTimeClose = times.length > 1 ? times[times.length - 1] : times[0];
     const iProfit = profits[profits.length - 1];
     const iTP = first(/\bt ?\/ ?p\b|take profit|ทำกำไร/);
-    const iPos = first(/position|ตำแหน่ง|deal|order|ticket/);
+    const iPos = first(/position|ตำแหน่ง|deal|order|ticket|id/);
 
     const out = [];
     for (let i = hi + 1; i < cellRows.length; i++) {
@@ -3027,7 +3331,7 @@
       if (c.length < 5) break;                       // summary / blank rows -> stop
       const sym = (c[iSym] || "").trim();
       const type = norm(c[iType]);
-      if (!sym || !/buy|sell|ซื้อ|ขาย/.test(type)) continue;
+      if (!sym || !/buy|sell|long|short|ซื้อ|ขาย/.test(type)) continue;
       const profit = mt5Num(c[iProfit]);
       if (profit == null) continue;
       const comm = iComm >= 0 ? (mt5Num(c[iComm]) || 0) : 0;
@@ -3036,7 +3340,7 @@
         mt5Id: (iPos >= 0 ? (c[iPos] || "").trim() : "") || (sym + "|" + (c[iTimeOpen] || "")),
         date: mt5Date(c[iTimeOpen]) || mt5Date(c[iTimeClose]),
         symbol: sym,
-        side: /sell|ขาย/.test(type) ? "short" : "long",
+        side: /sell|short|ขาย/.test(type) ? "short" : "long",
         lot: iVol >= 0 ? mt5Num(c[iVol]) : null,
         entry: iPriceOpen >= 0 ? mt5Num(c[iPriceOpen]) : null,
         sl: iSL >= 0 ? mt5Num(c[iSL]) : null,
@@ -3047,6 +3351,7 @@
     }
     const res = out.filter(r => r.date);
     res._dual = iPriceClose >= 0 && iPriceOpen !== iPriceClose;
+    res._source = "MT5";
     return res;
   }
 
@@ -3056,27 +3361,32 @@
     const score = (a) => a.length * (a._dual ? 1.15 : 1);
     doc.querySelectorAll("table").forEach(tb => {
       const rows = [...tb.querySelectorAll("tr")].map(tr =>
-        [...tr.querySelectorAll("th,td")].map(td => td.textContent.replace(/ /g, " ").trim()));
+        [...tr.querySelectorAll("th,td")].map(td => td.textContent.replace(/\u00a0/g, " ").trim()));
       const parsed = parseMt5Rows(rows);
       if (score(parsed) > score(best)) best = parsed;
     });
     // some reports put everything in one big table already handled; also try the flat row list
     if (!best.length) {
       const allRows = [...doc.querySelectorAll("tr")].map(tr =>
-        [...tr.querySelectorAll("th,td")].map(td => td.textContent.replace(/ /g, " ").trim()));
+        [...tr.querySelectorAll("th,td")].map(td => td.textContent.replace(/\u00a0/g, " ").trim()));
       best = parseMt5Rows(allRows);
     }
     return best;
   }
   function rowsFromCsv(text) {
-    const lines = text.split(/\r?\n/).filter(l => l.trim() !== "");
+    const clean = String(text || "").replace(/^\uFEFF/, "");
+    const lines = clean.split(/\r?\n/).filter(l => l.trim() !== "");
+    // Detect dominant delimiter on header candidate lines
+    const sample = lines.slice(0, 10).join("\n");
+    const delim = (sample.match(/\t/g) || []).length > (sample.match(/,/g) || []).length ? "\t"
+      : (sample.match(/;/g) || []).length > (sample.match(/,/g) || []).length ? ";" : ",";
     const split = (l) => {
       const o = []; let cur = "", q = false;
       for (let i = 0; i < l.length; i++) {
         const ch = l[i];
         if (q) { if (ch === '"' && l[i + 1] === '"') { cur += '"'; i++; } else if (ch === '"') q = false; else cur += ch; }
         else if (ch === '"') q = true;
-        else if (ch === "," || ch === "\t" || ch === ";") { o.push(cur); cur = ""; }
+        else if (ch === delim) { o.push(cur); cur = ""; }
         else cur += ch;
       }
       o.push(cur); return o.map(x => x.trim());
@@ -3099,9 +3409,7 @@
     });
   }
 
-  document.getElementById("mt5ImportBtn").addEventListener("click", () => document.getElementById("mt5ImportInput").click());
-  document.getElementById("mt5ImportInput").addEventListener("change", async (e) => {
-    const file = e.target.files[0]; e.target.value = "";
+  async function handleHistoryFileImport(file) {
     if (!file) return;
     let text;
     try { text = await readFileSmart(file); } catch (err) { Swal.fire({ icon: "error", title: "อ่านไฟล์ไม่สำเร็จ" }); return; }
@@ -3110,11 +3418,21 @@
     try { parsed = isCsv ? rowsFromCsv(text) : rowsFromHtml(text); }
     catch (err) { parsed = []; }
     if (!parsed.length) {
-      Swal.fire({ icon: "info", title: "ไม่พบตารางประวัติเทรด", html: "ใน MT5: <b>Toolbox → History → คลิกขวา → Report → HTML</b><br>(หรือ IUX cabinet ส่งออกเป็น CSV) แล้วเลือกไฟล์นั้น" });
+      Swal.fire({
+        icon: "info",
+        title: "ไม่พบตารางประวัติเทรด",
+        html: `<div style="text-align:left;font-size:13px;line-height:1.6">
+          รองรับไฟล์ต่อไปนี้:<br>
+          • <b>OKX (CSV)</b>: ไปที่ <b>Assets → Order Center → Position History (หรือ Order / Trading History) → Download CSV</b><br>
+          • <b>MT5 (HTML / CSV)</b>: <b>Toolbox → History → คลิกขวา → Report → HTML</b><br>
+          • <b>IUX (CSV)</b>: ส่งออกไฟล์ประวัติจากหน้า Cabinet</div>`
+      });
       return;
     }
+    const isOkx = parsed._source === "OKX";
+    const srcLabel = isOkx ? "OKX" : "MT5";
     // ---- dedup vs trades already in the journal (manual entries included) ----
-    const baseSym = (s) => String(s || "").toLowerCase().replace(/[.\-#+_].*$/, "").replace(/[^a-z0-9]/g, "");
+    const baseSym = (s) => String(s || "").toLowerCase().replace(/-swap$/i, "").replace(/[.\-#+_].*$/, "").replace(/[^a-z0-9]/g, "");
     const existIds = new Set(trades.map(t => t.mt5Id).filter(Boolean));
     const exactKey = (t) => `${t.date}|${baseSym(t.symbol)}|${round5(t.entry)}|${round5(t.exit)}|${round5(t.lot ?? t.contracts)}`;
     function round5(n) { return n == null ? "" : Math.round(Number(n) * 1e5) / 1e5; }
@@ -3133,22 +3451,29 @@
       (fuzzyHit(r) ? maybe : fresh).push(r);
     });
 
+    const hasFeeCol = isOkx && parsed.some(r => r.fee != null && Math.abs(r.fee) > 0 && r.pnlGross !== r.pnl);
     const rowHtml = (list) => list.slice(0, 6).map(r =>
-      `<tr><td>${r.date}</td><td>${escapeHtml(r.symbol)}</td><td>${r.side === "short" ? "SELL" : "BUY"}</td><td>${r.lot ?? ""}</td><td style="text-align:right;color:${r.pnl >= 0 ? "#16a34a" : "#dc2626"}">${(r.pnl >= 0 ? "+" : "") + r.pnl}</td></tr>`).join("");
+      `<tr><td>${r.date}</td><td>${escapeHtml(r.symbol)}</td><td>${r.side === "short" ? "SHORT" : "LONG"}</td><td>${r.lot ?? ""}</td><td style="text-align:right;color:${r.pnl >= 0 ? "#16a34a" : "#dc2626"}">${(r.pnl >= 0 ? "+" : "") + r.pnl}</td></tr>`).join("");
     const net0 = fresh.reduce((s, r) => s + (pnlNum(r.pnl) || 0), 0);
+    const defaultMarket = isOkx ? "futures" : "forex";
 
     const { value: res } = await Swal.fire({
-      title: `นำเข้า ${fresh.length} ไม้`,
+      title: `นำเข้าจาก ${srcLabel} (${fresh.length} ไม้)`,
       html: `<div style="font-size:13px;text-align:left">พบทั้งหมด ${parsed.length} · ใหม่ <b>${fresh.length}</b> · ซ้ำแน่ข้ามให้ ${dupExact} · <b>อาจซ้ำ ${maybe.length}</b> (ตรงกับที่มีในสมุด: วัน+สัญลักษณ์+ทิศ+P/L)
         <table style="width:100%;margin-top:8px;border-collapse:collapse;font-size:12px">
-        <tr style="color:#888"><td>วันที่</td><td>สัญลักษณ์</td><td>ทิศ</td><td>Lot</td><td style="text-align:right">P/L</td></tr>${rowHtml(fresh)}
+        <tr style="color:#888"><td>วันที่</td><td>สัญลักษณ์</td><td>ทิศ</td><td>${isOkx ? "จำนวน" : "Lot"}</td><td style="text-align:right">P/L</td></tr>${rowHtml(fresh)}
         ${fresh.length > 6 ? `<tr><td colspan="5" style="color:#888">… อีก ${fresh.length - 6} ไม้</td></tr>` : ""}</table>
         <div style="color:#888;margin-top:4px">P/L รวมของรายการใหม่: <b style="color:${net0 >= 0 ? "#16a34a" : "#dc2626"}">${(net0 >= 0 ? "+" : "") + net0.toFixed(2)}</b></div>
+        ${hasFeeCol ? `<label style="display:flex;gap:6px;align-items:flex-start;margin-top:10px;background:#0001;padding:6px 8px;border-radius:6px"><input type="checkbox" id="okxIncFee" checked style="margin-top:2px"><span>คำนวณ P/L สุทธิหลังหักค่าธรรมเนียม (Fee / Funding) แล้ว</span></label>` : ""}
         ${maybe.length ? `<label style="display:flex;gap:6px;align-items:flex-start;margin-top:10px;background:#0001;padding:6px 8px;border-radius:6px"><input type="checkbox" id="mt5IncMaybe" style="margin-top:2px"><span>นำเข้ารายการ "อาจซ้ำ" ${maybe.length} รายการด้วย (ติ๊กเฉพาะถ้าที่กรอกไว้ไม่ใช่ไม้เดียวกัน)</span></label>` : ""}
         <label style="display:block;margin-top:10px">ตลาดของไม้เหล่านี้:
-        <select id="mt5Market" class="swal2-input" style="height:auto;margin:4px 0 0"><option value="forex">Forex</option><option value="futures">Futures</option><option value="other">อื่นๆ</option></select></label></div>`,
+        <select id="mt5Market" class="swal2-input" style="height:auto;margin:4px 0 0"><option value="forex" ${defaultMarket === "forex" ? "selected" : ""}>Forex</option><option value="futures" ${defaultMarket === "futures" ? "selected" : ""}>Futures / Crypto</option><option value="other">อื่นๆ</option></select></label></div>`,
       showCancelButton: true, confirmButtonText: "นำเข้า", cancelButtonText: "ยกเลิก",
-      preConfirm: () => ({ market: document.getElementById("mt5Market").value, incMaybe: !!(document.getElementById("mt5IncMaybe") || {}).checked }),
+      preConfirm: () => ({
+        market: document.getElementById("mt5Market").value,
+        incMaybe: !!(document.getElementById("mt5IncMaybe") || {}).checked,
+        incFee: document.getElementById("okxIncFee") ? document.getElementById("okxIncFee").checked : true,
+      }),
       didOpen: () => { if (!fresh.length && !maybe.length) Swal.getConfirmButton().disabled = true; },
     });
     if (!res) return;
@@ -3157,22 +3482,36 @@
     if (!toImport.length) return;
 
     toImport.forEach((r, i) => {
+      const finalPnl = (hasFeeCol && !res.incFee && r.pnlGross != null) ? r.pnlGross : r.pnl;
       trades.push({
         id: uid(), createdAt: Date.now() + i,
         date: r.date, marketType: market, symbol: r.symbol, side: r.side,
         lot: market === "futures" ? null : r.lot, contracts: market === "futures" ? r.lot : null,
-        entry: r.entry, sl: r.sl, tp: r.tp, exit: r.exit, pnl: r.pnl,
-        session: "", account: "", model: "", grade: null,
+        entry: r.entry, sl: r.sl, tp: r.tp, exit: r.exit, pnl: finalPnl,
+        session: "", account: isOkx ? "OKX" : "", model: "", grade: null,
         followedRules: null, breakeven: false, enteredWindow: false, riskPct: null,
         checklistDone: [], checklistTotal: 0, tags: [], negTags: [],
-        imageBefore: null, imageAfter: null, tvLink: "", tvSymbol: "",
-        notes: "นำเข้าจาก MT5", mt5Id: r.mt5Id || null,
+        imageBefore: null, imageAfter: null, tvLink: "", tvSymbol: r.tvSymbol || "",
+        notes: `นำเข้าจาก ${srcLabel}`, mt5Id: r.mt5Id || null,
       });
     });
     saveTrades();
+    if (activePf !== "all" && activePf !== pfKey(market)) {
+      activePf = pfKey(market);
+      try { localStorage.setItem(PF_ACTIVE_KEY, activePf); } catch (e) {}
+      syncPfSwitchUI();
+    }
     renderCalendar(); renderLog();
     if (typeof renderOverview === "function") renderOverview();
-    successToast(`นำเข้า ${toImport.length} ไม้เรียบร้อย`);
+    successToast(`นำเข้าจาก ${srcLabel} ${toImport.length} ไม้เรียบร้อย`);
+  }
+
+  document.getElementById("mt5ImportBtn").addEventListener("click", () => document.getElementById("mt5ImportInput").click());
+  const topCsvBtn = document.getElementById("topCsvImportBtn");
+  if (topCsvBtn) topCsvBtn.addEventListener("click", () => document.getElementById("mt5ImportInput").click());
+  document.getElementById("mt5ImportInput").addEventListener("change", async (e) => {
+    const file = e.target.files[0]; e.target.value = "";
+    await handleHistoryFileImport(file);
   });
 
   document.getElementById("logMarketFilter").addEventListener("change", renderLog);
@@ -4485,8 +4824,17 @@
     const file = importInput.files[0];
     importInput.value = "";
     if (!file) return;
+    if (/\.(csv|html?)$/i.test(file.name)) {
+      await handleHistoryFileImport(file);
+      return;
+    }
     try {
-      const parsed = JSON.parse(await file.text());
+      const text = await file.text();
+      if (!/^\s*[\[{]/.test(text)) {
+        await handleHistoryFileImport(file);
+        return;
+      }
+      const parsed = JSON.parse(text);
       if (!parsed || typeof parsed !== "object") { Swal.fire({ icon: "error", title: "รูปแบบไฟล์ไม่ถูกต้อง" }); return; }
       const counts = await restoreAllData(parsed);
       renderCalendar();
