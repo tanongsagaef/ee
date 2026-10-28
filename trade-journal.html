@@ -555,11 +555,11 @@
     <div class="okx-perf-head">
       <h3 class="okx-perf-title">สถิติผลการเทรด</h3>
       <select id="okxPerfRange" class="okx-perf-select">
-        <option value="30d" selected>30 วันล่าสุด</option>
-        <option value="month">เดือนที่เลือก (ตามปฏิทิน)</option>
+        <option value="month" selected>เดือนที่เลือก (ตามปฏิทิน)</option>
+        <option value="all">ทั้งหมด (ตรงกับหน้าภาพรวม)</option>
+        <option value="30d">30 วันล่าสุด</option>
         <option value="7d">7 วันล่าสุด</option>
         <option value="90d">90 วันล่าสุด</option>
-        <option value="all">ทั้งหมด</option>
       </select>
     </div>
     <div class="okx-perf-grid" id="okxPerfBody"></div>
@@ -2109,12 +2109,13 @@
       if (t.leverage != null) details.push(["Leverage", t.leverage + "x"]);
       if (t.size != null) details.push(["Size", t.size]);
       if (t.duration) details.push(["ระยะเวลา", t.duration]);
+      else if (t.holdMs != null) details.push(["เวลาถือครอง", fmtHoldDurationTh(t.holdMs)]);
       if (t.exitType) details.push(["ออกแบบ", t.exitType]);
-      if (t.pnlPct != null) details.push(["PNL %", t.pnlPct + "%"]);
+      if (t.pnlPct != null) details.push(["PNL %", (Number(t.pnlPct) >= 0 ? "+" : "") + Number(t.pnlPct).toFixed(2) + "%"]);
       if (t.rrr != null) details.push(["RRR แผน", t.rrr]);
       if (t.margin != null) details.push(["Margin $", t.margin]);
       if (t.riskUsd != null) details.push(["ความเสี่ยง $", t.riskUsd]);
-      if (t.fee != null) details.push(["ค่าธรรมเนียม $", t.fee]);
+      if (t.fee != null) details.push(["ค่าธรรมเนียม $", fmtMoney(Number(t.fee))]);
     }
     if (t.entry != null) details.push(["ราคาเข้า", t.entry]);
     if (t.sl != null) details.push(["ราคา SL", t.sl]);
@@ -2252,18 +2253,13 @@
     const total = scope.length;
     const closed = scope.filter(t => !isPending(t));
     const pendingCount = total - closed.length;
-    // win/loss COUNT respects a manual outcome (ชนะ/แพ้/เสมอ); money aggregates stay P/L-based
-    const wins = closed.filter(t => tradeOutcome(t) === "win");
-    const losses = closed.filter(t => tradeOutcome(t) === "loss");
-    const pnlWins = closed.filter(t => pnlNum(t.pnl) > 0);
-    const pnlLosses = closed.filter(t => pnlNum(t.pnl) < 0);
-    const totalPnl = closed.reduce((s, t) => s + pnlNum(t.pnl), 0);
-    const winRate = closed.length ? (wins.length / closed.length * 100) : 0;
-    const avgWin = pnlWins.length ? pnlWins.reduce((s, t) => s + pnlNum(t.pnl), 0) / pnlWins.length : 0;
-    const avgLoss = pnlLosses.length ? pnlLosses.reduce((s, t) => s + pnlNum(t.pnl), 0) / pnlLosses.length : 0;
-    const grossWin = pnlWins.reduce((s, t) => s + pnlNum(t.pnl), 0);
-    const grossLoss = Math.abs(pnlLosses.reduce((s, t) => s + pnlNum(t.pnl), 0));
-    const profitFactor = grossLoss > 0 ? (grossWin / grossLoss) : (grossWin > 0 ? Infinity : 0);
+    const okxSt = computeOkxStats(scope);
+    const totalPnl = okxSt.totalPnl;
+    const winRate = okxSt.winRate;
+    const avgWin = okxSt.avgWin;
+    const avgLoss = okxSt.avgLoss;
+    const profitFactor = okxSt.profitFactor;
+    const rrRatio = okxSt.rrRatio;
 
     const byDate = tradesByDate();
     let bestDay = null, worstDay = null;
@@ -2287,24 +2283,32 @@
     const maxDD = computeMaxDrawdown();
     const maxDDPct = cap > 0 ? (maxDD / cap * 100) : null;
 
-    return { total, pendingCount, wins: wins.length, losses: losses.length, totalPnl, winRate, avgWin, avgLoss,
-      profitFactor, bestDay, worstDay, expR, rCount: rs.length, followRate, avgExec, maxDD, maxDDPct };
+    return {
+      total, pendingCount,
+      wins: okxSt.winCount, losses: okxSt.lossCount, beCount: okxSt.beCount,
+      totalPnl, grossProfit: okxSt.grossProfit, grossLoss: okxSt.grossLoss,
+      winRate, lossRate: okxSt.lossRate, avgPnl: okxSt.avgPnl, avgWin, avgLoss,
+      profitFactor, rrRatio, expectedValue: okxSt.expectedValue,
+      maxWinStreak: okxSt.maxWinStreak, maxLossStreak: okxSt.maxLossStreak,
+      avgPct: okxSt.avgPct, avgHoldMs: okxSt.avgHoldMs,
+      bestDay, worstDay, expR, rCount: rs.length, followRate, avgExec, maxDD, maxDDPct
+    };
   }
 
   function computeTagStats() {
     const map = {};
-    function add(tag, pnl, type) {
+    function add(tag, t, type) {
       const key = type + "::" + tag;
+      const pnl = pnlNum(t.pnl);
       if (!map[key]) map[key] = { tag, type, count: 0, totalPnl: 0, wins: 0 };
       map[key].count++;
       map[key].totalPnl += pnl;
-      if (pnl > 0) map[key].wins++;
+      if (tradeOutcome(t) === "win") map[key].wins++;
     }
     pfTrades().forEach(t => {
       if (isPending(t)) return;
-      const pnl = pnlNum(t.pnl);
-      (t.tags || []).forEach(tag => add(tag, pnl, "positive"));
-      (t.negTags || []).forEach(tag => add(tag, pnl, "negative"));
+      (t.tags || []).forEach(tag => add(tag, t, "positive"));
+      (t.negTags || []).forEach(tag => add(tag, t, "negative"));
     });
     return Object.values(map)
       .map(d => ({ ...d, winRate: d.count ? d.wins / d.count * 100 : 0, avgPnl: d.count ? d.totalPnl / d.count : 0 }))
@@ -2313,10 +2317,14 @@
 
   const DOW_FULL = ["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัส", "ศุกร์", "เสาร์"];
   function edgeR(t) {
-    if (t.entry == null || t.sl == null || t.exit == null) return null;
-    const risk = Math.abs(t.entry - t.sl);
-    if (!(risk > 0)) return null;
-    return ((t.exit - t.entry) * (t.side === "short" ? -1 : 1)) / risk;
+    if (t.entry != null && t.sl != null && t.exit != null) {
+      const risk = Math.abs(t.entry - t.sl);
+      if (risk > 0) return ((t.exit - t.entry) * (t.side === "short" ? -1 : 1)) / risk;
+    }
+    if (typeof t.riskUsd === "number" && t.riskUsd > 0 && !isPending(t)) {
+      return pnlNum(t.pnl) / t.riskUsd;
+    }
+    return null;
   }
   function renderEdgeReport() {
     const wrap = document.getElementById("edgeReportWrap");
@@ -2332,7 +2340,7 @@
       });
       if (!m.size) return "";
       const rows = [...m.entries()].map(([k, arr]) => {
-        const w = arr.filter(t => pnlNum(t.pnl) > 0).length;
+        const w = arr.filter(t => tradeOutcome(t) === "win").length;
         const pnl = arr.reduce((s, t) => s + pnlNum(t.pnl), 0);
         const rs = arr.map(edgeR).filter(x => x != null);
         return {
@@ -2680,14 +2688,20 @@
       equityHeroHtml,
       `<div class="metric capital-metric"><div class="metric-label">ทุนเริ่มต้น${activePf === "all" ? " (รวมทุกพอร์ต)" : pfSuffix} <button type="button" id="editCapitalBtn" class="metric-edit-btn" title="แก้ไขทุนเริ่มต้น">✎</button></div><div class="metric-value mono">${fmtPlain(cap)}</div></div>`,
       metric("กำไร/ขาดทุนรวม", fmtMoney(s.totalPnl), s.totalPnl >= 0 ? "pos" : "neg"),
+      metric("กำไรรวม / ขาดทุนรวม", `${fmtMoney(s.grossProfit)} / ${fmtMoney(s.grossLoss)}`),
       metric("ผลตอบแทน (%)", returnPct !== null ? (returnPct >= 0 ? "+" : "") + returnPct.toFixed(2) + "%" : "—", returnPct !== null ? (returnPct >= 0 ? "pos" : "neg") : ""),
       metric("จำนวนเทรดทั้งหมด", s.total),
       metric("รอผลเทรด", s.pendingCount),
-      metric("Win Rate", closedCount ? s.winRate.toFixed(1) + "%" : "—"),
-      metric("เทรดชนะ / แพ้", `${s.wins} / ${s.losses}`),
-      metric("กำไรเฉลี่ย/ครั้ง", s.wins ? fmtMoney(s.avgWin) : "—", "pos"),
-      metric("ขาดทุนเฉลี่ย/ครั้ง", s.losses ? fmtMoney(s.avgLoss) : "—", "neg"),
+      metric("อัตราชนะ (Win Rate)", closedCount ? s.winRate.toFixed(2) + "%" : "—", closedCount ? "pos" : ""),
+      metric("อัตราแพ้ (Loss Rate)", closedCount ? s.lossRate.toFixed(2) + "%" : "—", closedCount ? "neg" : ""),
+      metric("ชนะ / แพ้ / เสมอ", `${s.wins} / ${s.losses} / ${s.beCount}`),
+      metric("กำไร/ขาดทุนเฉลี่ยต่อไม้", closedCount ? fmtMoney(s.avgPnl) : "—", s.avgPnl >= 0 ? "pos" : "neg"),
+      metric("กำไรเฉลี่ยต่อไม้ชนะ", s.wins ? fmtMoney(s.avgWin) : "—", "pos"),
+      metric("ขาดทุนเฉลี่ยต่อไม้แพ้", s.losses ? fmtMoney(s.avgLoss) : "—", "neg"),
       metric("Profit Factor", s.profitFactor === Infinity ? "∞" : closedCount ? s.profitFactor.toFixed(2) : "—"),
+      metric("อัตราส่วน Risk/Reward", closedCount && s.rrRatio != null ? `1:${s.rrRatio.toFixed(2)}` : "—"),
+      metric("ชนะ / แพ้ติดต่อกันสูงสุด", `${s.maxWinStreak} / ${s.maxLossStreak}`),
+      metric("เวลาถือครองเฉลี่ย", fmtHoldDurationTh(s.avgHoldMs)),
       metric("Expectancy (R เฉลี่ย/ไม้)", s.expR == null ? "—" : (s.expR >= 0 ? "+" : "") + s.expR.toFixed(2) + "R", s.expR == null ? "" : s.expR >= 0 ? "pos" : "neg"),
       metric("Drawdown สูงสุด", s.maxDD > 0 ? "−" + fmtPlain(s.maxDD) + (s.maxDDPct != null ? ` (${s.maxDDPct.toFixed(1)}%)` : "") : "—", s.maxDD > 0 ? "neg" : ""),
       metric("ทำตามแผน", s.followRate == null ? "—" : s.followRate.toFixed(0) + "%", s.followRate == null ? "" : s.followRate >= 80 ? "pos" : "neg"),
@@ -2979,11 +2993,12 @@
 
     if (!mine.length) { wrap.innerHTML = '<div class="panel"><div class="empty">ยังไม่มีบทวิเคราะห์ — กด "สร้างบทวิเคราะห์งวดนี้"</div></div>'; return; }
     wrap.innerHTML = '<div class="panel">' + mine.map(r => {
-      const s = r.stats || {};
+      const liveList = tradesForPeriod(r.key, r.period);
+      const s = liveList.length ? reviewStatsSnapshot(liveList) : (r.stats || {});
       const openActions = (r.actions || []).filter(a => a.done !== true).length;
       return `<div class="review-card" data-id="${r.id}">
         <h4>${periodLabel(r.key, r.period)}
-          <span class="r-meta">${s.closed || 0} ไม้ · ${s.pnl != null ? fmtMoney(s.pnl) : "—"} · Exp ${s.expR != null ? (s.expR >= 0 ? "+" : "") + s.expR.toFixed(2) + "R" : "—"} · ทำตามแผน ${s.followRate != null ? s.followRate.toFixed(0) + "%" : "—"}</span>
+          <span class="r-meta">${s.closed || 0} ไม้ · ${s.pnl != null ? fmtMoney(s.pnl) : "—"} · Win ${s.winRate != null ? s.winRate.toFixed(2) + "%" : "—"} · Exp ${s.expR != null ? (s.expR >= 0 ? "+" : "") + s.expR.toFixed(2) + "R" : "—"} · ทำตามแผน ${s.followRate != null ? s.followRate.toFixed(0) + "%" : "—"}</span>
         </h4>
         ${r.lessons ? `<div style="font-size:13px;margin-bottom:6px"><b>บทเรียน:</b> ${escapeHtml(r.lessons)}</div>` : ""}
         ${(r.actions || []).length ? `<div class="r-meta">Action: ${(r.actions || []).length} ข้อ · ค้าง ${openActions}</div>` : ""}
@@ -3010,7 +3025,7 @@
     editingReviewObj = r;
     const list = tradesForPeriod(r.key, r.period);
     const snap = reviewStatsSnapshot(list);
-    if (isNew || !r.stats) r.stats = snap;
+    r.stats = snap;
 
     document.getElementById("reviewModalTitle").textContent = "บทวิเคราะห์ · " + periodLabel(r.key, r.period);
     document.getElementById("reviewDeleteBtn").classList.toggle("hidden", isNew);
@@ -3018,7 +3033,7 @@
     document.getElementById("reviewSnapshot").innerHTML = [
       ["ไม้ที่ปิด", S.closed || 0, ""],
       ["P/L", S.pnl != null ? fmtMoney(S.pnl) : "—", S.pnl >= 0 ? "pos" : "neg"],
-      ["Win rate", S.winRate != null ? S.winRate.toFixed(0) + "%" : "—", ""],
+      ["Win rate", S.winRate != null ? S.winRate.toFixed(2) + "%" : "—", ""],
       ["Expectancy", S.expR != null ? (S.expR >= 0 ? "+" : "") + S.expR.toFixed(2) + "R" : "—", S.expR >= 0 ? "pos" : "neg"],
       ["ทำตามแผน", S.followRate != null ? S.followRate.toFixed(0) + "%" : "—", S.followRate >= 80 ? "pos" : "neg"],
       ["Drawdown งวดนี้", S.dd ? "−" + fmtPlain(S.dd) : "—", S.dd ? "neg" : ""],
@@ -3284,12 +3299,12 @@
     /* ---- aggregates ---- */
     const agg = (arr) => {
       const c = arr.filter(t => !isPending(t));
-      const w = c.filter(t => pnlNum(t.pnl) > 0), l = c.filter(t => pnlNum(t.pnl) < 0);
-      const gW = w.reduce((s, t) => s + pnlNum(t.pnl), 0), gL = Math.abs(l.reduce((s, t) => s + pnlNum(t.pnl), 0));
+      const w = c.filter(t => tradeOutcome(t) === "win"), l = c.filter(t => tradeOutcome(t) === "loss");
+      const gW = w.reduce((s, t) => s + Math.max(0, pnlNum(t.pnl)), 0), gL = Math.abs(l.reduce((s, t) => s + Math.min(0, pnlNum(t.pnl)), 0));
       const rs = c.map(rMult).filter(x => x != null);
       return {
         n: arr.length, win: w.length, loss: l.length,
-        wr: (w.length + l.length) ? w.length / (w.length + l.length) * 100 : 0,
+        wr: c.length ? w.length / c.length * 100 : 0,
         pnl: c.reduce((s, t) => s + pnlNum(t.pnl), 0),
         pf: gL > 0 ? gW / gL : (gW > 0 ? Infinity : 0),
         rSum: rs.reduce((s, x) => s + x, 0),
@@ -3302,12 +3317,12 @@
       return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0]));
     };
     const perHead = ["ช่วง", "เทรด", "ชนะ", "แพ้", "Win%", "กำไร/ขาดทุน", "R"];
-    const perRow = ([k, arr]) => { const a = agg(arr); return [k, a.n, a.win, a.loss, num(a.wr, 0) + "%", num(a.pnl), num(a.rSum, 2)]; };
+    const perRow = ([k, arr]) => { const a = agg(arr); return [k, a.n, a.win, a.loss, num(a.wr, 2) + "%", num(a.pnl), num(a.rSum, 2)]; };
 
     const O = agg(L);
     const overall = [
       ["ช่วงข้อมูล", ((L[0] && L[0].date) || "") + " ถึง " + ((L[L.length - 1] && L[L.length - 1].date) || "")],
-      ["จำนวนเทรด", O.n], ["ชนะ / แพ้", O.win + " / " + O.loss], ["Win rate", num(O.wr, 0) + "%"],
+      ["จำนวนเทรด", O.n], ["ชนะ / แพ้", O.win + " / " + O.loss], ["Win rate", num(O.wr, 2) + "%"],
       ["กำไร/ขาดทุนรวม", num(O.pnl)],
       ["Profit factor", O.pf === Infinity ? "∞" : num(O.pf, 2)],
       ["R รวม", num(O.rSum, 2)],
@@ -3447,6 +3462,7 @@
     const iOrdId = first(/^order id$|^ordid$|รหัสคำสั่ง|订单id/);
     const iSL = first(/sl trigger price|sltriggerpx|stop loss|\bs\/l\b/);
     const iTP = first(/tp trigger price|tptriggerpx|take profit|\bt\/p\b/);
+    const iLev = first(/^leverage$|เลเวอเรจ|杠杆/);
 
     const out = [];
     // Mode 1: OKX Position History (has both open price and close price columns)
@@ -3482,7 +3498,8 @@
         const net = (iNetPnl >= 0 || iRealizedPnl >= 0) ? gross : (gross + fee);
         const idVal = iId >= 0 && c[iId] ? c[iId].trim() : "";
         const ratioVal = iPnlRatio >= 0 ? mt5Num(c[iPnlRatio]) : null;
-        const pnlPct = ratioVal != null ? Math.round(ratioVal * 100 * 1e6) / 1e6 : null;
+        const pnlPct = ratioVal != null ? Math.round(ratioVal * 100 * 100) / 100 : null;
+        const lev = iLev >= 0 ? mt5Num(c[iLev]) : null;
         const tOpenMs = parseTimeMs(tOpen);
         const tCloseMs = parseTimeMs(tClose);
         const holdMs = (tOpenMs > 0 && tCloseMs >= tOpenMs) ? (tCloseMs - tOpenMs) : null;
@@ -3497,13 +3514,14 @@
           tvSymbol: okxTvSymbol(sym),
           side,
           lot: qty,
+          leverage: lev,
           entry: openPx,
           sl: iSL >= 0 ? mt5Num(c[iSL]) : null,
           tp: iTP >= 0 ? mt5Num(c[iTP]) : null,
           exit: closePx,
-          pnlGross: Math.round(gross * 1e6) / 1e6,
-          fee: Math.round(fee * 1e6) / 1e6,
-          pnl: Math.round(net * 1e6) / 1e6,
+          pnlGross: Math.round(gross * 100) / 100,
+          fee: Math.round(fee * 100) / 100,
+          pnl: Math.round(net * 100) / 100,
           pnlPct,
         });
       }
@@ -3753,7 +3771,7 @@
 
   /* ---------- auto-seed OKX position history (UID 389636117818959348) ---------- */
   (function seedOkxHistoryOnce() {
-    const SEED_KEY = "tj_okx_seed_389636117818959348_v2";
+    const SEED_KEY = "tj_okx_seed_389636117818959348_v3";
     try { if (localStorage.getItem(SEED_KEY)) return; } catch (e) {}
     const OKX_CSV = [
       "Position Create Time,Position Update Time,Business Line,Index,Instrument Name,Margin Mode,Direction,Leverage,Max Position Quantity,Total Close Quantity,Average Open Price,Average Close Price,Margin Currency,Pnl,Pnl Ratio,Fee,Funding Fee,Liquidation Clearance Fee,Type,Contract Face Value,Contract Multiplier",
@@ -3849,16 +3867,40 @@
     ].join("\n");
     const parsed = rowsFromCsv(OKX_CSV);
     if (!parsed || !parsed.length) return;
-    const existById = new Map(trades.filter(t => t.mt5Id).map(t => [t.mt5Id, t]));
+    const baseSym = (s) => String(s || "").toLowerCase().replace(/-swap$/i, "").replace(/[.\-#+_].*$/, "").replace(/[^a-z0-9]/g, "");
+    const usedIds = new Set();
+    const removeIds = new Set();
     let changed = 0;
     parsed.forEach((r, i) => {
-      const existing = r.mt5Id ? existById.get(r.mt5Id) : null;
-      if (existing) {
-        existing.pnl = r.pnl;
-        existing.pnlPct = r.pnlPct ?? existing.pnlPct ?? null;
-        existing.holdMs = r.holdMs ?? existing.holdMs ?? null;
+      const openDate = mt5Date(r.openTime);
+      const matches = trades.filter(t => {
+        if (usedIds.has(t.id) || removeIds.has(t.id)) return false;
+        if (r.mt5Id && t.mt5Id === r.mt5Id) return true;
+        if (baseSym(t.symbol) !== baseSym(r.symbol)) return false;
+        const sameEntry = Math.abs((Number(t.entry) || 0) - (Number(r.entry) || 0)) < 1e-4;
+        const sameExit = Math.abs((Number(t.exit) || 0) - (Number(r.exit) || 0)) < 1e-4;
+        const sameQty = Math.abs((Number(t.contracts ?? t.lot) || 0) - (Number(r.lot) || 0)) < 1e-4;
+        const sameDate = t.date === r.date || (openDate && t.date === openDate);
+        return sameEntry && sameExit && sameQty && sameDate;
+      });
+      if (matches.length > 0) {
+        const existing = matches[0];
+        usedIds.add(existing.id);
+        for (let m = 1; m < matches.length; m++) {
+          removeIds.add(matches[m].id);
+          changed++;
+        }
+        existing.mt5Id = r.mt5Id || existing.mt5Id;
+        existing.date = r.date;
         existing.openTime = r.openTime || existing.openTime || null;
         existing.closeTime = r.closeTime || existing.closeTime || null;
+        existing.holdMs = r.holdMs ?? existing.holdMs ?? null;
+        existing.pnl = r.pnl;
+        existing.pnlGross = r.pnlGross ?? existing.pnlGross ?? null;
+        existing.fee = r.fee ?? existing.fee ?? null;
+        existing.pnlPct = r.pnlPct ?? existing.pnlPct ?? null;
+        existing.leverage = r.leverage ?? existing.leverage ?? null;
+        existing.contracts = r.lot ?? existing.contracts ?? null;
         changed++;
         return;
       }
@@ -3866,8 +3908,9 @@
         id: uid(), createdAt: Date.now() + i,
         date: r.date, openTime: r.openTime || null, closeTime: r.closeTime || null, holdMs: r.holdMs ?? null,
         marketType: "futures", symbol: r.symbol, side: r.side,
-        lot: null, contracts: r.lot,
-        entry: r.entry, sl: r.sl, tp: r.tp, exit: r.exit, pnl: r.pnl, pnlPct: r.pnlPct ?? null,
+        lot: null, contracts: r.lot, leverage: r.leverage ?? null,
+        entry: r.entry, sl: r.sl, tp: r.tp, exit: r.exit,
+        pnl: r.pnl, pnlGross: r.pnlGross ?? null, fee: r.fee ?? null, pnlPct: r.pnlPct ?? null,
         session: "", account: "OKX", model: "", grade: null,
         followedRules: null, breakeven: false, enteredWindow: false, riskPct: null,
         checklistDone: [], checklistTotal: 0, tags: [], negTags: [],
@@ -3876,6 +3919,9 @@
       });
       changed++;
     });
+    if (removeIds.size > 0) {
+      trades = trades.filter(t => !removeIds.has(t.id));
+    }
     try { localStorage.setItem(SEED_KEY, "1"); } catch (e) {}
     if (changed > 0) {
       saveTrades();
@@ -3885,6 +3931,8 @@
         syncPfSwitchUI();
       }
       renderCalendar();
+      renderLog();
+      if (typeof renderOverview === "function") renderOverview();
     }
   })();
 
@@ -3982,7 +4030,9 @@
         date: r.date, openTime: r.openTime || null, closeTime: r.closeTime || null, holdMs: r.holdMs ?? null,
         marketType: market, symbol: r.symbol, side: r.side,
         lot: market === "futures" ? null : r.lot, contracts: market === "futures" ? r.lot : null,
-        entry: r.entry, sl: r.sl, tp: r.tp, exit: r.exit, pnl: finalPnl, pnlPct: r.pnlPct ?? null,
+        leverage: r.leverage ?? null,
+        entry: r.entry, sl: r.sl, tp: r.tp, exit: r.exit,
+        pnl: finalPnl, pnlGross: r.pnlGross ?? null, fee: r.fee ?? null, pnlPct: r.pnlPct ?? null,
         session: "", account: isOkx ? "OKX" : "", model: "", grade: null,
         followedRules: null, breakeven: false, enteredWindow: false, riskPct: null,
         checklistDone: [], checklistTotal: 0, tags: [], negTags: [],
@@ -4047,21 +4097,37 @@
       return;
     }
 
-    wrap.innerHTML = `<div class="table-scroll"><table>
+    const logSt = computeOkxStats(list);
+    const logSummaryHtml = `<div class="metrics-grid" style="margin-bottom:14px;">
+      <div class="metric"><div class="metric-label">จำนวนรายการที่แสดง</div><div class="metric-value mono">${list.length} ไม้${logSt.n < list.length ? ` (ปิดแล้ว ${logSt.n})` : ""}</div></div>
+      <div class="metric"><div class="metric-label">กำไร/ขาดทุนรวม</div><div class="metric-value mono ${logSt.totalPnl > 0 ? "pos" : logSt.totalPnl < 0 ? "neg" : ""}">${fmtMoney(logSt.totalPnl)}</div></div>
+      <div class="metric"><div class="metric-label">อัตราชนะ / แพ้</div><div class="metric-value mono">${logSt.n ? logSt.winRate.toFixed(2) + "%" : "—"} <span style="font-size:12px;color:var(--muted);font-weight:600;">(${logSt.winCount}W / ${logSt.lossCount}L)</span></div></div>
+      <div class="metric"><div class="metric-label">Profit Factor</div><div class="metric-value mono">${!logSt.n ? "—" : logSt.profitFactor === Infinity ? "∞" : logSt.profitFactor.toFixed(2)}</div></div>
+      <div class="metric"><div class="metric-label">อัตราส่วน Risk/Reward</div><div class="metric-value mono">${logSt.n && logSt.rrRatio != null ? "1:" + logSt.rrRatio.toFixed(2) : "—"}</div></div>
+    </div>`;
+
+    wrap.innerHTML = logSummaryHtml + `<div class="table-scroll"><table>
       <thead><tr>
-        <th>วันที่</th><th>ตลาด</th><th>สัญลักษณ์</th><th>ทิศทาง</th><th>กำไร/ขาดทุน</th><th>แท็ก</th>
+        <th>วันที่</th><th>ตลาด</th><th>สัญลักษณ์</th><th>ทิศทาง</th><th>กำไร/ขาดทุน</th><th>PnL%</th><th>เวลาถือครอง</th><th>แท็ก</th>
       </tr></thead>
       <tbody>
-        ${list.map(t => `
+        ${list.map(t => {
+          const pctV = tradePnlPctVal(t);
+          const pctStr = pctV != null ? `${pctV > 0 ? "+" : ""}${pctV.toFixed(2)}%` : "—";
+          const pctCls = pctV > 0 ? "pos" : pctV < 0 ? "neg" : "";
+          const holdStr = fmtHoldDurationTh(tradeHoldMsVal(t));
+          return `
           <tr class="trade-row" data-id="${t.id}">
             <td class="mono">${t.date}</td>
             <td><span class="badge market">${MARKET_LABEL[t.marketType] || t.marketType}</span></td>
             <td><div class="row-symbol">${(t.imageAfter || t.imageBefore || t.image) ? `<img class="row-thumb" src="${t.imageAfter || t.imageBefore || t.image}">` : ""}${escapeHtml(t.symbol || "—")}</div></td>
             <td><span class="badge ${t.side === "long" ? "up" : "down"}">${t.side === "long" ? "BUY" : "SELL"}</span></td>
             <td>${pnlHtml(t)}</td>
+            <td class="mono ${pctCls}">${pctStr}</td>
+            <td class="mono" style="color:var(--muted);font-size:12px;">${holdStr}</td>
             <td>${(t.tags || []).map(tag => `<span class="tag-chip">${escapeHtml(tag)}</span>`).join("")}</td>
-          </tr>
-        `).join("")}
+          </tr>`;
+        }).join("")}
       </tbody>
     </table></div>`;
 
@@ -4442,20 +4508,19 @@
   }
   function tradesForPlaybook(pb) {
     const nm = (pb.name || "").trim().toLowerCase();
-    return trades.filter(t =>
+    return pfTrades().filter(t =>
       t.playbookId === pb.id ||
       (!t.playbookId && nm && [(t.model || ""), (t.setup || "")].some(s => s.trim().toLowerCase() === nm))
     );
   }
   function playbookStats(pb) {
     const closed = tradesForPlaybook(pb).filter(t => !isPending(t));
-    const wins = closed.filter(t => pnlNum(t.pnl) > 0).length;
-    const losses = closed.filter(t => pnlNum(t.pnl) < 0).length;
+    const wins = closed.filter(t => tradeOutcome(t) === "win").length;
     const pnl = closed.reduce((s, t) => s + pnlNum(t.pnl), 0);
     const rs = closed.map(edgeR).filter(x => x != null && isFinite(x));
     return {
       n: closed.length,
-      wr: (wins + losses) ? wins / (wins + losses) * 100 : null,
+      wr: closed.length ? wins / closed.length * 100 : null,
       pnl,
       avgR: rs.length ? rs.reduce((a, b) => a + b, 0) / rs.length : null,
     };
@@ -5094,7 +5159,9 @@
     // carry forward computed fields the form doesn't edit
     if (editingId) {
       const prev = trades.find(x => x.id === editingId) || {};
-      ["mfe", "mae", "mfeMaeAt"].forEach(k => { if (prev[k] != null) record[k] = prev[k]; });
+      ["mfe", "mae", "mfeMaeAt", "mt5Id", "openTime", "closeTime", "holdMs", "pnlGross"].forEach(k => {
+        if (prev[k] != null && record[k] == null) record[k] = prev[k];
+      });
     }
 
     if (editingId) {
@@ -5108,6 +5175,8 @@
     renderCalendar();
     renderLog();
     if (currentTab === "overview") renderOverview();
+    if (currentTab === "playbooks") renderPlaybooks();
+    if (currentTab === "review") renderReviewTab();
     successToast(isEdit ? "แก้ไขเทรดเรียบร้อย" : "บันทึกเทรดเรียบร้อย");
   }
 
@@ -5128,8 +5197,12 @@
       trades = trades.filter(t => t.id !== idToDelete);
       saveTrades();
       closeTradeModal();
+      syncPfSwitchUI();
       renderCalendar();
       renderLog();
+      if (currentTab === "overview") renderOverview();
+      if (currentTab === "playbooks") renderPlaybooks();
+      if (currentTab === "review") renderReviewTab();
       successToast("ลบเทรดเรียบร้อย");
     });
   });
